@@ -321,7 +321,7 @@ public class KeystoreHandler {
 
         private Pair<KeyStore, String> generateKeystore(ConfigurationService configuration) throws Exception {
             logger.debug("generating key");
-            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(KEY_ALGO, BouncyCastleProvider.PROVIDER_NAME);
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(KEY_ALGO);
             keyPairGenerator.initialize(KEY_SIZE);
             KeyPair keyPair = keyPairGenerator.genKeyPair();
 
