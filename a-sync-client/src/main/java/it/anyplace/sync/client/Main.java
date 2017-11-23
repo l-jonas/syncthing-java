@@ -13,37 +13,41 @@
  */
 package it.anyplace.sync.client;
 
-import it.anyplace.sync.core.configuration.ConfigurationService;
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
-import it.anyplace.sync.discovery.protocol.gd.GlobalDiscoveryHandler;
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.discovery.protocol.ld.LocalDiscorveryHandler;
-import it.anyplace.sync.core.security.KeystoreHandler;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.List;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 import it.anyplace.sync.bep.BlockExchangeConnectionHandler;
 import it.anyplace.sync.bep.BlockPusher;
 import it.anyplace.sync.bep.BlockPusher.IndexEditObserver;
 import it.anyplace.sync.bep.IndexBrowser;
-import it.anyplace.sync.core.beans.FileInfo;
-import it.anyplace.sync.discovery.DeviceAddressSupplier;
-import it.anyplace.sync.core.beans.DeviceInfo;
-import java.util.Collections;
-import static com.google.common.base.Preconditions.checkArgument;
 import it.anyplace.sync.bep.IndexFinder;
-import org.apache.commons.io.IOUtils;
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.beans.DeviceInfo;
+import it.anyplace.sync.core.beans.FileInfo;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.security.KeystoreHandler;
+import it.anyplace.sync.discovery.DeviceAddressSupplier;
+import it.anyplace.sync.discovery.protocol.gd.GlobalDiscoveryHandler;
+import it.anyplace.sync.discovery.protocol.ld.LocalDiscorveryHandler;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  *

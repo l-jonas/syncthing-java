@@ -14,6 +14,7 @@
 package it.anyplace.sync.core.configuration.gsonbeans;
 
 import com.google.common.collect.Lists;
+
 import java.util.List;
 
 /**

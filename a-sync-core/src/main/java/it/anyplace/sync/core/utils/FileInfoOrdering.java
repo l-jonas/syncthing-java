@@ -17,8 +17,10 @@ import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ComparisonChain;
-import it.anyplace.sync.core.beans.FileInfo;
+
 import java.util.Comparator;
+
+import it.anyplace.sync.core.beans.FileInfo;
 
 public class FileInfoOrdering {
 

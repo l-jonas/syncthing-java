@@ -13,49 +13,54 @@
  */
 package it.anyplace.sync.bep;
 
-import it.anyplace.sync.bep.protos.BlockExchageProtos;
 import com.google.common.base.Function;
-import static com.google.common.base.MoreObjects.firstNonNull;
-import it.anyplace.sync.core.beans.FileInfo;
-import com.google.common.collect.Maps;
-import com.google.common.eventbus.Subscribe;
-import java.util.Date;
-import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.util.List;
+import com.google.common.base.Stopwatch;
+import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import it.anyplace.sync.core.beans.BlockInfo;
-import java.util.Collections;
-import javax.annotation.Nullable;
-import it.anyplace.sync.core.beans.FileInfo.Version;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.bep.BlockExchangeConnectionHandler.AnyIndexMessageReceivedEvent;
-import java.io.IOException;
-import com.google.common.io.BaseEncoding;
-import it.anyplace.sync.bep.BlockExchangeConnectionHandler.ClusterConfigMessageProcessedEvent;
-import com.google.common.base.Strings;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.eventbus.EventBus;
-import it.anyplace.sync.core.beans.IndexInfo;
-import it.anyplace.sync.core.interfaces.Sequencer;
-import com.google.common.base.Stopwatch;
+import com.google.common.eventbus.Subscribe;
+import com.google.common.io.BaseEncoding;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import it.anyplace.sync.core.beans.FolderInfo;
-import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdString;
-import java.io.Closeable;
-import org.apache.commons.lang3.tuple.Pair;
-import it.anyplace.sync.core.beans.FileBlocks;
-import it.anyplace.sync.core.interfaces.IndexRepository;
-import it.anyplace.sync.core.utils.ExecutorUtils;
+
+import javax.annotation.Nullable;
+
+import it.anyplace.sync.bep.BlockExchangeConnectionHandler.AnyIndexMessageReceivedEvent;
 import it.anyplace.sync.bep.BlockExchangeConnectionHandler.ClusterConfigInfo;
+import it.anyplace.sync.bep.BlockExchangeConnectionHandler.ClusterConfigMessageProcessedEvent;
+import it.anyplace.sync.bep.protos.BlockExchageProtos;
+import it.anyplace.sync.core.beans.BlockInfo;
+import it.anyplace.sync.core.beans.FileBlocks;
+import it.anyplace.sync.core.beans.FileInfo;
+import it.anyplace.sync.core.beans.FileInfo.Version;
+import it.anyplace.sync.core.beans.FolderInfo;
+import it.anyplace.sync.core.beans.IndexInfo;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.interfaces.IndexRepository;
+import it.anyplace.sync.core.interfaces.Sequencer;
 import it.anyplace.sync.core.interfaces.TempRepository;
+import it.anyplace.sync.core.utils.ExecutorUtils;
+
+import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import com.google.common.collect.Sets;
-import java.util.Set;
+import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdString;
 
 /**
  *

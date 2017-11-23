@@ -13,12 +13,15 @@
  */
 package it.anyplace.sync.core.beans;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Strings.emptyToNull;
 import com.google.common.collect.Lists;
-import it.anyplace.sync.core.utils.BlockUtils;
+
 import java.util.Collections;
 import java.util.List;
+
+import it.anyplace.sync.core.utils.BlockUtils;
+
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Strings.emptyToNull;
 
 /**
  *

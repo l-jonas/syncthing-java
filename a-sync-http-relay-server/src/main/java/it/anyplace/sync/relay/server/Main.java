@@ -13,10 +13,6 @@
  */
 package it.anyplace.sync.relay.server;
 
-import static com.google.common.base.MoreObjects.firstNonNull;
-import static com.google.common.base.Strings.emptyToNull;
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.httprelay.server.HttpRelayServer;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -25,6 +21,12 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.httprelay.server.HttpRelayServer;
+
+import static com.google.common.base.MoreObjects.firstNonNull;
+import static com.google.common.base.Strings.emptyToNull;
 
 /**
  *

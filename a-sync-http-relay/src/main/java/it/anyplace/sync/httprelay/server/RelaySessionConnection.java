@@ -13,9 +13,17 @@
  */
 package it.anyplace.sync.httprelay.server;
 
-import static com.google.common.base.Objects.equal;
 import com.google.common.eventbus.EventBus;
+import com.google.protobuf.ByteString;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Closeable;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -24,18 +32,14 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.google.protobuf.ByteString;
+
+import it.anyplace.sync.core.interfaces.RelayConnection;
 import it.anyplace.sync.httprelay.protos.HttpRelayProtos;
 import it.anyplace.sync.httprelay.protos.HttpRelayProtos.HttpRelayPeerMessage;
 import it.anyplace.sync.httprelay.protos.HttpRelayProtos.HttpRelayServerMessage;
-import java.io.File;
-import java.io.FileOutputStream;
-import org.apache.commons.io.FileUtils;
+
+import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
-import it.anyplace.sync.core.interfaces.RelayConnection;
 
 /**
  *

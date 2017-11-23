@@ -13,15 +13,14 @@
  */
 package it.anyplace.sync.client.protocol.rp;
 
-import it.anyplace.sync.core.interfaces.RelayConnection;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.core.beans.DeviceAddress.AddressType;
-import it.anyplace.sync.core.security.KeystoreHandler;
-import static it.anyplace.sync.core.security.KeystoreHandler.deviceIdStringToHashData;
-import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdString;
+import com.google.common.io.BaseEncoding;
+
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -30,14 +29,19 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import org.apache.commons.io.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
-import static it.anyplace.sync.core.security.KeystoreHandler.RELAY;
-import com.google.common.io.BaseEncoding;
+
 import it.anyplace.sync.client.protocol.rp.beans.SessionInvitation;
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.beans.DeviceAddress.AddressType;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.interfaces.RelayConnection;
+import it.anyplace.sync.core.security.KeystoreHandler;
+
 import static com.google.common.base.Preconditions.checkArgument;
+import static it.anyplace.sync.core.security.KeystoreHandler.RELAY;
+import static it.anyplace.sync.core.security.KeystoreHandler.deviceIdStringToHashData;
+import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdString;
 
 /**
  *

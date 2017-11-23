@@ -13,48 +13,51 @@
  */
 package it.anyplace.sync.discovery.protocol.ld;
 
-import it.anyplace.sync.discovery.protocol.ld.protos.LocalDiscoveryProtos;
 import com.google.common.base.Function;
-import it.anyplace.sync.core.beans.DeviceAddress;
 import com.google.common.base.Functions;
-import static com.google.common.base.MoreObjects.firstNonNull;
-import static com.google.common.base.Objects.equal;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.google.common.eventbus.AsyncEventBus;
+import com.google.common.eventbus.EventBus;
+import com.google.common.eventbus.Subscribe;
+import com.google.protobuf.ByteString;
+
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
+import java.io.DataOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.google.common.collect.HashMultimap;
-import com.google.common.eventbus.AsyncEventBus;
-import com.google.common.eventbus.EventBus;
-import com.google.protobuf.ByteString;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.eventbus.Subscribe;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.discovery.protocol.ld.protos.LocalDiscoveryProtos.Announce;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Set;
-import org.apache.commons.io.IOUtils;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
+import it.anyplace.sync.discovery.protocol.ld.protos.LocalDiscoveryProtos;
+import it.anyplace.sync.discovery.protocol.ld.protos.LocalDiscoveryProtos.Announce;
+
+import static com.google.common.base.MoreObjects.firstNonNull;
+import static com.google.common.base.Objects.equal;
+import static com.google.common.base.Preconditions.checkArgument;
 import static it.anyplace.sync.core.security.KeystoreHandler.deviceIdStringToHashData;
 import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdString;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Future;
-import java.io.Closeable;
-import static com.google.common.base.Preconditions.checkArgument;
-import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
-import static com.google.common.base.Preconditions.checkArgument;
 
 /**
  *

@@ -13,9 +13,11 @@
  */
 package it.anyplace.sync.core.cache;
 
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import javax.annotation.Nullable;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+
+import it.anyplace.sync.core.configuration.ConfigurationService;
 
 /**
  *

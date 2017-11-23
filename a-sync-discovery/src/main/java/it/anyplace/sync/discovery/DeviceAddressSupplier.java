@@ -16,12 +16,16 @@ package it.anyplace.sync.discovery;
 import com.google.common.base.Function;
 import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
-import it.anyplace.sync.core.beans.DeviceAddress;
+
 import java.io.Closeable;
+import java.util.Iterator;
 import java.util.PriorityQueue;
 import java.util.Queue;
+
 import javax.annotation.Nullable;
-import java.util.Iterator;
+
+import it.anyplace.sync.core.beans.DeviceAddress;
+
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 

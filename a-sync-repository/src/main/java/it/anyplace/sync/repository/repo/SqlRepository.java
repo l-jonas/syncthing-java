@@ -14,57 +14,61 @@
 package it.anyplace.sync.repository.repo;
 
 import com.google.common.base.Function;
-import static com.google.common.base.Objects.equal;
 import com.google.common.base.Optional;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.eventbus.EventBus;
 import com.google.common.io.BaseEncoding;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.beans.BlockInfo;
-import it.anyplace.sync.core.beans.FileInfo;
-import it.anyplace.sync.core.beans.FileInfo.FileType;
-import it.anyplace.sync.core.beans.FileInfo.Version;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import javax.annotation.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import it.anyplace.sync.core.beans.IndexInfo;
-import it.anyplace.sync.core.interfaces.Sequencer;
-import java.util.Collections;
 import java.util.Random;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import it.anyplace.sync.core.beans.FolderStats;
-import static com.google.common.base.Strings.nullToEmpty;
-import com.google.common.eventbus.EventBus;
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
-import it.anyplace.sync.repository.repo.protos.IndexSerializationProtos;
-import it.anyplace.sync.core.beans.FileBlocks;
-import static it.anyplace.sync.core.beans.FileInfo.checkBlocks;
-import java.io.Closeable;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.tuple.Pair;
+
+import javax.annotation.Nullable;
+
+import it.anyplace.sync.core.beans.BlockInfo;
 import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.beans.FileBlocks;
+import it.anyplace.sync.core.beans.FileInfo;
+import it.anyplace.sync.core.beans.FileInfo.FileType;
+import it.anyplace.sync.core.beans.FileInfo.Version;
+import it.anyplace.sync.core.beans.FolderStats;
+import it.anyplace.sync.core.beans.IndexInfo;
+import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.interfaces.DeviceAddressRepository;
 import it.anyplace.sync.core.interfaces.IndexRepository;
-import it.anyplace.sync.core.interfaces.IndexRepository.FolderStatsUpdatedEvent;
+import it.anyplace.sync.core.interfaces.Sequencer;
+import it.anyplace.sync.core.interfaces.TempRepository;
+import it.anyplace.sync.repository.repo.protos.IndexSerializationProtos;
+
+import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.emptyToNull;
-import it.anyplace.sync.core.interfaces.TempRepository;
-import java.util.UUID;
-import org.apache.commons.io.FileUtils;
+import static com.google.common.base.Strings.nullToEmpty;
+import static it.anyplace.sync.core.beans.FileInfo.checkBlocks;
 import static org.apache.http.util.TextUtils.isBlank;
 
 /**

@@ -13,8 +13,9 @@
  */
 package it.anyplace.sync.core.beans;
 
-import java.util.Date;
 import org.apache.commons.io.FileUtils;
+
+import java.util.Date;
 
 /**
  *

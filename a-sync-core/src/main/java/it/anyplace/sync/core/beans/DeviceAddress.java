@@ -13,14 +13,17 @@
  */
 package it.anyplace.sync.core.beans;
 
-import static com.google.common.base.MoreObjects.firstNonNull;
-import static com.google.common.base.Objects.equal;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
-import static com.google.common.base.Strings.emptyToNull;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -29,11 +32,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
+
 import javax.annotation.Nullable;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.utils.URLEncodedUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static com.google.common.base.MoreObjects.firstNonNull;
+import static com.google.common.base.Objects.equal;
+import static com.google.common.base.Strings.emptyToNull;
 
 /**
  *

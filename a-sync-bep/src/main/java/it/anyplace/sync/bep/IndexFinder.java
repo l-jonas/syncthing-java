@@ -13,30 +13,32 @@
  */
 package it.anyplace.sync.bep;
 
-import static com.google.common.base.Objects.equal;
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Queues;
 import com.google.common.eventbus.AsyncEventBus;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
-import it.anyplace.sync.core.beans.FileInfo;
-import it.anyplace.sync.core.interfaces.IndexRepository;
-import it.anyplace.sync.core.utils.ExecutorUtils;
-import static it.anyplace.sync.core.utils.FileInfoOrdering.ALPHA_ASC_DIR_FIRST;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Closeable;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import it.anyplace.sync.core.beans.FileInfo;
+import it.anyplace.sync.core.interfaces.IndexRepository;
+import it.anyplace.sync.core.utils.ExecutorUtils;
+
+import static com.google.common.base.Objects.equal;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static it.anyplace.sync.core.utils.FileInfoOrdering.ALPHA_ASC_DIR_FIRST;
 
 public class IndexFinder implements Closeable {
 

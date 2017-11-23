@@ -13,10 +13,12 @@
  */
 package it.anyplace.sync.client.protocol.rp.beans;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import com.google.common.base.Strings;
+
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  *

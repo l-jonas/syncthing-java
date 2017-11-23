@@ -13,10 +13,12 @@
  */
 package it.anyplace.sync.core.logs;
 
+import com.google.common.eventbus.EventBus;
+
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
+
 import static com.google.common.base.Preconditions.checkNotNull;
-import com.google.common.eventbus.EventBus;
 
 public class LogAppender extends AppenderBase<ILoggingEvent> {
 

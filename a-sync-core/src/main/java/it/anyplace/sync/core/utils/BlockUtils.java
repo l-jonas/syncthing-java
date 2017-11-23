@@ -18,8 +18,10 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
-import it.anyplace.sync.core.beans.BlockInfo;
+
 import java.util.List;
+
+import it.anyplace.sync.core.beans.BlockInfo;
 
 /**
  *

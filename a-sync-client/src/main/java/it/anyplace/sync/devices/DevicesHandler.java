@@ -13,19 +13,14 @@
  */
 package it.anyplace.sync.devices;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.core.beans.DeviceInfo;
-import it.anyplace.sync.core.beans.DeviceStats;
-import it.anyplace.sync.core.beans.DeviceStats.DeviceStatus;
-import it.anyplace.sync.core.events.DeviceAddressActiveEvent;
-import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
-import it.anyplace.sync.core.utils.ExecutorUtils;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Closeable;
 import java.util.Collection;
 import java.util.Collections;
@@ -35,8 +30,16 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.beans.DeviceInfo;
+import it.anyplace.sync.core.beans.DeviceStats;
+import it.anyplace.sync.core.beans.DeviceStats.DeviceStatus;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.events.DeviceAddressActiveEvent;
+import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
+import it.anyplace.sync.core.utils.ExecutorUtils;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class DevicesHandler implements Closeable {

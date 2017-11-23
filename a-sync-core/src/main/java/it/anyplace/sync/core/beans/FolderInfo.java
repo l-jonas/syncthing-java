@@ -13,10 +13,11 @@
  */
 package it.anyplace.sync.core.beans;
 
+import javax.annotation.Nullable;
+
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.emptyToNull;
-import javax.annotation.Nullable;
 
 /**
  *

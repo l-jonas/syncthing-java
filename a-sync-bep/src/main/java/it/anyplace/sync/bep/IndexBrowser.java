@@ -14,36 +14,45 @@
 package it.anyplace.sync.bep;
 
 import com.google.common.base.Function;
-import static com.google.common.base.Objects.equal;
-import com.google.common.collect.Lists;
-import it.anyplace.sync.core.beans.FileInfo;
-import java.util.Collections;
-import java.util.List;
-import it.anyplace.sync.core.utils.PathUtils;
-import static it.anyplace.sync.core.utils.PathUtils.*;
-import java.util.Comparator;
-import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
-import it.anyplace.sync.core.utils.ExecutorUtils;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Closeable;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import static com.google.common.base.Strings.emptyToNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+
+import it.anyplace.sync.core.beans.FileInfo;
 import it.anyplace.sync.core.interfaces.IndexRepository;
-import static it.anyplace.sync.core.utils.FileInfoOrdering.ALPHA_ASC_DIR_FIRST;
+import it.anyplace.sync.core.utils.ExecutorUtils;
+import it.anyplace.sync.core.utils.PathUtils;
+
+import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
-import java.util.Map;
-import java.util.Set;
+import static com.google.common.base.Strings.emptyToNull;
+import static it.anyplace.sync.core.utils.FileInfoOrdering.ALPHA_ASC_DIR_FIRST;
+import static it.anyplace.sync.core.utils.PathUtils.PARENT_PATH;
+import static it.anyplace.sync.core.utils.PathUtils.PATH_SEPARATOR;
+import static it.anyplace.sync.core.utils.PathUtils.ROOT_PATH;
+import static it.anyplace.sync.core.utils.PathUtils.getParentPath;
+import static it.anyplace.sync.core.utils.PathUtils.normalizePath;
 
 /**
  *

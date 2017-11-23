@@ -13,69 +13,73 @@
  */
 package it.anyplace.sync.bep;
 
-import it.anyplace.sync.bep.protos.BlockExchageProtos;
 import com.google.common.base.Function;
-import static com.google.common.base.MoreObjects.firstNonNull;
-import it.anyplace.sync.core.security.KeystoreHandler;
-import static com.google.common.base.Objects.equal;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.net.Socket;
-import java.nio.ByteBuffer;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.google.common.base.Predicate;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.eventbus.EventBus;
+import com.google.common.eventbus.Subscribe;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessage;
+
+import net.jpountz.lz4.LZ4Factory;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import javax.net.ssl.SSLSocket;
+
+import it.anyplace.sync.bep.beans.ClusterConfigFolderInfo;
+import it.anyplace.sync.bep.protos.BlockExchageProtos;
 import it.anyplace.sync.bep.protos.BlockExchageProtos.ClusterConfig;
 import it.anyplace.sync.bep.protos.BlockExchageProtos.Device;
 import it.anyplace.sync.bep.protos.BlockExchageProtos.Folder;
 import it.anyplace.sync.bep.protos.BlockExchageProtos.Index;
 import it.anyplace.sync.bep.protos.BlockExchageProtos.IndexUpdate;
-import java.io.DataOutputStream;
-import java.lang.reflect.InvocationTargetException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import net.jpountz.lz4.LZ4Factory;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.tuple.Pair;
-import static it.anyplace.sync.core.security.KeystoreHandler.deviceIdStringToHashData;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Response;
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.client.protocol.rp.RelayClient;
-import java.io.Closeable;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Request;
-import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdString;
-import java.util.Collections;
-import java.util.concurrent.Callable;
-import static it.anyplace.sync.core.security.KeystoreHandler.BEP;
 import it.anyplace.sync.bep.protos.BlockExchageProtos.Ping;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import javax.net.ssl.SSLSocket;
-import com.google.common.collect.Maps;
-import com.google.common.eventbus.Subscribe;
-import java.util.Map;
-import com.google.common.collect.Sets;
-import java.util.Set;
-import it.anyplace.sync.core.beans.IndexInfo;
-import it.anyplace.sync.core.beans.FolderInfo;
-import it.anyplace.sync.httprelay.client.HttpRelayClient;
-import it.anyplace.sync.bep.beans.ClusterConfigFolderInfo;
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
+import it.anyplace.sync.bep.protos.BlockExchageProtos.Request;
+import it.anyplace.sync.bep.protos.BlockExchageProtos.Response;
+import it.anyplace.sync.client.protocol.rp.RelayClient;
+import it.anyplace.sync.core.beans.DeviceAddress;
 import it.anyplace.sync.core.beans.DeviceInfo;
+import it.anyplace.sync.core.beans.FolderInfo;
+import it.anyplace.sync.core.beans.IndexInfo;
+import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.events.DeviceAddressActiveEvent;
+import it.anyplace.sync.core.security.KeystoreHandler;
+import it.anyplace.sync.httprelay.client.HttpRelayClient;
+
+import static com.google.common.base.MoreObjects.firstNonNull;
+import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static it.anyplace.sync.core.security.KeystoreHandler.BEP;
+import static it.anyplace.sync.core.security.KeystoreHandler.deviceIdStringToHashData;
+import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdString;
 
 /*
  * To change this template, choose Tools | Templates

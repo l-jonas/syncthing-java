@@ -17,29 +17,34 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.common.eventbus.Subscribe;
 import com.google.protobuf.ByteString;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.httprelay.server.RelaySessionConnection.ConnectionClosedEvent;
-import it.anyplace.sync.httprelay.protos.HttpRelayProtos;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.util.Map;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.io.IOUtils;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static com.google.common.base.Strings.emptyToNull;
+
+import java.io.Closeable;
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Map;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import it.anyplace.sync.client.protocol.rp.RelayClient;
 import it.anyplace.sync.client.protocol.rp.beans.SessionInvitation;
-import it.anyplace.sync.core.security.KeystoreHandler;
+import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.interfaces.RelayConnection;
-import java.io.File;
+import it.anyplace.sync.core.security.KeystoreHandler;
+import it.anyplace.sync.httprelay.protos.HttpRelayProtos;
+import it.anyplace.sync.httprelay.server.RelaySessionConnection.ConnectionClosedEvent;
+
 import static com.google.common.base.Preconditions.checkNotNull;
-import java.io.Closeable;
-import org.apache.commons.io.IOUtils;
+import static com.google.common.base.Strings.emptyToNull;
 
 /**
  *

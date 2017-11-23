@@ -15,11 +15,18 @@ package it.anyplace.sync.core.configuration;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.MoreObjects;
-import static com.google.common.base.Objects.equal;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.io.BaseEncoding;
 import com.google.gson.Gson;
+
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -30,32 +37,30 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+
 import javax.annotation.Nullable;
-import static org.apache.commons.lang3.StringUtils.isBlank;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.apache.commons.io.FileUtils;
-import com.google.common.collect.Maps;
+
 import it.anyplace.sync.core.beans.DeviceInfo;
 import it.anyplace.sync.core.beans.FolderInfo;
 import it.anyplace.sync.core.configuration.gsonbeans.DeviceConfig;
 import it.anyplace.sync.core.configuration.gsonbeans.DeviceConfigList;
 import it.anyplace.sync.core.configuration.gsonbeans.FolderConfig;
 import it.anyplace.sync.core.configuration.gsonbeans.FolderConfigList;
-import java.util.Map;
 import it.anyplace.sync.core.utils.ExecutorUtils;
-import java.io.Closeable;
-import java.util.Properties;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+
+import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.emptyToNull;
-import com.google.common.collect.Sets;
-import java.util.Enumeration;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 public class ConfigurationService implements Closeable {
 

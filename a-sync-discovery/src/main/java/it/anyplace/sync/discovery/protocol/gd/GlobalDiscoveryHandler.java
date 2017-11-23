@@ -14,36 +14,41 @@
 package it.anyplace.sync.discovery.protocol.gd;
 
 import com.google.common.base.Function;
-import static com.google.common.base.MoreObjects.firstNonNull;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.google.gson.Gson;
-import java.util.Collections;
-import java.util.List;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.discovery.utils.AddressRanker;
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
+import com.google.gson.Gson;
+
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLContextBuilder;
+import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+
+import javax.annotation.Nullable;
+
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.discovery.utils.AddressRanker;
+
+import static com.google.common.base.MoreObjects.firstNonNull;
 
 /**
  *

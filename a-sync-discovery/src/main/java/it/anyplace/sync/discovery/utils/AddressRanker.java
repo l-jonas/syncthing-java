@@ -15,7 +15,6 @@ package it.anyplace.sync.discovery.utils;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
-import static com.google.common.base.Objects.equal;
 import com.google.common.base.Stopwatch;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -24,8 +23,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.core.beans.DeviceAddress.AddressType;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -43,10 +45,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.beans.DeviceAddress.AddressType;
+
+import static com.google.common.base.Objects.equal;
 
 /**
  *

@@ -13,11 +13,6 @@
  */
 package it.anyplace.sync.webclient;
 
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.security.KeystoreHandler;
-import java.awt.Desktop;
-import java.io.File;
-import java.net.URI;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -26,6 +21,13 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.awt.Desktop;
+import java.io.File;
+import java.net.URI;
+
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.security.KeystoreHandler;
 
 /**
  *

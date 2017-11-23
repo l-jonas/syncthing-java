@@ -13,9 +13,10 @@
  */
 package it.anyplace.sync.core.beans;
 
+import java.util.Date;
+
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.emptyToNull;
-import java.util.Date;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 public class DeviceStats {

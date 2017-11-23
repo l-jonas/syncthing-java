@@ -13,39 +13,44 @@
  */
 package it.anyplace.sync.client;
 
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import static com.google.common.base.Objects.equal;
+import com.google.common.base.Predicate;
+import com.google.common.base.Supplier;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.core.beans.FileInfo;
+import com.google.common.collect.Sets;
+import com.google.common.eventbus.Subscribe;
+
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import java.io.Closeable;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
-import com.google.common.eventbus.Subscribe;
-import com.google.common.base.Supplier;
-import javax.annotation.Nullable;
-import it.anyplace.sync.core.cache.BlockCache;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import javax.annotation.Nullable;
+
 import it.anyplace.sync.bep.BlockExchangeConnectionHandler;
 import it.anyplace.sync.bep.BlockPuller;
 import it.anyplace.sync.bep.BlockPuller.FileDownloadObserver;
 import it.anyplace.sync.bep.BlockPusher;
 import it.anyplace.sync.bep.BlockPusher.FileUploadObserver;
 import it.anyplace.sync.bep.IndexHandler;
+import it.anyplace.sync.core.beans.DeviceAddress;
 import it.anyplace.sync.core.beans.FileBlocks;
-import org.apache.commons.lang3.tuple.Pair;
+import it.anyplace.sync.core.beans.FileInfo;
 import it.anyplace.sync.core.beans.FolderInfo;
-import it.anyplace.sync.repository.repo.SqlRepository;
-import it.anyplace.sync.discovery.DiscoveryHandler;
-import com.google.common.collect.Sets;
-import it.anyplace.sync.discovery.DeviceAddressSupplier;
-import java.util.Set;
+import it.anyplace.sync.core.cache.BlockCache;
+import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.devices.DevicesHandler;
+import it.anyplace.sync.discovery.DeviceAddressSupplier;
+import it.anyplace.sync.discovery.DiscoveryHandler;
+import it.anyplace.sync.repository.repo.SqlRepository;
+
+import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**

@@ -14,21 +14,26 @@
 package it.anyplace.sync.core.beans;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+
+import org.apache.commons.io.FileUtils;
+
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+
+import javax.annotation.Nullable;
+
+import it.anyplace.sync.core.utils.PathUtils;
+
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
-import com.google.common.base.Strings;
-import java.util.Date;
-import com.google.common.collect.Lists;
-import java.util.Collections;
-import java.util.List;
-import com.google.common.collect.Iterables;
-import it.anyplace.sync.core.utils.PathUtils;
-import static it.anyplace.sync.core.utils.PathUtils.PARENT_PATH;
-import javax.annotation.Nullable;
-import static it.anyplace.sync.core.utils.PathUtils.ROOT_PATH;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.emptyToNull;
-import org.apache.commons.io.FileUtils;
+import static it.anyplace.sync.core.utils.PathUtils.PARENT_PATH;
+import static it.anyplace.sync.core.utils.PathUtils.ROOT_PATH;
 
 /**
  *

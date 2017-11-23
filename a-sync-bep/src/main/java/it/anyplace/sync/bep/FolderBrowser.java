@@ -20,13 +20,17 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.eventbus.Subscribe;
-import it.anyplace.sync.core.beans.FolderInfo;
-import it.anyplace.sync.core.beans.FolderStats;
+
+import org.apache.commons.lang3.tuple.Pair;
+
 import java.io.Closeable;
 import java.util.List;
-import org.apache.commons.lang3.tuple.Pair;
-import static com.google.common.base.Preconditions.checkNotNull;
+
+import it.anyplace.sync.core.beans.FolderInfo;
+import it.anyplace.sync.core.beans.FolderStats;
 import it.anyplace.sync.core.interfaces.IndexRepository;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  *
