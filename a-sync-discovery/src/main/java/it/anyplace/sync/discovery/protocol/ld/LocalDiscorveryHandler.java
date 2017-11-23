@@ -125,7 +125,7 @@ public class LocalDiscorveryHandler implements Closeable {
     }
 
     public Future sendAnnounceMessage() {
-        return processingExecutorService.submit(new Callable() {
+        return processingExecutorService.submit(new Callable<Object>() {
 
             @Override
             public Object call() throws Exception {
@@ -196,7 +196,7 @@ public class LocalDiscorveryHandler implements Closeable {
                                 final String deviceId = hashDataToDeviceIdString(announce.getId().toByteArray());
                                 if (!equal(deviceId, configuration.getDeviceId())) {
 //                                logger.debug("received local announce from device id = {}", deviceId);
-                                    final List<DeviceAddress> deviceAddresses = Lists.newArrayList(Iterables.transform(firstNonNull(announce.getAddressesList(), Collections.<String>emptyList()), new Function<String, DeviceAddress>() {
+                                    final List<DeviceAddress> deviceAddresses = Lists.newArrayList(Iterables.transform(firstNonNull(announce.getAddressesList(), Collections.emptyList()), new Function<String, DeviceAddress>() {
                                         @Override
                                         public DeviceAddress apply(String address) {
 //                                /*
@@ -209,7 +209,7 @@ public class LocalDiscorveryHandler implements Closeable {
                                                 .build();
                                         }
                                     }));
-                                    boolean isNew = false;
+                                    boolean isNew;
                                     synchronized (localDiscoveryRecords) {
                                         isNew = !localDiscoveryRecords.removeAll(deviceId).isEmpty();
                                         localDiscoveryRecords.putAll(deviceId, deviceAddresses);

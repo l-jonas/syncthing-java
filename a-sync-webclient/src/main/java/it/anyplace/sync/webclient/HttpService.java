@@ -29,13 +29,11 @@ public class HttpService implements Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    private final ConfigurationService configuration;
     private final SyncthingClient syncthingClient;
     private final static int PORT = 8385;
     private final Server server;
 
     public HttpService(ConfigurationService configuration) {
-        this.configuration = configuration;
         this.syncthingClient = new SyncthingClient(configuration);
         this.server = new Server(PORT);
 

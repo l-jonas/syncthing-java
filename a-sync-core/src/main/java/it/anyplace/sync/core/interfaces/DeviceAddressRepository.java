@@ -23,7 +23,7 @@ import it.anyplace.sync.core.beans.DeviceAddress;
  */
 public interface DeviceAddressRepository {
 
-    public List<DeviceAddress> findAllDeviceAddress();
+    List<DeviceAddress> findAllDeviceAddress();
 
-    public void updateDeviceAddress(DeviceAddress deviceAddress);
+    void updateDeviceAddress(DeviceAddress deviceAddress);
 }

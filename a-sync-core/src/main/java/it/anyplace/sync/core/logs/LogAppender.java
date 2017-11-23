@@ -46,8 +46,8 @@ public class LogAppender extends AppenderBase<ILoggingEvent> {
 
     public interface LogEventReceivedMessage {
 
-        public LogAppender getAppender();
+        LogAppender getAppender();
 
-        public ILoggingEvent getLogEvent();
+        ILoggingEvent getLogEvent();
     }
 }

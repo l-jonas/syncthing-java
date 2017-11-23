@@ -13,7 +13,6 @@
  */
 package it.anyplace.sync.bep;
 
-import com.google.common.base.Function;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
@@ -173,21 +172,11 @@ public class IndexHandler implements Closeable {
             .setFolder(folder)
             .setPath(bepFileInfo.getName())
             .setLastModified(new Date(bepFileInfo.getModifiedS() * 1000 + bepFileInfo.getModifiedNs() / 1000000))
-            .setVersionList(Iterables.transform(firstNonNull(bepFileInfo.hasVersion() ? bepFileInfo.getVersion().getCountersList() : null, Collections.<BlockExchageProtos.Counter>emptyList()), new Function<BlockExchageProtos.Counter, Version>() {
-                @Override
-                public Version apply(BlockExchageProtos.Counter record) {
-                    return new FileInfo.Version(record.getId(), record.getValue());
-                }
-            }))
+            .setVersionList(Iterables.transform(firstNonNull(bepFileInfo.hasVersion() ? bepFileInfo.getVersion().getCountersList() : null, Collections.emptyList()), record -> new Version(record.getId(), record.getValue())))
             .setDeleted(bepFileInfo.getDeleted());
         switch (bepFileInfo.getType()) {
             case FILE:
-                fileBlocks = new FileBlocks(folder, builder.getPath(), Iterables.transform(firstNonNull(bepFileInfo.getBlocksList(), Collections.<BlockExchageProtos.BlockInfo>emptyList()), new Function<BlockExchageProtos.BlockInfo, BlockInfo>() {
-                    @Override
-                    public BlockInfo apply(BlockExchageProtos.BlockInfo record) {
-                        return new BlockInfo(record.getOffset(), record.getSize(), BaseEncoding.base16().encode(record.getHash().toByteArray()));
-                    }
-                }));
+                fileBlocks = new FileBlocks(folder, builder.getPath(), Iterables.transform(firstNonNull(bepFileInfo.getBlocksList(), Collections.emptyList()), record -> new BlockInfo(record.getOffset(), record.getSize(), BaseEncoding.base16().encode(record.getHash().toByteArray()))));
                 builder
                     .setTypeFile()
                     .setHash(fileBlocks.getHash())
@@ -471,7 +460,7 @@ public class IndexHandler implements Closeable {
                 doHandleIndexMessageReceivedEvent(message, clusterConfigInfo, peerDeviceId);
             }
 
-            protected void doHandleIndexMessageReceivedEvent(BlockExchageProtos.IndexUpdate message, ClusterConfigInfo clusterConfigInfo, String peerDeviceId) throws IOException {
+            protected void doHandleIndexMessageReceivedEvent(BlockExchageProtos.IndexUpdate message, ClusterConfigInfo clusterConfigInfo, String peerDeviceId) {
 //            synchronized (writeAccessLock) {
 //                if (addProcessingDelayForInterface) {
 //                    delay = Math.min(MAX_DELAY, Math.max(MIN_DELAY, lastRecordProcessingTime * DELAY_FACTOR));
@@ -492,7 +481,7 @@ public class IndexHandler implements Closeable {
 //                IndexInfo oldIndexInfo = indexRepository.findIndexInfoByDeviceAndFolder(deviceId, folder);
 //            Stopwatch stopwatch = Stopwatch.createStarted();
                 logger.debug("processing {} index records for folder {}", message.getFilesList().size(), folder);
-                for (BlockExchageProtos.FileInfo fileInfo : (List<BlockExchageProtos.FileInfo>) message.getFilesList()) {
+                for (BlockExchageProtos.FileInfo fileInfo : message.getFilesList()) {
                     markActive();
 //                    if (oldIndexInfo != null && isVersionOlderThanSequence(fileInfo, oldIndexInfo.getLocalSequence())) {
 //                        logger.trace("skipping file {}, version older than sequence {}", fileInfo, oldIndexInfo.getLocalSequence());

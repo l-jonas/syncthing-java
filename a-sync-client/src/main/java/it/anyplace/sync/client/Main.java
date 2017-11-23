@@ -100,7 +100,7 @@ public class Main {
         logger.debug("{}", configuration.getStorageInfo().dumpAvailableSpace());
 
         if (cmd.hasOption("sp")) {
-            List<String> peers = Lists.newArrayList(Lists.transform(Arrays.<String>asList(cmd.getOptionValue("sp").split(",")),
+            List<String> peers = Lists.newArrayList(Lists.transform(Arrays.asList(cmd.getOptionValue("sp").split(",")),
                 new Function<String, String>() {
                 @Override
                 public String apply(String input) {
@@ -108,7 +108,7 @@ public class Main {
                 }
             }));
             logger.info("set peers = {}", peers);
-            configuration.edit().setPeers(Collections.<DeviceInfo>emptyList());
+            configuration.edit().setPeers(Collections.emptyList());
             for (String peer : peers) {
                 KeystoreHandler.validateDeviceId(peer);
                 configuration.edit().addPeers(new DeviceInfo(peer, null));
@@ -209,12 +209,15 @@ public class Main {
                 } else {
                     client.waitForRemoteIndexAquired();
                 }
-                String folderInfo = "";
+                StringBuilder folderInfo = new StringBuilder();
                 for (String folder : client.getIndexHandler().getFolderList()) {
-                    folderInfo += "\n\t\tfolder info : " + client.getIndexHandler().getFolderInfo(folder);
-                    folderInfo += "\n\t\tfolder stats : " + client.getIndexHandler().newFolderBrowser().getFolderStats(folder).dumpInfo() + "\n";
+                    folderInfo.append("\n\t\tfolder info : ")
+                            .append(client.getIndexHandler().getFolderInfo(folder));
+                    folderInfo.append("\n\t\tfolder stats : ")
+                            .append(client.getIndexHandler().newFolderBrowser().getFolderStats(folder).dumpInfo())
+                            .append("\n");
                 }
-                logger.info("folders:\n{}\n", folderInfo);
+                logger.info("folders:\n{}\n", folderInfo.toString());
             }
         }
         if (cmd.hasOption("li")) {

@@ -57,7 +57,6 @@ public class HttpRelayServer implements Closeable {
     private Server server;
     private final static long MAX_WAIT_FOR_DATA_SECS = 30;
     private ConfigurationService configuration;
-    private final KeystoreHandler keystoreHandler;
 
     public HttpRelayServer(InetSocketAddress relayServerAddress) {
         this.relayServerAddress = relayServerAddress;
@@ -67,7 +66,7 @@ public class HttpRelayServer implements Closeable {
             logger.warn("error loading config", ex);
             this.configuration = ConfigurationService.newLoader().load();
         }
-        keystoreHandler = KeystoreHandler.newLoader().loadAndStore(configuration);
+        KeystoreHandler.newLoader().loadAndStore(configuration);
     }
 
     private final Map<String, RelaySessionConnection> relayConnectionsBySessionId = Maps.newConcurrentMap();
@@ -162,8 +161,7 @@ public class HttpRelayServer implements Closeable {
             }
             case WAIT_FOR_DATA: {
                 RelaySessionConnection connection = requireConnectionBySessionId(message.getSessionId());
-                HttpRelayProtos.HttpRelayServerMessage response = connection.waitForDataAndGet(MAX_WAIT_FOR_DATA_SECS * 1000);
-                return response;
+                return connection.waitForDataAndGet(MAX_WAIT_FOR_DATA_SECS * 1000);
             }
         }
         throw new IllegalArgumentException("unsupported message type = " + message.getMessageType());

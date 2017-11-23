@@ -58,7 +58,6 @@ public class BlockPuller {
 
     private BlockCache blockCache;
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final ConfigurationService configuration;
     private final BlockExchangeConnectionHandler connectionHandler;
     private final Map<String, byte[]> blocksByHash = Maps.newConcurrentMap();
     private final List<String> hashList = Lists.newArrayList();
@@ -67,7 +66,6 @@ public class BlockPuller {
     private boolean closeConnection = false;
 
     public BlockPuller(ConfigurationService configuration, BlockExchangeConnectionHandler connectionHandler) {
-        this.configuration = configuration;
         this.connectionHandler = connectionHandler;
         this.blockCache = BlockCache.getBlockCache(configuration);
     }
@@ -77,7 +75,7 @@ public class BlockPuller {
         this.closeConnection = closeConnection;
     }
 
-    public FileDownloadObserver pullBlocks(FileBlocks fileBlocks) throws InterruptedException {
+    public FileDownloadObserver pullBlocks(FileBlocks fileBlocks) {
         logger.info("pulling file = {}", fileBlocks);
         checkArgument(connectionHandler.hasFolder(fileBlocks.getFolder()), "supplied connection handler %s will not share folder %s", connectionHandler, fileBlocks.getFolder());
         final Object lock = new Object();
@@ -156,12 +154,7 @@ public class BlockPuller {
             public InputStream getInputStream() {
                 checkArgument(missingHashes.isEmpty(), "pull failed, some blocks are still missing");
                 List<byte[]> blockList = Lists.newArrayList(Lists.transform(hashList, Functions.forMap(blocksByHash)));
-                return new SequenceInputStream(Collections.enumeration(Lists.transform(blockList, new Function<byte[], ByteArrayInputStream>() {
-                    @Override
-                    public ByteArrayInputStream apply(byte[] data) {
-                        return new ByteArrayInputStream(data);
-                    }
-                })));
+                return new SequenceInputStream(Collections.enumeration(Lists.transform(blockList, ByteArrayInputStream::new)));
             }
 
             @Override
@@ -180,12 +173,7 @@ public class BlockPuller {
         };
         try {
             synchronized (lock) {
-                hashList.addAll(Lists.transform(fileBlocks.getBlocks(), new Function<BlockInfo, String>() {
-                    @Override
-                    public String apply(BlockInfo block) {
-                        return block.getHash();
-                    }
-                }));
+                hashList.addAll(Lists.transform(fileBlocks.getBlocks(), BlockInfo::getHash));
                 missingHashes.addAll(hashList);
                 for (String hash : missingHashes) {
                     byte[] block = blockCache.pullBlock(hash);

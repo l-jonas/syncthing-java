@@ -36,7 +36,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class DeviceAddressSupplier implements Closeable, Iterable<DeviceAddress> {
 
     private final DiscoveryHandler discoveryHandler;
-    private final Queue<DeviceAddress> deviceAddressQeue = new PriorityQueue<DeviceAddress>(11, Ordering.natural().onResultOf(new Function<DeviceAddress, Integer>() {
+    private final Queue<DeviceAddress> deviceAddressQeue = new PriorityQueue<>(11, Ordering.natural().onResultOf(new Function<DeviceAddress, Integer>() {
         @Override
         public Integer apply(DeviceAddress deviceAddress) {
             return deviceAddress.getScore();

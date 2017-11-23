@@ -19,9 +19,9 @@ package it.anyplace.sync.core.interfaces;
  */
 public interface Sequencer {
     
-    public long indexId();
+    long indexId();
     
-    public long nextSequence();
+    long nextSequence();
     
-    public long currentSequence();
+    long currentSequence();
 }

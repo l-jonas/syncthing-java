@@ -19,5 +19,5 @@ import it.anyplace.sync.core.beans.DeviceAddress;
 
 public interface DeviceAddressReceivedEvent {
 
-    public List<DeviceAddress> getDeviceAddresses();
+    List<DeviceAddress> getDeviceAddresses();
 }

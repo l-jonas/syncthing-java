@@ -56,19 +56,16 @@ public class RelayClient {
         SESSION_INVITATION = 6,
         RESPONSE_SUCCESS_CODE = 0;
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final ConfigurationService configuration;
     private final KeystoreHandler keystoreHandler;
 
     public RelayClient(ConfigurationService configuration) {
-        this.configuration = configuration;
         this.keystoreHandler = KeystoreHandler.newLoader().loadAndStore(configuration);
     }
 
     public RelayConnection openRelayConnection(DeviceAddress address) throws Exception {
         Preconditions.checkArgument(address.getType().equals(AddressType.RELAY));
         SessionInvitation sessionInvitation = getSessionInvitation(address.getSocketAddress(), address.getDeviceId());
-        RelayConnection relayConnection = openConnectionSessionMode(sessionInvitation);
-        return relayConnection;
+        return openConnectionSessionMode(sessionInvitation);
     }
 
     public RelayConnection openConnectionSessionMode(final SessionInvitation sessionInvitation) throws Exception {
@@ -119,7 +116,7 @@ public class RelayClient {
         logger.debug("connecting to relay = {} (temporary protocol mode)", relaySocketAddress);
         try (Socket socket = keystoreHandler.createSocket(relaySocketAddress, RELAY);
             RelayDataInputStream in = new RelayDataInputStream(socket.getInputStream());
-            RelayDataOutputStream out = new RelayDataOutputStream(socket.getOutputStream());) {
+            RelayDataOutputStream out = new RelayDataOutputStream(socket.getOutputStream())) {
             {
                 logger.debug("sending connect request for device = {}", deviceId);
                 byte[] deviceIdData = deviceIdStringToHashData(deviceId);

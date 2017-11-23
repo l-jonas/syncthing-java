@@ -72,7 +72,7 @@ public class FileInfo {
             this.size = size;
             this.hash = hash;
         }
-        this.versionList = Collections.unmodifiableList(MoreObjects.firstNonNull(versionList, Collections.<Version>emptyList()));
+        this.versionList = Collections.unmodifiableList(MoreObjects.firstNonNull(versionList, Collections.emptyList()));
         this.deleted = deleted;
     }
 

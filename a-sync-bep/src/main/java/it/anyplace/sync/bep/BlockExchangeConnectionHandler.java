@@ -13,8 +13,6 @@
  */
 package it.anyplace.sync.bep;
 
-import com.google.common.base.Function;
-import com.google.common.base.Predicate;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.Iterables;
@@ -43,7 +41,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -104,7 +101,6 @@ public class BlockExchangeConnectionHandler implements Closeable {
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
-    private ConnectionInfo connectionInfo;
     private final DeviceAddress address;
     private long lastActive = Long.MIN_VALUE;
     private ClusterConfigInfo clusterConfigInfo;
@@ -163,7 +159,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
                 case HTTP_RELAY:
                 case HTTPS_RELAY: {
                     logger.debug("opening http relay connection");
-                    socket = keystoreHandler.wrapSocket(new HttpRelayClient(configuration).openRelayConnection(address), BEP);
+                    socket = keystoreHandler.wrapSocket(new HttpRelayClient().openRelayConnection(address), BEP);
                     break;
                 }
                 default:
@@ -181,7 +177,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
 
             BlockExchageProtos.Hello hello = receiveHelloMessage();
             logger.trace("received hello message = {}", hello);
-            connectionInfo = new ConnectionInfo();
+            ConnectionInfo connectionInfo = new ConnectionInfo();
             connectionInfo.setClientName(hello.getClientName());
             connectionInfo.setClientVersion(hello.getClientVersion());
             connectionInfo.setDeviceName(hello.getDeviceName());
@@ -252,12 +248,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
                     sendIndexMessage(folder);
                 }
             }
-            periodicExecutorService.scheduleWithFixedDelay(new Runnable() {
-                @Override
-                public void run() {
-                    sendPing();
-                }
-            }, 90, 90, TimeUnit.SECONDS);
+            periodicExecutorService.scheduleWithFixedDelay(this::sendPing, 90, 90, TimeUnit.SECONDS);
         } catch (Exception ex) {
             close();
             throw ex;
@@ -273,12 +264,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
     }
 
     private void closeBg() {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                close();
-            }
-        }).start();
+        new Thread(this::close).start();
     }
 
     private BlockExchageProtos.Hello receiveHelloMessage() throws IOException {
@@ -294,25 +280,22 @@ public class BlockExchangeConnectionHandler implements Closeable {
     }
 
     private Future sendHelloMessage(final byte[] payload) {
-        return outExecutorService.submit(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    logger.trace("sending message");
-                    ByteBuffer header = ByteBuffer.allocate(6);
-                    header.putInt(MAGIC);
-                    header.putShort((short) payload.length);
-                    out.write(header.array());
-                    out.write(payload);
-                    out.flush();
-                    logger.trace("sent message");
-                } catch (IOException ex) {
-                    if (outExecutorService.isShutdown()) {
-                        return;
-                    }
-                    logger.error("error writing to output stream", ex);
-                    closeBg();
+        return outExecutorService.submit(() -> {
+            try {
+                logger.trace("sending message");
+                ByteBuffer header = ByteBuffer.allocate(6);
+                header.putInt(MAGIC);
+                header.putShort((short) payload.length);
+                out.write(header.array());
+                out.write(payload);
+                out.flush();
+                logger.trace("sent message");
+            } catch (IOException ex) {
+                if (outExecutorService.isShutdown()) {
+                    return;
                 }
+                logger.error("error writing to output stream", ex);
+                closeBg();
             }
         });
     }
@@ -389,29 +372,26 @@ public class BlockExchangeConnectionHandler implements Closeable {
             .setType(messageTypes.inverse().get(message.getClass()))
             .build();
         final byte[] headerData = header.toByteArray(), messageData = message.toByteArray(); //TODO compression
-        return outExecutorService.submit(new Callable() {
-            @Override
-            public Object call() throws Exception {
-                try {
-                    logger.debug("sending message type = {} {}", header.getType(), getIdForMessage(message));
-                    logger.trace("sending message = {}", message);
-                    markActivityOnSocket();
-                    out.writeShort(headerData.length);
-                    out.write(headerData);
-                    out.writeInt(messageData.length);//with compression, check this
-                    out.write(messageData);
-                    out.flush();
-                    markActivityOnSocket();
-                    logger.debug("sent message {}", getIdForMessage(message));
-                } catch (IOException ex) {
-                    if (!outExecutorService.isShutdown()) {
-                        logger.error("error writing to output stream", ex);
-                        closeBg();
-                    }
-                    throw ex;
+        return outExecutorService.submit(() -> {
+            try {
+                logger.debug("sending message type = {} {}", header.getType(), getIdForMessage(message));
+                logger.trace("sending message = {}", message);
+                markActivityOnSocket();
+                out.writeShort(headerData.length);
+                out.write(headerData);
+                out.writeInt(messageData.length);//with compression, check this
+                out.write(messageData);
+                out.flush();
+                markActivityOnSocket();
+                logger.debug("sent message {}", getIdForMessage(message));
+            } catch (IOException ex) {
+                if (!outExecutorService.isShutdown()) {
+                    logger.error("error writing to output stream", ex);
+                    closeBg();
                 }
-                return null;
+                throw ex;
             }
+            return null;
         });
     }
 
@@ -481,117 +461,97 @@ public class BlockExchangeConnectionHandler implements Closeable {
     }
 
     private void startMessageListenerService() {
-        inExecutorService.submit(new Runnable() {
-
-            @Override
-            public void run() {
-                try {
-                    while (!Thread.interrupted()) {
-                        final Pair<BlockExchageProtos.MessageType, GeneratedMessage> message = receiveMessage();
-                        logger.debug("received message type = {} {}", message.getLeft(), getIdForMessage(message.getRight()));
-                        logger.trace("received message = {}", message.getRight());
-                        messageProcessingService.submit(new Runnable() {
-                            @Override
-                            public void run() {
-                                logger.debug("processing message type = {} {}", message.getLeft(), getIdForMessage(message.getRight()));
-                                try {
-                                    switch (message.getLeft()) {
-                                        case INDEX:
-                                            eventBus.post(new IndexMessageReceivedEvent((Index) message.getValue()));
-                                            break;
-                                        case INDEX_UPDATE:
-                                            eventBus.post(new IndexUpdateMessageReceivedEvent((IndexUpdate) message.getValue()));
-                                            break;
-                                        case REQUEST:
-                                            eventBus.post(new RequestMessageReceivedEvent((Request) message.getValue()));
-                                            break;
-                                        case RESPONSE:
-                                            eventBus.post(new ResponseMessageReceivedEvent((Response) message.getValue()));
-                                            break;
-                                        case PING:
-                                            logger.debug("ping message received");
-                                            break;
-                                        case CLOSE:
-                                            logger.info("received close message = {}", message.getValue());
-                                            closeBg();
-                                            break;
-                                        case CLUSTER_CONFIG: {
-                                            checkArgument(clusterConfigInfo == null, "received cluster config message twice!");
-                                            clusterConfigInfo = new ClusterConfigInfo();
-                                            ClusterConfig clusterConfig = (ClusterConfig) message.getValue();
-                                            for (Folder folder : firstNonNull(clusterConfig.getFoldersList(), Collections.<Folder>emptyList())) {
-                                                ClusterConfigFolderInfo.Builder builder = ClusterConfigFolderInfo.newBuilder()
-                                                    .setFolder(folder.getId())
-                                                    .setLabel(folder.getLabel());
-                                                Map<String, Device> devicesById = Maps.uniqueIndex(firstNonNull(folder.getDevicesList(), Collections.<Device>emptyList()),
-                                                    new Function<Device, String>() {
-                                                    @Override
-                                                    public String apply(Device input) {
-                                                        return hashDataToDeviceIdString(input.getId().toByteArray());
-                                                    }
-                                                });
-                                                Device otherDevice = devicesById.get(address.getDeviceId()),
-                                                    ourDevice = devicesById.get(configuration.getDeviceId());
-                                                if (otherDevice != null) {
-                                                    builder.setAnnounced(true);
-                                                }
-                                                final ClusterConfigFolderInfo folderInfo;
-                                                if (ourDevice != null) {
-                                                    folderInfo = builder.setShared(true).build();
-                                                    logger.info("folder shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
-                                                    if (!configuration.getFolderNames().contains(folderInfo.getFolder())) {
-                                                        configuration.edit().addFolders(new FolderInfo(folderInfo.getFolder(), folderInfo.getLabel()));
-                                                        logger.info("new folder shared = {}", folderInfo);
-                                                        eventBus.post(new NewFolderSharedEvent() {
-                                                            @Override
-                                                            public String getFolder() {
-                                                                return folderInfo.getFolder();
-                                                            }
-
-                                                        });
-                                                    }
-                                                } else {
-                                                    folderInfo = builder.build();
-                                                    logger.info("folder not shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
-                                                }
-                                                clusterConfigInfo.putFolderInfo(folderInfo);
-                                                configuration.edit().addPeers(Iterables.filter(Iterables.transform(firstNonNull(folder.getDevicesList(), Collections.<Device>emptyList()), new Function<Device, DeviceInfo>() {
-                                                    @Override
-                                                    public DeviceInfo apply(Device device) {
-                                                        String deviceId = hashDataToDeviceIdString(device.getId().toByteArray()),
-                                                            name = device.hasName() ? device.getName() : null;
-                                                        return new DeviceInfo(deviceId, name);
-                                                    }
-                                                }), new Predicate<DeviceInfo>() {
-                                                    @Override
-                                                    public boolean apply(DeviceInfo s) {
-                                                        return !equal(s.getDeviceId(), configuration.getDeviceId());
-                                                    }
-                                                }));
-                                            }
-                                            configuration.edit().persistLater();
-                                            eventBus.post(new ClusterConfigMessageProcessedEvent(clusterConfig));
-                                        }
-                                        break;
-                                    }
-                                } catch (Exception ex) {
-                                    if (messageProcessingService.isShutdown()) {
-                                        return;
-                                    }
-                                    logger.error("error processing message", ex);
+        inExecutorService.submit(() -> {
+            try {
+                while (!Thread.interrupted()) {
+                    final Pair<BlockExchageProtos.MessageType, GeneratedMessage> message = receiveMessage();
+                    logger.debug("received message type = {} {}", message.getLeft(), getIdForMessage(message.getRight()));
+                    logger.trace("received message = {}", message.getRight());
+                    messageProcessingService.submit(() -> {
+                        logger.debug("processing message type = {} {}", message.getLeft(), getIdForMessage(message.getRight()));
+                        try {
+                            switch (message.getLeft()) {
+                                case INDEX:
+                                    eventBus.post(new IndexMessageReceivedEvent((Index) message.getValue()));
+                                    break;
+                                case INDEX_UPDATE:
+                                    eventBus.post(new IndexUpdateMessageReceivedEvent((IndexUpdate) message.getValue()));
+                                    break;
+                                case REQUEST:
+                                    eventBus.post(new RequestMessageReceivedEvent((Request) message.getValue()));
+                                    break;
+                                case RESPONSE:
+                                    eventBus.post(new ResponseMessageReceivedEvent((Response) message.getValue()));
+                                    break;
+                                case PING:
+                                    logger.debug("ping message received");
+                                    break;
+                                case CLOSE:
+                                    logger.info("received close message = {}", message.getValue());
                                     closeBg();
-                                    throw ex;
+                                    break;
+                                case CLUSTER_CONFIG: {
+                                    checkArgument(clusterConfigInfo == null, "received cluster config message twice!");
+                                    clusterConfigInfo = new ClusterConfigInfo();
+                                    ClusterConfig clusterConfig = (ClusterConfig) message.getValue();
+                                    for (Folder folder : firstNonNull(clusterConfig.getFoldersList(), Collections.<Folder>emptyList())) {
+                                        ClusterConfigFolderInfo.Builder builder = ClusterConfigFolderInfo.newBuilder()
+                                            .setFolder(folder.getId())
+                                            .setLabel(folder.getLabel());
+                                        Map<String, Device> devicesById = Maps.uniqueIndex(firstNonNull(folder.getDevicesList(), Collections.emptyList()),
+                                                input -> hashDataToDeviceIdString(input.getId().toByteArray()));
+                                        Device otherDevice = devicesById.get(address.getDeviceId()),
+                                            ourDevice = devicesById.get(configuration.getDeviceId());
+                                        if (otherDevice != null) {
+                                            builder.setAnnounced(true);
+                                        }
+                                        final ClusterConfigFolderInfo folderInfo;
+                                        if (ourDevice != null) {
+                                            folderInfo = builder.setShared(true).build();
+                                            logger.info("folder shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
+                                            if (!configuration.getFolderNames().contains(folderInfo.getFolder())) {
+                                                configuration.edit().addFolders(new FolderInfo(folderInfo.getFolder(), folderInfo.getLabel()));
+                                                logger.info("new folder shared = {}", folderInfo);
+                                                eventBus.post(new NewFolderSharedEvent() {
+                                                    @Override
+                                                    public String getFolder() {
+                                                        return folderInfo.getFolder();
+                                                    }
+
+                                                });
+                                            }
+                                        } else {
+                                            folderInfo = builder.build();
+                                            logger.info("folder not shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
+                                        }
+                                        clusterConfigInfo.putFolderInfo(folderInfo);
+                                        configuration.edit().addPeers(Iterables.filter(Iterables.transform(firstNonNull(folder.getDevicesList(), Collections.emptyList()), device -> {
+                                            String deviceId = hashDataToDeviceIdString(device.getId().toByteArray()),
+                                                name = device.hasName() ? device.getName() : null;
+                                            return new DeviceInfo(deviceId, name);
+                                        }), s -> !equal(s.getDeviceId(), configuration.getDeviceId())));
+                                    }
+                                    configuration.edit().persistLater();
+                                    eventBus.post(new ClusterConfigMessageProcessedEvent(clusterConfig));
                                 }
+                                break;
                             }
-                        });
-                    }
-                } catch (Exception ex) {
-                    if (inExecutorService.isShutdown()) {
-                        return;
-                    }
-                    logger.error("error receiving message", ex);
-                    closeBg();
+                        } catch (Exception ex) {
+                            if (messageProcessingService.isShutdown()) {
+                                return;
+                            }
+                            logger.error("error processing message", ex);
+                            closeBg();
+                            throw ex;
+                        }
+                    });
                 }
+            } catch (Exception ex) {
+                if (inExecutorService.isShutdown()) {
+                    return;
+                }
+                logger.error("error receiving message", ex);
+                closeBg();
             }
         });
     }
@@ -757,17 +717,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
         }
 
         public Set<String> getSharedFolders() {
-            return Sets.newTreeSet(Iterables.transform(Iterables.filter(folderInfoById.values(), new Predicate<ClusterConfigFolderInfo>() {
-                @Override
-                public boolean apply(ClusterConfigFolderInfo input) {
-                    return input.isShared();
-                }
-            }), new Function<ClusterConfigFolderInfo, String>() {
-                @Override
-                public String apply(ClusterConfigFolderInfo input) {
-                    return input.getFolder();
-                }
-            }));
+            return Sets.newTreeSet(Iterables.transform(Iterables.filter(folderInfoById.values(), ClusterConfigFolderInfo::isShared), ClusterConfigFolderInfo::getFolder));
         }
 
     }

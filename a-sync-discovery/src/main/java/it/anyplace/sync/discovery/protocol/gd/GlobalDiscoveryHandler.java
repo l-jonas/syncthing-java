@@ -131,10 +131,10 @@ public class GlobalDiscoveryHandler implements Closeable {
                     switch (response.getStatusLine().getStatusCode()) {
                         case HttpStatus.SC_NOT_FOUND:
                             logger.debug("device not found: {}", deviceId);
-                            return Collections.<DeviceAddress>emptyList();
+                            return Collections.emptyList();
                         case HttpStatus.SC_OK:
                             AnnouncementMessageBean announcementMessageBean = gson.fromJson(EntityUtils.toString(response.getEntity()), AnnouncementMessageBean.class);
-                            List<DeviceAddress> list = Lists.newArrayList(Iterables.transform(firstNonNull(announcementMessageBean.getAddresses(), Collections.<String>emptyList()), new Function<String, DeviceAddress>() {
+                            List<DeviceAddress> list = Lists.newArrayList(Iterables.transform(firstNonNull(announcementMessageBean.getAddresses(), Collections.emptyList()), new Function<String, DeviceAddress>() {
                                 @Override
                                 public DeviceAddress apply(String address) {
                                     return new DeviceAddress(deviceId, address);

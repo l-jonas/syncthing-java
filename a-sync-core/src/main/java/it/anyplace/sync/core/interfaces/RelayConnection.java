@@ -21,7 +21,7 @@ import java.net.Socket;
  */
 public interface RelayConnection {
 
-    public Socket getSocket();
+    Socket getSocket();
 
-    public boolean isServerSocket();
+    boolean isServerSocket();
 }

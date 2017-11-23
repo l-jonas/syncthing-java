@@ -90,7 +90,7 @@ public final class IndexSerializationProtos {
         getDescriptorForType() {
       return getDescriptor();
     }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
+    public static com.google.protobuf.Descriptors.EnumDescriptor
         getDescriptor() {
       return it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.getDescriptor().getEnumTypes().get(0);
     }
@@ -288,7 +288,7 @@ public final class IndexSerializationProtos {
             }
             case 26: {
               if (!((mutable_bitField0_ & 0x00000008) == 0x00000008)) {
-                peers_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.PeerIndexInfo>();
+                peers_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000008;
               }
               peers_.add(input.readMessage(it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.PeerIndexInfo.PARSER, extensionRegistry));
@@ -296,7 +296,7 @@ public final class IndexSerializationProtos {
             }
             case 34: {
               if (!((mutable_bitField0_ & 0x00000010) == 0x00000010)) {
-                files_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FileInfo>();
+                files_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000010;
               }
               files_.add(input.readMessage(it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FileInfo.PARSER, extensionRegistry));
@@ -309,7 +309,7 @@ public final class IndexSerializationProtos {
             }
             case 50: {
               if (!((mutable_bitField0_ & 0x00000020) == 0x00000020)) {
-                folders_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FolderInfo>();
+                folders_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000020;
               }
               folders_.add(input.readMessage(it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FolderInfo.PARSER, extensionRegistry));
@@ -336,7 +336,7 @@ public final class IndexSerializationProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_Index_descriptor;
     }
@@ -665,8 +665,7 @@ public final class IndexSerializationProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+        return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.core.repo.protos.Index}
@@ -674,7 +673,7 @@ public final class IndexSerializationProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.IndexOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return  it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_Index_descriptor;
       }
@@ -1033,7 +1032,7 @@ public final class IndexSerializationProtos {
         java.util.Collections.emptyList();
       private void ensurePeersIsMutable() {
         if (!((bitField0_ & 0x00000008) == 0x00000008)) {
-          peers_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.PeerIndexInfo>(peers_);
+          peers_ = new java.util.ArrayList<>(peers_);
           bitField0_ |= 0x00000008;
          }
       }
@@ -1255,8 +1254,7 @@ public final class IndexSerializationProtos {
             it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.PeerIndexInfo, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.PeerIndexInfo.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.PeerIndexInfoOrBuilder> 
           getPeersFieldBuilder() {
         if (peersBuilder_ == null) {
-          peersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-                    it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.PeerIndexInfo, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.PeerIndexInfo.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.PeerIndexInfoOrBuilder>(
+          peersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   peers_,
                   ((bitField0_ & 0x00000008) == 0x00000008),
                   getParentForChildren(),
@@ -1271,7 +1269,7 @@ public final class IndexSerializationProtos {
         java.util.Collections.emptyList();
       private void ensureFilesIsMutable() {
         if (!((bitField0_ & 0x00000010) == 0x00000010)) {
-          files_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FileInfo>(files_);
+          files_ = new java.util.ArrayList<>(files_);
           bitField0_ |= 0x00000010;
          }
       }
@@ -1493,8 +1491,7 @@ public final class IndexSerializationProtos {
             it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FileInfo, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FileInfo.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FileInfoOrBuilder> 
           getFilesFieldBuilder() {
         if (filesBuilder_ == null) {
-          filesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-                    it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FileInfo, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FileInfo.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FileInfoOrBuilder>(
+          filesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   files_,
                   ((bitField0_ & 0x00000010) == 0x00000010),
                   getParentForChildren(),
@@ -1509,7 +1506,7 @@ public final class IndexSerializationProtos {
         java.util.Collections.emptyList();
       private void ensureFoldersIsMutable() {
         if (!((bitField0_ & 0x00000020) == 0x00000020)) {
-          folders_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FolderInfo>(folders_);
+          folders_ = new java.util.ArrayList<>(folders_);
           bitField0_ |= 0x00000020;
          }
       }
@@ -1731,8 +1728,7 @@ public final class IndexSerializationProtos {
             it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FolderInfo, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FolderInfo.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FolderInfoOrBuilder> 
           getFoldersFieldBuilder() {
         if (foldersBuilder_ == null) {
-          foldersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-                    it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FolderInfo, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FolderInfo.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FolderInfoOrBuilder>(
+          foldersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   folders_,
                   ((bitField0_ & 0x00000020) == 0x00000020),
                   getParentForChildren(),
@@ -1889,7 +1885,7 @@ public final class IndexSerializationProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_PeerIndexInfo_descriptor;
     }
@@ -2164,8 +2160,7 @@ public final class IndexSerializationProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+        return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.core.repo.protos.PeerIndexInfo}
@@ -2173,7 +2168,7 @@ public final class IndexSerializationProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.PeerIndexInfoOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return  it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_PeerIndexInfo_descriptor;
       }
@@ -2829,7 +2824,7 @@ public final class IndexSerializationProtos {
             }
             case 130: {
               if (!((mutable_bitField0_ & 0x00001000) == 0x00001000)) {
-                blocks_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo>();
+                blocks_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00001000;
               }
               blocks_.add(input.readMessage(it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo.PARSER, extensionRegistry));
@@ -2850,7 +2845,7 @@ public final class IndexSerializationProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_FileInfo_descriptor;
     }
@@ -3367,8 +3362,7 @@ public final class IndexSerializationProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+        return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.core.repo.protos.FileInfo}
@@ -3376,7 +3370,7 @@ public final class IndexSerializationProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FileInfoOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return  it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_FileInfo_descriptor;
       }
@@ -4163,8 +4157,7 @@ public final class IndexSerializationProtos {
             it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Vector, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Vector.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.VectorOrBuilder> 
           getVersionFieldBuilder() {
         if (versionBuilder_ == null) {
-          versionBuilder_ = new com.google.protobuf.SingleFieldBuilder<
-                    it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Vector, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Vector.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.VectorOrBuilder>(
+          versionBuilder_ = new com.google.protobuf.SingleFieldBuilder<>(
                   version_,
                   getParentForChildren(),
                   isClean());
@@ -4211,7 +4204,7 @@ public final class IndexSerializationProtos {
         java.util.Collections.emptyList();
       private void ensureBlocksIsMutable() {
         if (!((bitField0_ & 0x00001000) == 0x00001000)) {
-          blocks_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo>(blocks_);
+          blocks_ = new java.util.ArrayList<>(blocks_);
           bitField0_ |= 0x00001000;
          }
       }
@@ -4433,8 +4426,7 @@ public final class IndexSerializationProtos {
             it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfoOrBuilder> 
           getBlocksFieldBuilder() {
         if (blocksBuilder_ == null) {
-          blocksBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-                    it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfoOrBuilder>(
+          blocksBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   blocks_,
                   ((bitField0_ & 0x00001000) == 0x00001000),
                   getParentForChildren(),
@@ -4561,7 +4553,7 @@ public final class IndexSerializationProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_FolderInfo_descriptor;
     }
@@ -4788,8 +4780,7 @@ public final class IndexSerializationProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+        return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.core.repo.protos.FolderInfo}
@@ -4797,7 +4788,7 @@ public final class IndexSerializationProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.FolderInfoOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return  it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_FolderInfo_descriptor;
       }
@@ -5161,7 +5152,7 @@ public final class IndexSerializationProtos {
             }
             case 10: {
               if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-                blocks_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo>();
+                blocks_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000001;
               }
               blocks_.add(input.readMessage(it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo.PARSER, extensionRegistry));
@@ -5182,7 +5173,7 @@ public final class IndexSerializationProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_Blocks_descriptor;
     }
@@ -5350,8 +5341,7 @@ public final class IndexSerializationProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+        return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.core.repo.protos.Blocks}
@@ -5359,7 +5349,7 @@ public final class IndexSerializationProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlocksOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return  it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_Blocks_descriptor;
       }
@@ -5506,7 +5496,7 @@ public final class IndexSerializationProtos {
         java.util.Collections.emptyList();
       private void ensureBlocksIsMutable() {
         if (!((bitField0_ & 0x00000001) == 0x00000001)) {
-          blocks_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo>(blocks_);
+          blocks_ = new java.util.ArrayList<>(blocks_);
           bitField0_ |= 0x00000001;
          }
       }
@@ -5728,8 +5718,7 @@ public final class IndexSerializationProtos {
             it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfoOrBuilder> 
           getBlocksFieldBuilder() {
         if (blocksBuilder_ == null) {
-          blocksBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-                    it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfo.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfoOrBuilder>(
+          blocksBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   blocks_,
                   ((bitField0_ & 0x00000001) == 0x00000001),
                   getParentForChildren(),
@@ -5861,7 +5850,7 @@ public final class IndexSerializationProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_BlockInfo_descriptor;
     }
@@ -6058,8 +6047,7 @@ public final class IndexSerializationProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+        return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.core.repo.protos.BlockInfo}
@@ -6067,7 +6055,7 @@ public final class IndexSerializationProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.BlockInfoOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return  it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_BlockInfo_descriptor;
       }
@@ -6390,7 +6378,7 @@ public final class IndexSerializationProtos {
             }
             case 10: {
               if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-                counters_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Counter>();
+                counters_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000001;
               }
               counters_.add(input.readMessage(it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Counter.PARSER, extensionRegistry));
@@ -6411,7 +6399,7 @@ public final class IndexSerializationProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_Vector_descriptor;
     }
@@ -6579,8 +6567,7 @@ public final class IndexSerializationProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+        return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.core.repo.protos.Vector}
@@ -6588,7 +6575,7 @@ public final class IndexSerializationProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.VectorOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return  it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_Vector_descriptor;
       }
@@ -6735,7 +6722,7 @@ public final class IndexSerializationProtos {
         java.util.Collections.emptyList();
       private void ensureCountersIsMutable() {
         if (!((bitField0_ & 0x00000001) == 0x00000001)) {
-          counters_ = new java.util.ArrayList<it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Counter>(counters_);
+          counters_ = new java.util.ArrayList<>(counters_);
           bitField0_ |= 0x00000001;
          }
       }
@@ -6957,8 +6944,7 @@ public final class IndexSerializationProtos {
             it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Counter, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Counter.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.CounterOrBuilder> 
           getCountersFieldBuilder() {
         if (countersBuilder_ == null) {
-          countersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-                    it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Counter, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.Counter.Builder, it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.CounterOrBuilder>(
+          countersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   counters_,
                   ((bitField0_ & 0x00000001) == 0x00000001),
                   getParentForChildren(),
@@ -7075,7 +7061,7 @@ public final class IndexSerializationProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_Counter_descriptor;
     }
@@ -7248,8 +7234,7 @@ public final class IndexSerializationProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+        return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.core.repo.protos.Counter}
@@ -7257,7 +7242,7 @@ public final class IndexSerializationProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.CounterOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return  it.anyplace.sync.repository.repo.protos.IndexSerializationProtos.internal_static_it_anyplace_sync_core_repo_protos_Counter_descriptor;
       }

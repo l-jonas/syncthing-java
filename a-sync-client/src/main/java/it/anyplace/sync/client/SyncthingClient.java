@@ -42,7 +42,6 @@ import it.anyplace.sync.bep.IndexHandler;
 import it.anyplace.sync.core.beans.DeviceAddress;
 import it.anyplace.sync.core.beans.FileBlocks;
 import it.anyplace.sync.core.beans.FileInfo;
-import it.anyplace.sync.core.beans.FolderInfo;
 import it.anyplace.sync.core.cache.BlockCache;
 import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.devices.DevicesHandler;
@@ -65,7 +64,7 @@ public class SyncthingClient implements Closeable {
     private final SqlRepository sqlRepository;
     private final IndexHandler indexHandler;
     private final List<BlockExchangeConnectionHandler> connections = Collections.synchronizedList(Lists.<BlockExchangeConnectionHandler>newArrayList());
-    private final List<BlockExchangeConnectionHandler> pool = Lists.<BlockExchangeConnectionHandler>newArrayList();
+    private final List<BlockExchangeConnectionHandler> pool = Lists.newArrayList();
     private final DevicesHandler devicesHandler;
 
     public SyncthingClient(ConfigurationService configuration) {
@@ -80,7 +79,7 @@ public class SyncthingClient implements Closeable {
     public void clearCacheAndIndex() {
         logger.info("clear cache");
         indexHandler.clearIndex();
-        configuration.edit().setFolders(Collections.<FolderInfo>emptyList()).persistLater();
+        configuration.edit().setFolders(Collections.emptyList()).persistLater();
         BlockCache.getBlockCache(configuration).clear();
     }
 
@@ -158,7 +157,7 @@ public class SyncthingClient implements Closeable {
         }
     }
 
-    public BlockExchangeConnectionHandler connectToBestPeer() throws Exception {
+    public BlockExchangeConnectionHandler connectToBestPeer() {
         try (DeviceAddressSupplier deviceAddressSupplier = discoveryHandler.newDeviceAddressSupplier()) {
             for (DeviceAddress deviceAddress : deviceAddressSupplier) {
                 try {
@@ -241,7 +240,7 @@ public class SyncthingClient implements Closeable {
         };
     }
 
-    public IndexHandler waitForRemoteIndexAquired() throws InterruptedException {
+    public IndexHandler waitForRemoteIndexAquired() {
         Supplier<BlockExchangeConnectionHandler> supplier = getPeerConnectionsSupplierSafe();
         while (true) {
             try (BlockExchangeConnectionHandler connection = supplier.get()) {
@@ -288,7 +287,7 @@ public class SyncthingClient implements Closeable {
         return new BlockPusher(configuration, connectionHandler, true).withIndexHandler(indexHandler).pushFile(data, indexHandler.waitForRemoteIndexAquired(connectionHandler).getFileInfoByPath(folder, path), folder, path);
     }
 
-    public BlockPusher.IndexEditObserver pushDir(String folder, String path) throws InterruptedException {
+    public BlockPusher.IndexEditObserver pushDir(String folder, String path) {
         BlockExchangeConnectionHandler connectionHandler = getConnectionForFolder(folder);
         return new BlockPusher(configuration, connectionHandler, true).withIndexHandler(indexHandler).pushDir(folder, path);
     }

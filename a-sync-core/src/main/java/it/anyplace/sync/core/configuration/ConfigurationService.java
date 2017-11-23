@@ -297,15 +297,24 @@ public class ConfigurationService implements Closeable {
         public String dumpAvailableSpace() {
             StringWriter stringWriter = new StringWriter();
             stringWriter.append("dir / used space / free space");
-            stringWriter.append("\n\tcache = " + getCache()
-                + " " + FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(getCache()))
-                + " / " + FileUtils.byteCountToDisplaySize(getCache().getFreeSpace()));
-            stringWriter.append("\n\ttemp = " + getTemp()
-                + " " + FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(getTemp()))
-                + " / " + FileUtils.byteCountToDisplaySize(getTemp().getFreeSpace()));
-            stringWriter.append("\n\tdatabase = " + getDatabase()
-                + " " + FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(getDatabase()))
-                + " / " + FileUtils.byteCountToDisplaySize(getDatabase().getFreeSpace()));
+            stringWriter.append("\n\tcache = ")
+                    .append(String.valueOf(getCache()))
+                    .append(" ")
+                    .append(FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(getCache())))
+                    .append(" / ")
+                    .append(FileUtils.byteCountToDisplaySize(getCache().getFreeSpace()));
+            stringWriter.append("\n\ttemp = ")
+                    .append(String.valueOf(getTemp()))
+                    .append(" ")
+                    .append(FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(getTemp())))
+                    .append(" / ")
+                    .append(FileUtils.byteCountToDisplaySize(getTemp().getFreeSpace()));
+            stringWriter.append("\n\tdatabase = ")
+                    .append(String.valueOf(getDatabase()))
+                    .append(" ")
+                    .append(FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(getDatabase())))
+                    .append(" / ")
+                    .append(FileUtils.byteCountToDisplaySize(getDatabase().getFreeSpace()));
             return stringWriter.toString();
         }
 

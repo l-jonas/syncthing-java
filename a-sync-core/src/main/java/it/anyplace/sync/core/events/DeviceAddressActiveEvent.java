@@ -17,5 +17,5 @@ import it.anyplace.sync.core.beans.DeviceAddress;
 
 public interface DeviceAddressActiveEvent {
 
-    public DeviceAddress getDeviceAddress();
+    DeviceAddress getDeviceAddress();
 }

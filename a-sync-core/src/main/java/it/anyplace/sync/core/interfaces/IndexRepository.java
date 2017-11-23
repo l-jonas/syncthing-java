@@ -31,43 +31,43 @@ import it.anyplace.sync.core.beans.IndexInfo;
  */
 public interface IndexRepository {
 
-    public EventBus getEventBus();
+    EventBus getEventBus();
 
-    public Sequencer getSequencer();
+    Sequencer getSequencer();
 
-    public void updateIndexInfo(IndexInfo indexInfo);
+    void updateIndexInfo(IndexInfo indexInfo);
 
-    public @Nullable
+    @Nullable
     IndexInfo findIndexInfoByDeviceAndFolder(String deviceId, String folder);
 
-    public @Nullable
+    @Nullable
     FileInfo findFileInfo(String folder, String path);
 
-    public @Nullable
+    @Nullable
     Date findFileInfoLastModified(String folder, String path);
 
-    public @Nullable
+    @Nullable
     FileInfo findNotDeletedFileInfo(String folder, String path);
 
-    public @Nullable
+    @Nullable
     FileBlocks findFileBlocks(String folder, String path);
 
-    public void updateFileInfo(FileInfo fileInfo, @Nullable FileBlocks fileBlocks);
+    void updateFileInfo(FileInfo fileInfo, @Nullable FileBlocks fileBlocks);
 
-    public List<FileInfo> findNotDeletedFilesByFolderAndParent(String folder, String parentPath);
+    List<FileInfo> findNotDeletedFilesByFolderAndParent(String folder, String parentPath);
 
-    public void clearIndex();
+    void clearIndex();
 
-    public @Nullable
+    @Nullable
     FolderStats findFolderStats(String folder);
 
-    public List<FolderStats> findAllFolderStats();
+    List<FolderStats> findAllFolderStats();
 
-    public List<FileInfo> findFileInfoBySearchTerm(String query);
+    List<FileInfo> findFileInfoBySearchTerm(String query);
 
-    public long countFileInfoBySearchTerm(String query);
+    long countFileInfoBySearchTerm(String query);
 
-    public abstract class FolderStatsUpdatedEvent {
+    abstract class FolderStatsUpdatedEvent {
 
         public abstract List<FolderStats> getFolderStats();
 

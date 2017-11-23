@@ -139,7 +139,7 @@ public class DevicesHandler implements Closeable {
 
     public interface DeviceStatsUpdateEvent {
 
-        public List<DeviceStats> getChangedDeviceStats();
+        List<DeviceStats> getChangedDeviceStats();
     }
 
     @Override

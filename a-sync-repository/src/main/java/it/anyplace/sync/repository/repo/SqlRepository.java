@@ -78,11 +78,8 @@ import static org.apache.http.util.TextUtils.isBlank;
 public class SqlRepository implements Closeable, IndexRepository, DeviceAddressRepository, TempRepository {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final ConfigurationService configuration;
     private final static int VERSION = 13;
     private Sequencer sequencer = new IndexRepoSequencer();
-    private final String jdbcUrl;
-    private final HikariConfig hikariConfig;
     private final HikariDataSource dataSource;
 //    private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     private final EventBus eventBus = new EventBus();
@@ -106,14 +103,13 @@ public class SqlRepository implements Closeable, IndexRepository, DeviceAddressR
         });
 
     public SqlRepository(ConfigurationService configuration) {
-        this.configuration = configuration;
         logger.info("starting sql database");
         File dbDir = new File(configuration.getDatabase(), "h2_index_database");
         dbDir.mkdirs();
         checkArgument(dbDir.isDirectory() && dbDir.canWrite());
-        jdbcUrl = "jdbc:h2:file:" + new File(dbDir, "index").getAbsolutePath() + nullToEmpty(configuration.getRepositoryH2Config());
+        String jdbcUrl = "jdbc:h2:file:" + new File(dbDir, "index").getAbsolutePath() + nullToEmpty(configuration.getRepositoryH2Config());
         logger.debug("jdbc url = {}", jdbcUrl);
-        hikariConfig = new HikariConfig();
+        HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setDriverClassName("org.h2.Driver");
         hikariConfig.setJdbcUrl(jdbcUrl);
         hikariConfig.setMinimumIdle(4);
@@ -584,7 +580,7 @@ public class SqlRepository implements Closeable, IndexRepository, DeviceAddressR
         initDb();
         sequencer = new IndexRepoSequencer();
         indexInfoByDeviceIdAndFolder.invalidateAll();
-        folderStatsByFolder.invalidateAll();;
+        folderStatsByFolder.invalidateAll();
     }
 
     // FOLDER STATS - BEGIN

@@ -81,7 +81,7 @@ public final class HttpRelayProtos {
         getDescriptorForType() {
       return getDescriptor();
     }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
+    public static com.google.protobuf.Descriptors.EnumDescriptor
         getDescriptor() {
       return it.anyplace.sync.httprelay.protos.HttpRelayProtos.getDescriptor().getEnumTypes().get(0);
     }
@@ -190,7 +190,7 @@ public final class HttpRelayProtos {
         getDescriptorForType() {
       return getDescriptor();
     }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
+    public static com.google.protobuf.Descriptors.EnumDescriptor
         getDescriptor() {
       return it.anyplace.sync.httprelay.protos.HttpRelayProtos.getDescriptor().getEnumTypes().get(1);
     }
@@ -374,7 +374,7 @@ public final class HttpRelayProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.httprelay.protos.HttpRelayProtos.internal_static_it_anyplace_sync_httprelay_protos_HttpRelayPeerMessage_descriptor;
     }
@@ -674,8 +674,7 @@ public final class HttpRelayProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+        return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.httprelay.protos.HttpRelayPeerMessage}
@@ -683,7 +682,7 @@ public final class HttpRelayProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.httprelay.protos.HttpRelayProtos.HttpRelayPeerMessageOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.httprelay.protos.HttpRelayProtos.internal_static_it_anyplace_sync_httprelay_protos_HttpRelayPeerMessage_descriptor;
       }
@@ -1251,7 +1250,7 @@ public final class HttpRelayProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.httprelay.protos.HttpRelayProtos.internal_static_it_anyplace_sync_httprelay_protos_HttpRelayServerMessage_descriptor;
     }
@@ -1524,8 +1523,7 @@ public final class HttpRelayProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+        return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.httprelay.protos.HttpRelayServerMessage}
@@ -1533,7 +1531,7 @@ public final class HttpRelayProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.httprelay.protos.HttpRelayProtos.HttpRelayServerMessageOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.httprelay.protos.HttpRelayProtos.internal_static_it_anyplace_sync_httprelay_protos_HttpRelayServerMessage_descriptor;
       }

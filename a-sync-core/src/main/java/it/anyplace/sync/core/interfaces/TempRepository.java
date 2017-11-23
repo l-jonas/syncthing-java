@@ -19,7 +19,7 @@ package it.anyplace.sync.core.interfaces;
  */
 public interface TempRepository {
 
-    public String pushTempData(byte[] data);
+    String pushTempData(byte[] data);
     
-    public byte[] popTempData(String key);
+    byte[] popTempData(String key);
 }

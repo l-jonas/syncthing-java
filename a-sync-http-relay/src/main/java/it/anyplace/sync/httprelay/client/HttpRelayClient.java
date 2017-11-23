@@ -20,7 +20,6 @@ import java.util.EnumSet;
 
 import it.anyplace.sync.core.beans.DeviceAddress;
 import it.anyplace.sync.core.beans.DeviceAddress.AddressType;
-import it.anyplace.sync.core.configuration.ConfigurationService;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -32,13 +31,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class HttpRelayClient {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final ConfigurationService configuration;
 
-    public HttpRelayClient(ConfigurationService configuration) {
-        this.configuration = configuration;
-    }
-
-    public HttpRelayConnection openRelayConnection(DeviceAddress deviceAddress) throws Exception {
+    public HttpRelayConnection openRelayConnection(DeviceAddress deviceAddress) {
         checkNotNull(deviceAddress);
         checkArgument(EnumSet.of(AddressType.HTTP_RELAY, AddressType.HTTPS_RELAY).contains(deviceAddress.getType()));
         String httpRelayServerUrl = deviceAddress.getAddress().replaceFirst("^relay-", "");

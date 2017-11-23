@@ -47,7 +47,6 @@ public class IndexFinder implements Closeable {
     private final IndexRepository indexRepository;
     private final ExecutorService queryExecutorService = Executors.newSingleThreadExecutor(), eventProcessingService = Executors.newCachedThreadPool();
     private final EventBus eventBus = new AsyncEventBus(eventProcessingService);
-    private final boolean dropQueriesOnNewSubmit = true;
     private final int maxResults;
 //    private final Queue<Future> runningQueries = Queues.newConcurrentLinkedQueue();
     private Future previousQuery;
@@ -72,64 +71,62 @@ public class IndexFinder implements Closeable {
     public synchronized IndexFinder submitSearch(final String query) {
         checkArgument(!StringUtils.isBlank(query), "query term cannot be blank");
         logger.info("submitSearch, term = '{}'", query);
-        if (dropQueriesOnNewSubmit == true && previousQuery != null) {
+        boolean dropQueriesOnNewSubmit = true;
+        if (dropQueriesOnNewSubmit && previousQuery != null) {
 //            previousQuery.cancel(true); note: cannot interrupt. interrupt break h2 connection to db
             previousQuery.cancel(false);
         }
-        previousQuery = queryExecutorService.submit(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    logger.info("search file info for query = '{}'", query);
-                    final long count = indexRepository.countFileInfoBySearchTerm(query);
-                    final boolean hasTooManyResults = count > maxResults, hasGoodResults = count > 0 && count <= maxResults;
-                    final List<FileInfo> list = hasGoodResults ? indexRepository.findFileInfoBySearchTerm(query) : null;
+        previousQuery = queryExecutorService.submit(() -> {
+            try {
+                logger.info("search file info for query = '{}'", query);
+                final long count = indexRepository.countFileInfoBySearchTerm(query);
+                final boolean hasTooManyResults = count > maxResults, hasGoodResults = count > 0 && count <= maxResults;
+                final List<FileInfo> list = hasGoodResults ? indexRepository.findFileInfoBySearchTerm(query) : null;
 //                    final List<FileInfo> list = indexRepository.findFileInfoBySearchTerm(query);
 //                    final boolean hasTooManyResults = list.size() > maxResults, hasGoodResults = !list.isEmpty() && !hasTooManyResults;
-                    logger.info("got {} results for search term = '{}'", count, query);
-                    if (!eventProcessingService.isShutdown()) {
-                        eventBus.post(new SearchCompletedEvent() {
-                            @Override
-                            public String getQuery() {
-                                return query;
-                            }
+                logger.info("got {} results for search term = '{}'", count, query);
+                if (!eventProcessingService.isShutdown()) {
+                    eventBus.post(new SearchCompletedEvent() {
+                        @Override
+                        public String getQuery() {
+                            return query;
+                        }
 
-                            @Override
-                            public List<FileInfo> getResultList() {
-                                checkNotNull(list, "this query has no good results (got either too many results or zero results)");
-                                List<FileInfo> res = Lists.newArrayList(list);
-                                Collections.sort(list, ordering);
-                                return res;
-                            }
+                        @Override
+                        public List<FileInfo> getResultList() {
+                            checkNotNull(list, "this query has no good results (got either too many results or zero results)");
+                            List<FileInfo> res = Lists.newArrayList(list);
+                            Collections.sort(list, ordering);
+                            return res;
+                        }
 
-                            @Override
-                            public long getResultCount() {
-                                return count;
-                            }
+                        @Override
+                        public long getResultCount() {
+                            return count;
+                        }
 
-                            @Override
-                            public boolean hasZeroResults() {
-                                return count == 0;
-                            }
+                        @Override
+                        public boolean hasZeroResults() {
+                            return count == 0;
+                        }
 
-                            @Override
-                            public boolean hasTooManyResults() {
-                                return hasTooManyResults;
-                            }
+                        @Override
+                        public boolean hasTooManyResults() {
+                            return hasTooManyResults;
+                        }
 
-                            @Override
-                            public boolean hasGoodResults() {
-                                return hasGoodResults;
-                            }
-                        });
-                    }
-                } catch (Exception ex) {
-                    if (Thread.currentThread().isInterrupted()) {
-                        logger.warn("interrupted search for term = '{}', ex = {}", query, ex);
-                    } else {
-                        logger.error("error running file info search by term = '{}'", query);
-                        logger.error("error running file info search by term", ex);
-                    }
+                        @Override
+                        public boolean hasGoodResults() {
+                            return hasGoodResults;
+                        }
+                    });
+                }
+            } catch (Exception ex) {
+                if (Thread.currentThread().isInterrupted()) {
+                    logger.warn("interrupted search for term = '{}', ex = {}", query, ex);
+                } else {
+                    logger.error("error running file info search by term = '{}'", query);
+                    logger.error("error running file info search by term", ex);
                 }
             }
         });
@@ -167,17 +164,17 @@ public class IndexFinder implements Closeable {
 
     public interface SearchCompletedEvent {
 
-        public String getQuery();
+        String getQuery();
 
-        public long getResultCount();
+        long getResultCount();
 
-        public boolean hasZeroResults();
+        boolean hasZeroResults();
 
-        public boolean hasTooManyResults();
+        boolean hasTooManyResults();
 
-        public boolean hasGoodResults();
+        boolean hasGoodResults();
 
-        public List<FileInfo> getResultList();
+        List<FileInfo> getResultList();
     }
 
     @Override

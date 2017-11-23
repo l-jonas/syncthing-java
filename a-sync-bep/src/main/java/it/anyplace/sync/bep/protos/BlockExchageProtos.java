@@ -117,7 +117,7 @@ public final class BlockExchageProtos {
         getDescriptorForType() {
       return getDescriptor();
     }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
+    public static com.google.protobuf.Descriptors.EnumDescriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.getDescriptor().getEnumTypes().get(0);
     }
@@ -136,7 +136,7 @@ public final class BlockExchageProtos {
     private final int index;
     private final int value;
 
-    private MessageType(int index, int value) {
+    MessageType(int index, int value) {
       this.index = index;
       this.value = value;
     }
@@ -199,7 +199,7 @@ public final class BlockExchageProtos {
         getDescriptorForType() {
       return getDescriptor();
     }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
+    public static com.google.protobuf.Descriptors.EnumDescriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.getDescriptor().getEnumTypes().get(1);
     }
@@ -218,7 +218,7 @@ public final class BlockExchageProtos {
     private final int index;
     private final int value;
 
-    private MessageCompression(int index, int value) {
+    MessageCompression(int index, int value) {
       this.index = index;
       this.value = value;
     }
@@ -290,7 +290,7 @@ public final class BlockExchageProtos {
         getDescriptorForType() {
       return getDescriptor();
     }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
+    public static com.google.protobuf.Descriptors.EnumDescriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.getDescriptor().getEnumTypes().get(2);
     }
@@ -309,7 +309,7 @@ public final class BlockExchageProtos {
     private final int index;
     private final int value;
 
-    private Compression(int index, int value) {
+    Compression(int index, int value) {
       this.index = index;
       this.value = value;
     }
@@ -399,7 +399,7 @@ public final class BlockExchageProtos {
         getDescriptorForType() {
       return getDescriptor();
     }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
+    public static com.google.protobuf.Descriptors.EnumDescriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.getDescriptor().getEnumTypes().get(3);
     }
@@ -418,7 +418,7 @@ public final class BlockExchageProtos {
     private final int index;
     private final int value;
 
-    private FileInfoType(int index, int value) {
+    FileInfoType(int index, int value) {
       this.index = index;
       this.value = value;
     }
@@ -499,7 +499,7 @@ public final class BlockExchageProtos {
         getDescriptorForType() {
       return getDescriptor();
     }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
+    public static com.google.protobuf.Descriptors.EnumDescriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.getDescriptor().getEnumTypes().get(4);
     }
@@ -518,7 +518,7 @@ public final class BlockExchageProtos {
     private final int index;
     private final int value;
 
-    private ErrorCode(int index, int value) {
+    ErrorCode(int index, int value) {
       this.index = index;
       this.value = value;
     }
@@ -581,7 +581,7 @@ public final class BlockExchageProtos {
         getDescriptorForType() {
       return getDescriptor();
     }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
+    public static com.google.protobuf.Descriptors.EnumDescriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.getDescriptor().getEnumTypes().get(5);
     }
@@ -600,7 +600,7 @@ public final class BlockExchageProtos {
     private final int index;
     private final int value;
 
-    private FileDownloadProgressUpdateType(int index, int value) {
+    FileDownloadProgressUpdateType(int index, int value) {
       this.index = index;
       this.value = value;
     }
@@ -734,7 +734,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Hello_descriptor;
     }
@@ -1010,11 +1010,10 @@ public final class BlockExchageProtos {
     }
     public Builder toBuilder() { return newBuilder(this); }
 
-    @java.lang.Override
+    @Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Hello}
@@ -1022,7 +1021,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.HelloOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Hello_descriptor;
       }
@@ -1499,7 +1498,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Header_descriptor;
     }
@@ -1673,8 +1672,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Header}
@@ -1682,7 +1680,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.HeaderOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Header_descriptor;
       }
@@ -1967,7 +1965,7 @@ public final class BlockExchageProtos {
             }
             case 10: {
               if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-                folders_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.Folder>();
+                folders_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000001;
               }
               folders_.add(input.readMessage(it.anyplace.sync.bep.protos.BlockExchageProtos.Folder.PARSER, extensionRegistry));
@@ -1988,7 +1986,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_ClusterConfig_descriptor;
     }
@@ -2157,8 +2155,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.ClusterConfig}
@@ -2166,7 +2163,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.ClusterConfigOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_ClusterConfig_descriptor;
       }
@@ -2314,7 +2311,7 @@ public final class BlockExchageProtos {
         java.util.Collections.emptyList();
       private void ensureFoldersIsMutable() {
         if (!((bitField0_ & 0x00000001) == 0x00000001)) {
-          folders_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.Folder>(folders_);
+          folders_ = new java.util.ArrayList<>(folders_);
           bitField0_ |= 0x00000001;
          }
       }
@@ -2538,8 +2535,7 @@ public final class BlockExchageProtos {
           it.anyplace.sync.bep.protos.BlockExchageProtos.Folder, it.anyplace.sync.bep.protos.BlockExchageProtos.Folder.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.FolderOrBuilder> 
           getFoldersFieldBuilder() {
         if (foldersBuilder_ == null) {
-          foldersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-              it.anyplace.sync.bep.protos.BlockExchageProtos.Folder, it.anyplace.sync.bep.protos.BlockExchageProtos.Folder.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.FolderOrBuilder>(
+          foldersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   folders_,
                   ((bitField0_ & 0x00000001) == 0x00000001),
                   getParentForChildren(),
@@ -2741,7 +2737,7 @@ public final class BlockExchageProtos {
             }
             case 130: {
               if (!((mutable_bitField0_ & 0x00000040) == 0x00000040)) {
-                devices_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.Device>();
+                devices_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000040;
               }
               devices_.add(input.readMessage(it.anyplace.sync.bep.protos.BlockExchageProtos.Device.PARSER, extensionRegistry));
@@ -2762,7 +2758,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Folder_descriptor;
     }
@@ -3130,8 +3126,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Folder}
@@ -3139,7 +3134,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.FolderOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Folder_descriptor;
       }
@@ -3627,7 +3622,7 @@ public final class BlockExchageProtos {
         java.util.Collections.emptyList();
       private void ensureDevicesIsMutable() {
         if (!((bitField0_ & 0x00000040) == 0x00000040)) {
-          devices_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.Device>(devices_);
+          devices_ = new java.util.ArrayList<>(devices_);
           bitField0_ |= 0x00000040;
          }
       }
@@ -3851,8 +3846,7 @@ public final class BlockExchageProtos {
           it.anyplace.sync.bep.protos.BlockExchageProtos.Device, it.anyplace.sync.bep.protos.BlockExchageProtos.Device.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.DeviceOrBuilder> 
           getDevicesFieldBuilder() {
         if (devicesBuilder_ == null) {
-          devicesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-              it.anyplace.sync.bep.protos.BlockExchageProtos.Device, it.anyplace.sync.bep.protos.BlockExchageProtos.Device.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.DeviceOrBuilder>(
+          devicesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   devices_,
                   ((bitField0_ & 0x00000040) == 0x00000040),
                   getParentForChildren(),
@@ -4091,7 +4085,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Device_descriptor;
     }
@@ -4385,7 +4379,7 @@ public final class BlockExchageProtos {
             .computeBytesSizeNoTag(addresses_.getByteString(i));
         }
         size += dataSize;
-        size += 1 * getAddressesList().size();
+        size += getAddressesList().size();
       }
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         size += com.google.protobuf.CodedOutputStream
@@ -4482,8 +4476,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Device}
@@ -4491,7 +4484,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.DeviceOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Device_descriptor;
       }
@@ -5203,7 +5196,7 @@ public final class BlockExchageProtos {
             }
             case 18: {
               if (!((mutable_bitField0_ & 0x00000002) == 0x00000002)) {
-                files_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo>();
+                files_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000002;
               }
               files_.add(input.readMessage(it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo.PARSER, extensionRegistry));
@@ -5224,7 +5217,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Index_descriptor;
     }
@@ -5445,8 +5438,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Index}
@@ -5454,7 +5446,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.IndexOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Index_descriptor;
       }
@@ -5689,7 +5681,7 @@ public final class BlockExchageProtos {
         java.util.Collections.emptyList();
       private void ensureFilesIsMutable() {
         if (!((bitField0_ & 0x00000002) == 0x00000002)) {
-          files_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo>(files_);
+          files_ = new java.util.ArrayList<>(files_);
           bitField0_ |= 0x00000002;
          }
       }
@@ -5913,8 +5905,7 @@ public final class BlockExchageProtos {
           it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo, it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfoOrBuilder> 
           getFilesFieldBuilder() {
         if (filesBuilder_ == null) {
-          filesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-              it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo, it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfoOrBuilder>(
+          filesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   files_,
                   ((bitField0_ & 0x00000002) == 0x00000002),
                   getParentForChildren(),
@@ -6036,7 +6027,7 @@ public final class BlockExchageProtos {
             }
             case 18: {
               if (!((mutable_bitField0_ & 0x00000002) == 0x00000002)) {
-                files_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo>();
+                files_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000002;
               }
               files_.add(input.readMessage(it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo.PARSER, extensionRegistry));
@@ -6057,7 +6048,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_IndexUpdate_descriptor;
     }
@@ -6278,8 +6269,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.IndexUpdate}
@@ -6287,7 +6277,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.IndexUpdateOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_IndexUpdate_descriptor;
       }
@@ -6522,7 +6512,7 @@ public final class BlockExchageProtos {
         java.util.Collections.emptyList();
       private void ensureFilesIsMutable() {
         if (!((bitField0_ & 0x00000002) == 0x00000002)) {
-          files_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo>(files_);
+          files_ = new java.util.ArrayList<>(files_);
           bitField0_ |= 0x00000002;
          }
       }
@@ -6746,8 +6736,7 @@ public final class BlockExchageProtos {
           it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo, it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfoOrBuilder> 
           getFilesFieldBuilder() {
         if (filesBuilder_ == null) {
-          filesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-              it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo, it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfo.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfoOrBuilder>(
+          filesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   files_,
                   ((bitField0_ & 0x00000002) == 0x00000002),
                   getParentForChildren(),
@@ -7037,7 +7026,7 @@ public final class BlockExchageProtos {
             }
             case 130: {
               if (!((mutable_bitField0_ & 0x00000800) == 0x00000800)) {
-                blocks_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfo>();
+                blocks_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000800;
               }
               blocks_.add(input.readMessage(it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfo.PARSER, extensionRegistry));
@@ -7058,7 +7047,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_FileInfo_descriptor;
     }
@@ -7525,8 +7514,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.FileInfo}
@@ -7534,7 +7522,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfoOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_FileInfo_descriptor;
       }
@@ -8237,8 +8225,7 @@ public final class BlockExchageProtos {
           it.anyplace.sync.bep.protos.BlockExchageProtos.Vector, it.anyplace.sync.bep.protos.BlockExchageProtos.Vector.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.VectorOrBuilder> 
           getVersionFieldBuilder() {
         if (versionBuilder_ == null) {
-          versionBuilder_ = new com.google.protobuf.SingleFieldBuilder<
-              it.anyplace.sync.bep.protos.BlockExchageProtos.Vector, it.anyplace.sync.bep.protos.BlockExchageProtos.Vector.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.VectorOrBuilder>(
+          versionBuilder_ = new com.google.protobuf.SingleFieldBuilder<>(
                   version_,
                   getParentForChildren(),
                   isClean());
@@ -8285,7 +8272,7 @@ public final class BlockExchageProtos {
         java.util.Collections.emptyList();
       private void ensureBlocksIsMutable() {
         if (!((bitField0_ & 0x00000800) == 0x00000800)) {
-          blocks_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfo>(blocks_);
+          blocks_ = new java.util.ArrayList<>(blocks_);
           bitField0_ |= 0x00000800;
          }
       }
@@ -8509,8 +8496,7 @@ public final class BlockExchageProtos {
           it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfo, it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfo.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfoOrBuilder> 
           getBlocksFieldBuilder() {
         if (blocksBuilder_ == null) {
-          blocksBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-              it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfo, it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfo.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfoOrBuilder>(
+          blocksBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   blocks_,
                   ((bitField0_ & 0x00000800) == 0x00000800),
                   getParentForChildren(),
@@ -8642,7 +8628,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_BlockInfo_descriptor;
     }
@@ -8840,8 +8826,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.BlockInfo}
@@ -8849,7 +8834,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfoOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_BlockInfo_descriptor;
       }
@@ -9173,7 +9158,7 @@ public final class BlockExchageProtos {
             }
             case 10: {
               if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-                counters_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.Counter>();
+                counters_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000001;
               }
               counters_.add(input.readMessage(it.anyplace.sync.bep.protos.BlockExchageProtos.Counter.PARSER, extensionRegistry));
@@ -9194,7 +9179,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Vector_descriptor;
     }
@@ -9363,8 +9348,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Vector}
@@ -9372,7 +9356,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.VectorOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Vector_descriptor;
       }
@@ -9520,7 +9504,7 @@ public final class BlockExchageProtos {
         java.util.Collections.emptyList();
       private void ensureCountersIsMutable() {
         if (!((bitField0_ & 0x00000001) == 0x00000001)) {
-          counters_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.Counter>(counters_);
+          counters_ = new java.util.ArrayList<>(counters_);
           bitField0_ |= 0x00000001;
          }
       }
@@ -9744,8 +9728,7 @@ public final class BlockExchageProtos {
           it.anyplace.sync.bep.protos.BlockExchageProtos.Counter, it.anyplace.sync.bep.protos.BlockExchageProtos.Counter.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.CounterOrBuilder> 
           getCountersFieldBuilder() {
         if (countersBuilder_ == null) {
-          countersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-              it.anyplace.sync.bep.protos.BlockExchageProtos.Counter, it.anyplace.sync.bep.protos.BlockExchageProtos.Counter.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.CounterOrBuilder>(
+          countersBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   counters_,
                   ((bitField0_ & 0x00000001) == 0x00000001),
                   getParentForChildren(),
@@ -9862,7 +9845,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Counter_descriptor;
     }
@@ -10036,8 +10019,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Counter}
@@ -10045,7 +10027,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.CounterOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Counter_descriptor;
       }
@@ -10424,7 +10406,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Request_descriptor;
     }
@@ -10772,8 +10754,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Request}
@@ -10781,7 +10762,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.RequestOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Request_descriptor;
       }
@@ -11395,7 +11376,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Response_descriptor;
     }
@@ -11593,8 +11574,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Response}
@@ -11602,7 +11582,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.ResponseOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Response_descriptor;
       }
@@ -11949,7 +11929,7 @@ public final class BlockExchageProtos {
             }
             case 18: {
               if (!((mutable_bitField0_ & 0x00000002) == 0x00000002)) {
-                updates_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.FileDownloadProgressUpdate>();
+                updates_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000002;
               }
               updates_.add(input.readMessage(it.anyplace.sync.bep.protos.BlockExchageProtos.FileDownloadProgressUpdate.PARSER, extensionRegistry));
@@ -11970,7 +11950,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_DownloadProgress_descriptor;
     }
@@ -12191,8 +12171,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.DownloadProgress}
@@ -12200,7 +12179,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.DownloadProgressOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_DownloadProgress_descriptor;
       }
@@ -12435,7 +12414,7 @@ public final class BlockExchageProtos {
         java.util.Collections.emptyList();
       private void ensureUpdatesIsMutable() {
         if (!((bitField0_ & 0x00000002) == 0x00000002)) {
-          updates_ = new java.util.ArrayList<it.anyplace.sync.bep.protos.BlockExchageProtos.FileDownloadProgressUpdate>(updates_);
+          updates_ = new java.util.ArrayList<>(updates_);
           bitField0_ |= 0x00000002;
          }
       }
@@ -12659,8 +12638,7 @@ public final class BlockExchageProtos {
           it.anyplace.sync.bep.protos.BlockExchageProtos.FileDownloadProgressUpdate, it.anyplace.sync.bep.protos.BlockExchageProtos.FileDownloadProgressUpdate.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.FileDownloadProgressUpdateOrBuilder> 
           getUpdatesFieldBuilder() {
         if (updatesBuilder_ == null) {
-          updatesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
-              it.anyplace.sync.bep.protos.BlockExchageProtos.FileDownloadProgressUpdate, it.anyplace.sync.bep.protos.BlockExchageProtos.FileDownloadProgressUpdate.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.FileDownloadProgressUpdateOrBuilder>(
+          updatesBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<>(
                   updates_,
                   ((bitField0_ & 0x00000002) == 0x00000002),
                   getParentForChildren(),
@@ -12819,7 +12797,7 @@ public final class BlockExchageProtos {
             }
             case 32: {
               if (!((mutable_bitField0_ & 0x00000008) == 0x00000008)) {
-                blockIndexes_ = new java.util.ArrayList<java.lang.Integer>();
+                blockIndexes_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000008;
               }
               blockIndexes_.add(input.readInt32());
@@ -12829,7 +12807,7 @@ public final class BlockExchageProtos {
               int length = input.readRawVarint32();
               int limit = input.pushLimit(length);
               if (!((mutable_bitField0_ & 0x00000008) == 0x00000008) && input.getBytesUntilLimit() > 0) {
-                blockIndexes_ = new java.util.ArrayList<java.lang.Integer>();
+                blockIndexes_ = new java.util.ArrayList<>();
                 mutable_bitField0_ |= 0x00000008;
               }
               while (input.getBytesUntilLimit() > 0) {
@@ -12853,7 +12831,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_FileDownloadProgressUpdate_descriptor;
     }
@@ -13043,7 +13021,7 @@ public final class BlockExchageProtos {
             .computeInt32SizeNoTag(blockIndexes_.get(i));
         }
         size += dataSize;
-        size += 1 * getBlockIndexesList().size();
+        size += getBlockIndexesList().size();
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -13120,8 +13098,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.FileDownloadProgressUpdate}
@@ -13129,7 +13106,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.FileDownloadProgressUpdateOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_FileDownloadProgressUpdate_descriptor;
       }
@@ -13504,8 +13481,7 @@ public final class BlockExchageProtos {
           it.anyplace.sync.bep.protos.BlockExchageProtos.Vector, it.anyplace.sync.bep.protos.BlockExchageProtos.Vector.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.VectorOrBuilder> 
           getVersionFieldBuilder() {
         if (versionBuilder_ == null) {
-          versionBuilder_ = new com.google.protobuf.SingleFieldBuilder<
-              it.anyplace.sync.bep.protos.BlockExchageProtos.Vector, it.anyplace.sync.bep.protos.BlockExchageProtos.Vector.Builder, it.anyplace.sync.bep.protos.BlockExchageProtos.VectorOrBuilder>(
+          versionBuilder_ = new com.google.protobuf.SingleFieldBuilder<>(
                   version_,
                   getParentForChildren(),
                   isClean());
@@ -13518,7 +13494,7 @@ public final class BlockExchageProtos {
       private java.util.List<java.lang.Integer> blockIndexes_ = java.util.Collections.emptyList();
       private void ensureBlockIndexesIsMutable() {
         if (!((bitField0_ & 0x00000008) == 0x00000008)) {
-          blockIndexes_ = new java.util.ArrayList<java.lang.Integer>(blockIndexes_);
+          blockIndexes_ = new java.util.ArrayList<>(blockIndexes_);
           bitField0_ |= 0x00000008;
          }
       }
@@ -13656,7 +13632,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Ping_descriptor;
     }
@@ -13781,8 +13757,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Ping}
@@ -13790,7 +13765,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.PingOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Ping_descriptor;
       }
@@ -13986,7 +13961,7 @@ public final class BlockExchageProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Close_descriptor;
     }
@@ -14163,8 +14138,7 @@ public final class BlockExchageProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.bep.protos.Close}
@@ -14172,7 +14146,7 @@ public final class BlockExchageProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.bep.protos.BlockExchageProtos.CloseOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return it.anyplace.sync.bep.protos.BlockExchageProtos.internal_static_it_anyplace_sync_bep_protos_Close_descriptor;
       }

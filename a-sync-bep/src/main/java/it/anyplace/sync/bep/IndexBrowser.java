@@ -13,7 +13,6 @@
  */
 package it.anyplace.sync.bep;
 
-import com.google.common.base.Function;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -135,14 +134,10 @@ public final class IndexBrowser implements Closeable {
             .setPath(ROOT_PATH)
             .build();
         this.currentPath = ROOT_PATH;
-        executorService.scheduleWithFixedDelay(new Runnable() {
-            @Override
-            public void run() {
-                logger.debug("folder cache cleanup");
-                listFolderCache.cleanUp();
-                fileInfoCache.cleanUp();
-            }
-
+        executorService.scheduleWithFixedDelay(() -> {
+            logger.debug("folder cache cleanup");
+            listFolderCache.cleanUp();
+            fileInfoCache.cleanUp();
         }, 1, 1, TimeUnit.MINUTES);
     }
 
@@ -158,7 +153,6 @@ public final class IndexBrowser implements Closeable {
             if (preloadJobs.contains(currentPath)) {
                 preloadJobs.remove(currentPath);
                 preloadJobs.add(currentPath); ///add last
-                return; // no need to trigger job
             } else {
                 preloadJobs.add(currentPath);
                 executorService.submit(new Runnable() {
@@ -292,12 +286,7 @@ public final class IndexBrowser implements Closeable {
     }
 
     public List<String> listNames() {
-        return Collections.unmodifiableList(Lists.transform(listFiles(), new Function<FileInfo, String>() {
-            @Override
-            public String apply(FileInfo input) {
-                return input.getFileName();
-            }
-        }));
+        return Collections.unmodifiableList(Lists.transform(listFiles(), FileInfo::getFileName));
     }
 
     public FileInfo getFileInfoByRelativePath(String relativePath) {

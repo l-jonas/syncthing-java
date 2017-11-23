@@ -135,7 +135,7 @@ public final class LocalDiscoveryProtos {
         makeExtensionsImmutable();
       }
     }
-    public static final com.google.protobuf.Descriptors.Descriptor
+    public static com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
       return it.anyplace.sync.discovery.protocol.ld.protos.LocalDiscoveryProtos.internal_static_it_anyplace_sync_core_protocol_ld_protos_Announce_descriptor;
     }
@@ -270,7 +270,7 @@ public final class LocalDiscoveryProtos {
             .computeBytesSizeNoTag(addresses_.getByteString(i));
         }
         size += dataSize;
-        size += 1 * getAddressesList().size();
+        size += getAddressesList().size();
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
@@ -351,8 +351,7 @@ public final class LocalDiscoveryProtos {
     @java.lang.Override
     protected Builder newBuilderForType(
         com.google.protobuf.GeneratedMessage.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
+      return new Builder(parent);
     }
     /**
      * Protobuf type {@code it.anyplace.sync.core.protocol.ld.protos.Announce}
@@ -360,7 +359,7 @@ public final class LocalDiscoveryProtos {
     public static final class Builder extends
         com.google.protobuf.GeneratedMessage.Builder<Builder>
        implements it.anyplace.sync.discovery.protocol.ld.protos.LocalDiscoveryProtos.AnnounceOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
+      public static com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return  it.anyplace.sync.discovery.protocol.ld.protos.LocalDiscoveryProtos.internal_static_it_anyplace_sync_core_protocol_ld_protos_Announce_descriptor;
       }

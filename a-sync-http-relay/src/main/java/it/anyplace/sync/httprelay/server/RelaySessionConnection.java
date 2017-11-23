@@ -269,11 +269,11 @@ public class RelaySessionConnection implements Closeable {
     }
 
     public enum DataReceivedEvent {
-        INSTANCE;
+        INSTANCE
     }
 
     public enum ConnectionClosedEvent {
-        INSTANCE;
+        INSTANCE
     }
 
 }

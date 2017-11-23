@@ -13,7 +13,6 @@
  */
 package it.anyplace.sync.bep;
 
-import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -152,23 +151,20 @@ public class BlockPusher {
                                 .setData(ByteString.copyFrom(data))
                                 .setId(request.getId())
                                 .build());
-                            monitoringProcessExecutorService.submit(new Runnable() {
-                                @Override
-                                public void run() {
-                                    try {
-                                        future.get();
-                                        sentBlocks.add(hash);
-                                        synchronized (updateLock) {
-                                            updateLock.notifyAll();
-                                        }
-                                        //TODO retry on error, register error and throw on watcher
-                                    } catch (InterruptedException ex) {
-                                        //return and do nothing
-                                    } catch (ExecutionException ex) {
-                                        uploadError.set(ex);
-                                        synchronized (updateLock) {
-                                            updateLock.notifyAll();
-                                        }
+                            monitoringProcessExecutorService.submit(() -> {
+                                try {
+                                    future.get();
+                                    sentBlocks.add(hash);
+                                    synchronized (updateLock) {
+                                        updateLock.notifyAll();
+                                    }
+                                    //TODO retry on error, register error and throw on watcher
+                                } catch (InterruptedException ex) {
+                                    //return and do nothing
+                                } catch (ExecutionException ex) {
+                                    uploadError.set(ex);
+                                    synchronized (updateLock) {
+                                        updateLock.notifyAll();
                                     }
                                 }
                             });
@@ -213,7 +209,7 @@ public class BlockPusher {
                 .setSize(fileSize)
                 .setType(BlockExchageProtos.FileInfoType.FILE)
                 .addAllBlocks(dataSource.getBlocks()), fileInfo == null ? null : fileInfo.getVersionList()).getRight();
-            final FileUploadObserver messageUploadObserver = new FileUploadObserver() {
+            return new FileUploadObserver() {
                 @Override
                 public void close() {
                     logger.debug("closing upload process");
@@ -229,8 +225,8 @@ public class BlockPusher {
                         connectionHandler.close();
                     }
                     if (indexHandler != null) {
-                        FileInfo fileInfo = indexHandler.pushRecord(indexUpdate.getFolder(), Iterables.getOnlyElement(indexUpdate.getFilesList()));
-                        logger.info("sent file info record = {}", fileInfo);
+                        FileInfo fileInfo1 = indexHandler.pushRecord(indexUpdate.getFolder(), Iterables.getOnlyElement(indexUpdate.getFilesList()));
+                        logger.info("sent file info record = {}", fileInfo1);
                     }
                 }
 
@@ -267,7 +263,6 @@ public class BlockPusher {
                 }
 
             };
-            return messageUploadObserver;
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
@@ -276,7 +271,7 @@ public class BlockPusher {
     private Pair<Future, IndexUpdate> sendIndexUpdate(String folder, BlockExchageProtos.FileInfo.Builder fileInfoBuilder, @Nullable Iterable<Version> oldVersions) {
         {
             long nextSequence = indexHandler.getSequencer().nextSequence();
-            final List<Version> list = Lists.newArrayList(firstNonNull(oldVersions, Collections.<Version>emptyList()));
+            final List<Version> list = Lists.newArrayList(firstNonNull(oldVersions, Collections.emptyList()));
             logger.debug("version list = {}", list);
             final long id = ByteBuffer.wrap(deviceIdStringToHashData(configuration.getDeviceId())).getLong();
             Counter version = Counter.newBuilder()
@@ -286,12 +281,7 @@ public class BlockPusher {
             logger.debug("append new version = {}", version);
             fileInfoBuilder
                 .setSequence(nextSequence)
-                .setVersion(Vector.newBuilder().addAllCounters(Iterables.transform(list, new Function<Version, Counter>() {
-                    @Override
-                    public Counter apply(Version record) {
-                        return Counter.newBuilder().setId(record.getId()).setValue(record.getValue()).build();
-                    }
-                })).addCounters(version));
+                .setVersion(Vector.newBuilder().addAllCounters(Iterables.transform(list, record -> Counter.newBuilder().setId(record.getId()).setValue(record.getValue()).build())).addCounters(version));
         }
         Date lastModified = new Date();
         BlockExchageProtos.FileInfo fileInfo = fileInfoBuilder
@@ -486,12 +476,7 @@ public class BlockPusher {
 
         public Set<String> getHashes() {
             if (hashes == null) {
-                hashes = Sets.newHashSet(Iterables.transform(getBlocks(), new Function<BlockInfo, String>() {
-                    @Override
-                    public String apply(BlockInfo input) {
-                        return BaseEncoding.base16().encode(input.getHash().toByteArray());
-                    }
-                }));
+                hashes = Sets.newHashSet(Iterables.transform(getBlocks(), input -> BaseEncoding.base16().encode(input.getHash().toByteArray())));
             }
             return hashes;
         }
@@ -500,12 +485,7 @@ public class BlockPusher {
 
         public String getHash() {
             if (hash == null) {
-                hash = BlockUtils.hashBlocks(Lists.transform(getBlocks(), new Function<BlockInfo, it.anyplace.sync.core.beans.BlockInfo>() {
-                    @Override
-                    public it.anyplace.sync.core.beans.BlockInfo apply(BlockInfo input) {
-                        return new it.anyplace.sync.core.beans.BlockInfo(input.getOffset(), input.getSize(), BaseEncoding.base16().encode(input.getHash().toByteArray()));
-                    }
-                }));
+                hash = BlockUtils.hashBlocks(Lists.transform(getBlocks(), input -> new it.anyplace.sync.core.beans.BlockInfo(input.getOffset(), input.getSize(), BaseEncoding.base16().encode(input.getHash().toByteArray()))));
             }
             return hash;
         }

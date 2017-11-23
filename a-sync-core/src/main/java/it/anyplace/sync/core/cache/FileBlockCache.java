@@ -47,8 +47,6 @@ public class FileBlockCache extends BlockCache {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final File dir;
     private long size;
-    private final long MAX_SIZE = 50 * 1024 * 1024; //TODO max size from config
-    private final double PERC_TO_DELETE = 0.5; //perc of files to delete on max size cleanup
 
     public FileBlockCache(File cacheDirectory) {
         this.dir = cacheDirectory;
@@ -67,6 +65,7 @@ public class FileBlockCache extends BlockCache {
     }
 
     private void runCleanup() {
+        long MAX_SIZE = 50 * 1024 * 1024;
         if (size > MAX_SIZE) {
             logger.info("starting cleanup of cache directory, initial size = {}", FileUtils.byteCountToDisplaySize(size));
             List<File> files = Lists.newArrayList(dir.listFiles());
@@ -76,6 +75,7 @@ public class FileBlockCache extends BlockCache {
                     return input.lastModified();
                 }
             }));
+            double PERC_TO_DELETE = 0.5;
             for (File file : Iterables.limit(files, (int) (files.size() * PERC_TO_DELETE))) {
                 logger.debug("delete file {}", file);
                 FileUtils.deleteQuietly(file);

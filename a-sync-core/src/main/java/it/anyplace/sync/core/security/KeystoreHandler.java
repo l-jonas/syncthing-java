@@ -93,17 +93,14 @@ public class KeystoreHandler {
     private final static int KEY_SIZE = 3072, SOCKET_TIMEOUT = 2000;
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
-    private final ConfigurationService configuration;
     private final KeyStore keyStore;
 
     static {
         Security.addProvider(new BouncyCastleProvider());
     }
 
-    private KeystoreHandler(ConfigurationService configuration, KeyStore keyStore) {
-        checkNotNull(configuration);
+    private KeystoreHandler(KeyStore keyStore) {
         checkNotNull(keyStore);
-        this.configuration = configuration;
         this.keyStore = keyStore;
     }
 
@@ -305,7 +302,7 @@ public class KeystoreHandler {
                     }
                 }
                 checkNotNull(keyStore, "unable to aquire keystore");
-                KeystoreHandler keystoreHandler = new KeystoreHandler(configuration, keyStore.getLeft());
+                KeystoreHandler keystoreHandler = new KeystoreHandler(keyStore.getLeft());
                 if (isNew) {
                     configuration.edit()
                         .setDeviceId(keyStore.getRight())

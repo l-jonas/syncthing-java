@@ -13,7 +13,6 @@
  */
 package it.anyplace.sync.bep;
 
-import com.google.common.base.Function;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -77,12 +76,7 @@ public final class FolderBrowser implements Closeable {
     }
 
     public List<Pair<FolderInfo, FolderStats>> getFolderInfoAndStatsList() {
-        return Lists.newArrayList(Iterables.transform(indexHandler.getFolderInfoList(), new Function<FolderInfo, Pair<FolderInfo, FolderStats>>() {
-            @Override
-            public Pair<FolderInfo, FolderStats> apply(FolderInfo folderInfo) {
-                return Pair.of(folderInfo, getFolderStats(folderInfo.getFolder()));
-            }
-        }));
+        return Lists.newArrayList(Iterables.transform(indexHandler.getFolderInfoList(), folderInfo -> Pair.of(folderInfo, getFolderStats(folderInfo.getFolder()))));
     }
 
     @Override
