@@ -30,11 +30,6 @@ import it.anyplace.sync.core.beans.BlockInfo;
 public class BlockUtils {
 
     public static String hashBlocks(List<BlockInfo> blocks) {
-        return BaseEncoding.base16().encode(Hashing.sha256().hashBytes(Joiner.on(",").join(Iterables.transform(blocks, new Function<BlockInfo, String>() {
-            @Override
-            public String apply(BlockInfo input) {
-                return input.getHash();
-            }
-        })).getBytes()).asBytes());
+        return BaseEncoding.base16().encode(Hashing.sha256().hashBytes(Joiner.on(",").join(Iterables.transform(blocks, input -> input.getHash())).getBytes()).asBytes());
     }
 }

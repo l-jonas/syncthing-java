@@ -13,8 +13,6 @@
  */
 package it.anyplace.sync.core.cache;
 
-import org.slf4j.LoggerFactory;
-
 import javax.annotation.Nullable;
 
 import it.anyplace.sync.core.configuration.ConfigurationService;
@@ -27,11 +25,7 @@ public abstract class BlockCache {
 
     public static BlockCache getBlockCache(ConfigurationService configuration) {
         if (configuration.getCache() != null) {
-            try {
-                return new FileBlockCache(configuration.getCache());
-            } catch (Exception ex) {
-                LoggerFactory.getLogger(BlockCache.class).warn("unable to open cache", ex);
-            }
+            return new FileBlockCache(configuration.getCache());
         }
         return new DummyBlockCache();
     }

@@ -29,6 +29,7 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v1CertificateBuilder;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +40,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.security.GeneralSecurityException;
 import java.security.KeyManagementException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -81,6 +83,12 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  */
 public class KeystoreHandler {
 
+    public static class CryptoException extends GeneralSecurityException {
+        CryptoException(Throwable t) {
+            super(t);
+        }
+    }
+
     private final static String JKS_PASSWORD = "password",
         KEY_PASSWORD = "password",
         KEY_ALGO = "RSA",
@@ -88,8 +96,6 @@ public class KeystoreHandler {
         CERTIFICATE_CN = "CN=syncthing",
         BC_PROVIDER = "BC",
         TLS_VERSION = "TLSv1.2";
-    public final static String CONFIGURATION_KEYSTORE_PROP = "keystore",
-        CONFIGURATION_DEVICEID_PROP = "deviceid";
     private final static int KEY_SIZE = 3072, SOCKET_TIMEOUT = 2000;
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -190,23 +196,31 @@ public class KeystoreHandler {
         return sslContext.getSocketFactory();
     }
 
-    public Socket wrapSocket(Socket socket, boolean isServerSocket, final String... protocols) throws KeyManagementException, NoSuchAlgorithmException, KeyStoreException, UnrecoverableKeyException, IOException {
-        logger.debug("wrapping plain socket, server mode = {}", isServerSocket);
-        SSLSocket sslSocket = (SSLSocket) getSocketFactory().createSocket(socket, null, socket.getPort(), true);
-        if (isServerSocket) {
-            sslSocket.setUseClientMode(false);
+    public Socket wrapSocket(Socket socket, boolean isServerSocket, final String... protocols) throws CryptoException, IOException {
+        try {
+            logger.debug("wrapping plain socket, server mode = {}", isServerSocket);
+            SSLSocket sslSocket = (SSLSocket) getSocketFactory().createSocket(socket, null, socket.getPort(), true);
+            if (isServerSocket) {
+                sslSocket.setUseClientMode(false);
+            }
+            enableALPN(sslSocket, protocols);
+            return sslSocket;
+        } catch (KeyManagementException | NoSuchAlgorithmException | KeyStoreException | UnrecoverableKeyException e) {
+            throw new CryptoException(e);
         }
-        enableALPN(sslSocket, protocols);
-        return sslSocket;
     }
 
     public final static String BEP = "bep/1.0", RELAY = "bep-relay";
 
-    public Socket createSocket(InetSocketAddress relaySocketAddress, final String... protocols) throws Exception {
-        SSLSocket socket = (SSLSocket) getSocketFactory().createSocket();
-        socket.connect(relaySocketAddress, SOCKET_TIMEOUT);
-        enableALPN(socket, protocols);
-        return socket;
+    public Socket createSocket(InetSocketAddress relaySocketAddress, final String... protocols) throws CryptoException, IOException {
+        try {
+            SSLSocket socket = (SSLSocket) getSocketFactory().createSocket();
+            socket.connect(relaySocketAddress, SOCKET_TIMEOUT);
+            enableALPN(socket, protocols);
+            return socket;
+        } catch (KeyManagementException | NoSuchAlgorithmException | KeyStoreException | UnrecoverableKeyException e) {
+            throw new CryptoException(e);
+        }
     }
 
     private void enableALPN(final SSLSocket socket, final String... protocols) {
@@ -249,7 +263,7 @@ public class KeystoreHandler {
         logger.debug("remote ssl certificate match deviceId = {}", deviceId);
     }
 
-    public Socket wrapSocket(RelayConnection relayConnection, String... protocols) throws Exception {
+    public Socket wrapSocket(RelayConnection relayConnection, String... protocols) throws CryptoException, IOException {
         return wrapSocket(relayConnection.getSocket(), relayConnection.isServerSocket(), protocols);
     }
 
@@ -289,7 +303,7 @@ public class KeystoreHandler {
                 if (keystoreData != null) {
                     try {
                         keyStore = importKeystore(keystoreData, configuration);
-                    } catch (Exception ex) {
+                    } catch (CryptoException | IOException ex) {
                         logger.error("error importing keystore", ex);
                     }
                 }
@@ -297,7 +311,7 @@ public class KeystoreHandler {
                     try {
                         keyStore = generateKeystore(configuration);
                         isNew = true;
-                    } catch (Exception ex) {
+                    } catch (CryptoException | IOException ex) {
                         logger.error("error generating keystore", ex);
                     }
                 }
@@ -316,45 +330,53 @@ public class KeystoreHandler {
             }
         }
 
-        private Pair<KeyStore, String> generateKeystore(ConfigurationService configuration) throws Exception {
-            logger.debug("generating key");
-            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(KEY_ALGO);
-            keyPairGenerator.initialize(KEY_SIZE);
-            KeyPair keyPair = keyPairGenerator.genKeyPair();
+        private Pair<KeyStore, String> generateKeystore(ConfigurationService configuration) throws CryptoException, IOException {
+            try {
+                logger.debug("generating key");
+                KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance(KEY_ALGO);
+                keyPairGenerator.initialize(KEY_SIZE);
+                KeyPair keyPair = keyPairGenerator.genKeyPair();
 
-            ContentSigner contentSigner = new JcaContentSignerBuilder(SIGNATURE_ALGO).setProvider(BC_PROVIDER).build(keyPair.getPrivate());
+                ContentSigner contentSigner = new JcaContentSignerBuilder(SIGNATURE_ALGO).setProvider(BC_PROVIDER).build(keyPair.getPrivate());
 
-            Date startDate = new Date(System.currentTimeMillis() - (24 * 60 * 60 * 1000));
-            Date endDate = new Date(System.currentTimeMillis() + (10 * 365 * 24 * 60 * 60 * 1000));
+                Date startDate = new Date(System.currentTimeMillis() - (24 * 60 * 60 * 1000));
+                Date endDate = new Date(System.currentTimeMillis() + (10 * 365 * 24 * 60 * 60 * 1000));
 
-            X509v1CertificateBuilder certificateBuilder = new JcaX509v1CertificateBuilder(new X500Principal(CERTIFICATE_CN), BigInteger.ZERO, startDate, endDate, new X500Principal(CERTIFICATE_CN), keyPair.getPublic());
+                X509v1CertificateBuilder certificateBuilder = new JcaX509v1CertificateBuilder(new X500Principal(CERTIFICATE_CN), BigInteger.ZERO, startDate, endDate, new X500Principal(CERTIFICATE_CN), keyPair.getPublic());
 
-            X509CertificateHolder certificateHolder = certificateBuilder.build(contentSigner);
+                X509CertificateHolder certificateHolder = certificateBuilder.build(contentSigner);
 
-            byte[] certificateDerData = certificateHolder.getEncoded();
-            logger.info("generated cert =\n{}", derToPem(certificateDerData));
-            String deviceId = derDataToDeviceIdString(certificateDerData);
-            logger.info("device id from cert = {}", deviceId);
+                byte[] certificateDerData = certificateHolder.getEncoded();
+                logger.info("generated cert =\n{}", derToPem(certificateDerData));
+                String deviceId = derDataToDeviceIdString(certificateDerData);
+                logger.info("device id from cert = {}", deviceId);
 
-            KeyStore keyStore = KeyStore.getInstance(configuration.getKeystoreAlgo());
-            keyStore.load(null, null);
-            Certificate[] certChain = new Certificate[1];
-            certChain[0] = new JcaX509CertificateConverter().setProvider(BC_PROVIDER).getCertificate(certificateHolder);
-            keyStore.setKeyEntry("key", keyPair.getPrivate(), KEY_PASSWORD.toCharArray(), certChain);
-            return Pair.of(keyStore, deviceId);
+                KeyStore keyStore = KeyStore.getInstance(configuration.getKeystoreAlgo());
+                keyStore.load(null, null);
+                Certificate[] certChain = new Certificate[1];
+                certChain[0] = new JcaX509CertificateConverter().setProvider(BC_PROVIDER).getCertificate(certificateHolder);
+                keyStore.setKeyEntry("key", keyPair.getPrivate(), KEY_PASSWORD.toCharArray(), certChain);
+                return Pair.of(keyStore, deviceId);
+            } catch (OperatorCreationException | CertificateException | NoSuchAlgorithmException | KeyStoreException e) {
+                throw new CryptoException(e);
+            }
         }
 
-        private Pair<KeyStore, String> importKeystore(byte[] keystoreData, ConfigurationService configuration) throws Exception {
-            String keystoreAlgo = configuration.getKeystoreAlgo();
-            KeyStore keyStore = KeyStore.getInstance(keystoreAlgo);
-            keyStore.load(new ByteArrayInputStream(keystoreData), JKS_PASSWORD.toCharArray());
-            String alias = keyStore.aliases().nextElement();
-            Certificate certificate = keyStore.getCertificate(alias);
-            checkArgument(certificate instanceof X509Certificate);
-            byte[] derData = certificate.getEncoded();
-            String deviceId = derDataToDeviceIdString(derData);
-            logger.debug("loaded device id from cert = {}", deviceId);
-            return Pair.of(keyStore, deviceId);
+        private Pair<KeyStore, String> importKeystore(byte[] keystoreData, ConfigurationService configuration) throws CryptoException, IOException {
+            try {
+                String keystoreAlgo = configuration.getKeystoreAlgo();
+                KeyStore keyStore = KeyStore.getInstance(keystoreAlgo);
+                keyStore.load(new ByteArrayInputStream(keystoreData), JKS_PASSWORD.toCharArray());
+                String alias = keyStore.aliases().nextElement();
+                Certificate certificate = keyStore.getCertificate(alias);
+                checkArgument(certificate instanceof X509Certificate);
+                byte[] derData = certificate.getEncoded();
+                String deviceId = derDataToDeviceIdString(derData);
+                logger.debug("loaded device id from cert = {}", deviceId);
+                return Pair.of(keyStore, deviceId);
+            } catch (NoSuchAlgorithmException | KeyStoreException | CertificateException e) {
+                throw new CryptoException(e);
+            }
         }
     }
 

@@ -15,7 +15,6 @@ package it.anyplace.sync.core.utils;
 
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ComparisonChain;
 
 import java.util.Comparator;
@@ -24,35 +23,18 @@ import it.anyplace.sync.core.beans.FileInfo;
 
 public class FileInfoOrdering {
 
-    private final static Function<FileInfo, Boolean> isParentFunction = Functions.forPredicate(new Predicate<FileInfo>() {
-        @Override
-        public boolean apply(FileInfo fileInfo) {
-            return PathUtils.isParent(fileInfo.getPath());
-        }
-    });
+    private final static Function<FileInfo, Boolean> isParentFunction = Functions.forPredicate(fileInfo -> PathUtils.isParent(fileInfo.getPath()));
 
-    public static final Comparator<FileInfo> ALPHA_ASC_DIR_FIRST = new Comparator<FileInfo>() {
-        @Override
-        public int compare(FileInfo a, FileInfo b) {
-            return ComparisonChain.start()
-                .compareTrueFirst(isParentFunction.apply(a), isParentFunction.apply(b))
-                .compare(a.isDirectory() ? 1 : 2, b.isDirectory() ? 1 : 2)
-                .compare(a.getPath(), b.getPath())
-                .result();
-        }
+    public static final Comparator<FileInfo> ALPHA_ASC_DIR_FIRST = (a, b) -> ComparisonChain.start()
+        .compareTrueFirst(isParentFunction.apply(a), isParentFunction.apply(b))
+        .compare(a.isDirectory() ? 1 : 2, b.isDirectory() ? 1 : 2)
+        .compare(a.getPath(), b.getPath())
+        .result();
 
-    };
-
-    public static final Comparator<FileInfo> LAST_MOD_DESC = new Comparator<FileInfo>() {
-        @Override
-        public int compare(FileInfo a, FileInfo b) {
-            return ComparisonChain.start()
-                .compareTrueFirst(isParentFunction.apply(a), isParentFunction.apply(b))
-                .compare(b.getLastModified(), a.getLastModified())
-                .compare(a.getPath(), b.getPath())
-                .result();
-        }
-
-    };
+    public static final Comparator<FileInfo> LAST_MOD_DESC = (a, b) -> ComparisonChain.start()
+        .compareTrueFirst(isParentFunction.apply(a), isParentFunction.apply(b))
+        .compare(b.getLastModified(), a.getLastModified())
+        .compare(a.getPath(), b.getPath())
+        .result();
 
 }

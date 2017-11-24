@@ -209,6 +209,7 @@ public final class IndexBrowser implements Closeable {
                 try {
                     preloadJobsLock.wait(100);
                 } catch (InterruptedException ex) {
+                    logger.warn("", ex);
                 }
             }
             return isCacheReady();
@@ -222,6 +223,7 @@ public final class IndexBrowser implements Closeable {
                 try {
                     preloadJobsLock.wait();
                 } catch (InterruptedException ex) {
+                    logger.warn("", ex);
                 }
             }
         }
@@ -325,11 +327,7 @@ public final class IndexBrowser implements Closeable {
 
     public IndexBrowser navigateToNearestPath(@Nullable String oldPath) {
         while (!StringUtils.isBlank(oldPath)) {
-            try {
-                return navigateToAbsolutePath(oldPath);
-            } catch (Exception ex) {
-                return navigateToNearestPath(PathUtils.getParentPath(oldPath));
-            }
+            return navigateToAbsolutePath(oldPath);
         }
         return this;
     }

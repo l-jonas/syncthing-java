@@ -96,6 +96,7 @@ public class ConfigurationService implements Closeable {
             try {
                 deviceName = InetAddress.getLocalHost().getHostName();
             } catch (UnknownHostException ex) {
+                logger.warn("", ex);
             }
             if (isBlank(deviceName) || equal(deviceName, "localhost")) {
                 deviceName = "s-client";
@@ -105,13 +106,9 @@ public class ConfigurationService implements Closeable {
         keystoreAlgo = properties.getProperty(KEYSTORE_ALGO);
         folders = Collections.synchronizedMap(Maps.<String, FolderInfo>newHashMap());
         String folderValue = properties.getProperty(FOLDERS);
-        try {
-            FolderConfigList folderConfigList = isBlank(folderValue) ? new FolderConfigList() : gson.fromJson(folderValue, FolderConfigList.class);
-            for (FolderConfig folderConfig : folderConfigList.getFolders()) {
-                folders.put(folderConfig.getFolder(), new FolderInfo(folderConfig.getFolder(), folderConfig.getLabel()));
-            }
-        } catch (Exception ex) {
-            logger.error("error reading folder field = " + folderValue, ex);
+        FolderConfigList folderConfigList = isBlank(folderValue) ? new FolderConfigList() : gson.fromJson(folderValue, FolderConfigList.class);
+        for (FolderConfig folderConfig : folderConfigList.getFolders()) {
+            folders.put(folderConfig.getFolder(), new FolderInfo(folderConfig.getFolder(), folderConfig.getLabel()));
         }
         String keystoreValue = properties.getProperty(KEYSTORE);
         if (!Strings.isNullOrEmpty(keystoreValue)) {
@@ -143,13 +140,9 @@ public class ConfigurationService implements Closeable {
         checkArgument(database.isDirectory() && database.canWrite(), "invalid database dir = %s", database);
         peers = Collections.synchronizedMap(Maps.<String, DeviceInfo>newHashMap());
         String peersValue = properties.getProperty(PEERS);
-        try {
-            DeviceConfigList deviceConfigList = isBlank(peersValue) ? new DeviceConfigList() : gson.fromJson(peersValue, DeviceConfigList.class);
-            for (DeviceConfig deviceConfig : deviceConfigList.getDevices()) {
-                peers.put(deviceConfig.getDeviceId(), new DeviceInfo(deviceConfig.getDeviceId(), deviceConfig.getName()));
-            }
-        } catch (Exception ex) {
-            logger.error("error reading peers field = " + peersValue, ex);
+        DeviceConfigList deviceConfigList = isBlank(peersValue) ? new DeviceConfigList() : gson.fromJson(peersValue, DeviceConfigList.class);
+        for (DeviceConfig deviceConfig : deviceConfigList.getDevices()) {
+            peers.put(deviceConfig.getDeviceId(), new DeviceInfo(deviceConfig.getDeviceId(), deviceConfig.getName()));
         }
         String discoveryServerValue = properties.getProperty(DISCOVERY_SERVERS);
         discoveryServers = Strings.isNullOrEmpty(discoveryServerValue) ? Collections.<String>emptyList() : Arrays.asList(discoveryServerValue.split(","));
@@ -404,23 +397,14 @@ public class ConfigurationService implements Closeable {
 
         public void persistLater() {
             isDirty = true;
-            executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    storeConfiguration();
-                }
-            });
+            executorService.submit(() -> storeConfiguration());
         }
 
         private void storeConfiguration() {
             if (configuration != null) {
                 if (isDirty) {
                     isDirty = false;
-                    try {
-                        newWriter().writeTo(configuration);
-                    } catch (Exception ex) {
-                        logger.error("unable to store configuration", ex);
-                    }
+                    newWriter().writeTo(configuration);
                 }
             } else {
                 logger.debug("dummy save config, no file set");

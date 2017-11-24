@@ -62,57 +62,50 @@ public class RelayClient {
         this.keystoreHandler = KeystoreHandler.newLoader().loadAndStore(configuration);
     }
 
-    public RelayConnection openRelayConnection(DeviceAddress address) throws Exception {
+    public RelayConnection openRelayConnection(DeviceAddress address) throws IOException, KeystoreHandler.CryptoException {
         Preconditions.checkArgument(address.getType().equals(AddressType.RELAY));
         SessionInvitation sessionInvitation = getSessionInvitation(address.getSocketAddress(), address.getDeviceId());
         return openConnectionSessionMode(sessionInvitation);
     }
 
-    public RelayConnection openConnectionSessionMode(final SessionInvitation sessionInvitation) throws Exception {
+    public RelayConnection openConnectionSessionMode(final SessionInvitation sessionInvitation) throws IOException {
         logger.debug("connecting to relay = {}:{} (session mode)", sessionInvitation.getAddress(), sessionInvitation.getPort());
         final Socket socket = new Socket(sessionInvitation.getAddress(), sessionInvitation.getPort());
         RelayDataInputStream in = new RelayDataInputStream(socket.getInputStream());
         RelayDataOutputStream out = new RelayDataOutputStream(socket.getOutputStream());
-        try {
-            {
-                logger.debug("sending join session request, session key = {}", sessionInvitation.getKey());
-                byte[] key = BaseEncoding.base16().decode(sessionInvitation.getKey());
-                int lengthOfKey = key.length;
-                out.writeHeader(JOIN_SESSION_REQUEST, 4 + lengthOfKey);
-                out.writeInt(lengthOfKey);
-                out.write(key);
-                out.flush();
-            }
-            {
-                logger.debug("reading relay response");
-                MessageReader messageReader = in.readMessage();
-                checkArgument(messageReader.getType() == RESPONSE);
-                Response response = messageReader.readResponse();
-                logger.debug("response = {}", response);
-                checkArgument(response.getCode() == RESPONSE_SUCCESS_CODE, "response code = %s (%s) expected %s", response.getCode(), response.getMessage(), RESPONSE_SUCCESS_CODE);
-                logger.debug("relay connection ready");
-            }
-            return new RelayConnection() {
-                @Override
-                public Socket getSocket() {
-                    return socket;
-                }
-
-                @Override
-                public boolean isServerSocket() {
-                    return sessionInvitation.isServerSocket();
-                }
-
-            };
-        } catch (Exception ex) {
-            IOUtils.closeQuietly(in);
-            IOUtils.closeQuietly(out);
-            IOUtils.closeQuietly(socket);
-            throw ex;
+        {
+            logger.debug("sending join session request, session key = {}", sessionInvitation.getKey());
+            byte[] key = BaseEncoding.base16().decode(sessionInvitation.getKey());
+            int lengthOfKey = key.length;
+            out.writeHeader(JOIN_SESSION_REQUEST, 4 + lengthOfKey);
+            out.writeInt(lengthOfKey);
+            out.write(key);
+            out.flush();
         }
+        {
+            logger.debug("reading relay response");
+            MessageReader messageReader = in.readMessage();
+            checkArgument(messageReader.getType() == RESPONSE);
+            Response response = messageReader.readResponse();
+            logger.debug("response = {}", response);
+            checkArgument(response.getCode() == RESPONSE_SUCCESS_CODE, "response code = %s (%s) expected %s", response.getCode(), response.getMessage(), RESPONSE_SUCCESS_CODE);
+            logger.debug("relay connection ready");
+        }
+        return new RelayConnection() {
+            @Override
+            public Socket getSocket() {
+                return socket;
+            }
+
+            @Override
+            public boolean isServerSocket() {
+                return sessionInvitation.isServerSocket();
+            }
+
+        };
     }
 
-    public SessionInvitation getSessionInvitation(InetSocketAddress relaySocketAddress, String deviceId) throws Exception {
+    public SessionInvitation getSessionInvitation(InetSocketAddress relaySocketAddress, String deviceId) throws IOException, KeystoreHandler.CryptoException {
         logger.debug("connecting to relay = {} (temporary protocol mode)", relaySocketAddress);
         try (Socket socket = keystoreHandler.createSocket(relaySocketAddress, RELAY);
             RelayDataInputStream in = new RelayDataInputStream(socket.getInputStream());

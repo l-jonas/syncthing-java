@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
@@ -44,6 +45,7 @@ import it.anyplace.sync.core.beans.FileBlocks;
 import it.anyplace.sync.core.beans.FileInfo;
 import it.anyplace.sync.core.cache.BlockCache;
 import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.security.KeystoreHandler;
 import it.anyplace.sync.devices.DevicesHandler;
 import it.anyplace.sync.discovery.DeviceAddressSupplier;
 import it.anyplace.sync.discovery.DiscoveryHandler;
@@ -90,12 +92,7 @@ public class SyncthingClient implements Closeable {
     private @Nullable
     BlockExchangeConnectionHandler borrowFromPool(final DeviceAddress deviceAddress) {
         synchronized (pool) {
-            BlockExchangeConnectionHandler connectionHandler = Iterables.find(pool, new Predicate<BlockExchangeConnectionHandler>() {
-                @Override
-                public boolean apply(BlockExchangeConnectionHandler input) {
-                    return equal(deviceAddress, input.getAddress());
-                }
-            }, null);
+            BlockExchangeConnectionHandler connectionHandler = Iterables.find(pool, input -> equal(deviceAddress, input.getAddress()), null);
             if (connectionHandler != null) {
                 pool.remove(connectionHandler);
                 if (connectionHandler.isClosed()) { //TODO check live
@@ -117,7 +114,7 @@ public class SyncthingClient implements Closeable {
         }
     }
 
-    private BlockExchangeConnectionHandler openConnection(DeviceAddress deviceAddress) throws Exception {
+    private BlockExchangeConnectionHandler openConnection(DeviceAddress deviceAddress) throws IOException, KeystoreHandler.CryptoException {
         final BlockExchangeConnectionHandler connectionHandler = new BlockExchangeConnectionHandler(configuration, deviceAddress);
         connectionHandler.setIndexHandler(indexHandler);
         connectionHandler.getEventBus().register(indexHandler);
@@ -148,7 +145,7 @@ public class SyncthingClient implements Closeable {
         }
     }
 
-    public BlockExchangeConnectionHandler getConnection(DeviceAddress deviceAddress) throws Exception {
+    public BlockExchangeConnectionHandler getConnection(DeviceAddress deviceAddress) throws IOException, KeystoreHandler.CryptoException {
         BlockExchangeConnectionHandler connectionHandlerFromPool = borrowFromPool(deviceAddress);
         if (connectionHandlerFromPool != null) {
             return connectionHandlerFromPool;
@@ -165,7 +162,7 @@ public class SyncthingClient implements Closeable {
                     BlockExchangeConnectionHandler connectionHandler = getConnection(deviceAddress);
                     logger.info("aquired connection to device = {}", deviceAddress);
                     return connectionHandler;
-                } catch (Exception ex) {
+                } catch (IOException | KeystoreHandler.CryptoException ex) {
                     logger.warn("error connecting to device = {}", deviceAddress);
                     logger.warn("error connecting to device", ex);
                 }
@@ -230,7 +227,7 @@ public class SyncthingClient implements Closeable {
                         BlockExchangeConnectionHandler connection = getConnection(deviceAddress);
                         deviceIds.add(deviceAddress.getDeviceId());
                         return connection;
-                    } catch (Exception ex) {
+                    } catch (IOException | KeystoreHandler.CryptoException ex) {
                         logger.warn("error connecting to device = {}", deviceAddress);
                         logger.warn("error connecting to device", ex);
                     }
@@ -249,7 +246,7 @@ public class SyncthingClient implements Closeable {
                 } else {
                     try {
                         indexHandler.waitForRemoteIndexAquired(connection);
-                    } catch (Exception ex) {
+                    } catch (InterruptedException ex) {
                         logger.warn("exception while waiting for index", ex);
                     }
                 }

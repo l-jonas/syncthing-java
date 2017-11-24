@@ -13,7 +13,6 @@
  */
 package it.anyplace.sync.core.cache;
 
-import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
@@ -69,12 +68,7 @@ public class FileBlockCache extends BlockCache {
         if (size > MAX_SIZE) {
             logger.info("starting cleanup of cache directory, initial size = {}", FileUtils.byteCountToDisplaySize(size));
             List<File> files = Lists.newArrayList(dir.listFiles());
-            Collections.sort(files, Ordering.natural().onResultOf(new Function<File, Long>() {
-                @Override
-                public Long apply(File input) {
-                    return input.lastModified();
-                }
-            }));
+            Collections.sort(files, Ordering.natural().onResultOf(input -> input.lastModified()));
             double PERC_TO_DELETE = 0.5;
             for (File file : Iterables.limit(files, (int) (files.size() * PERC_TO_DELETE))) {
                 logger.debug("delete file {}", file);
@@ -102,21 +96,17 @@ public class FileBlockCache extends BlockCache {
                     String cachedDataCode = BaseEncoding.base16().encode(Hashing.sha256().hashBytes(data).asBytes());
                     checkArgument(equal(code, cachedDataCode), "cached data code %s does not match code %s", cachedDataCode, code);
                 }
-                writerThread.submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            FileUtils.touch(file);
-                        } catch (IOException ex) {
-                            logger.warn("unable to 'touch' file {}", file);
-                            logger.warn("unable to 'touch' file", ex);
-                        }
+                writerThread.submit(() -> {
+                    try {
+                        FileUtils.touch(file);
+                    } catch (IOException ex) {
+                        logger.warn("unable to 'touch' file {}", file);
+                        logger.warn("unable to 'touch' file", ex);
                     }
-
                 });
                 logger.debug("read block {} from cache file {}", code, file);
                 return data;
-            } catch (Exception ex) {
+            } catch (IOException ex) {
                 logger.warn("error reading block from cache", ex);
                 FileUtils.deleteQuietly(file);
             }
@@ -135,29 +125,21 @@ public class FileBlockCache extends BlockCache {
 //        }
     @Override
     public boolean pushData(final String code, final byte[] data) {
-        try {
-            writerThread.submit(new Runnable() {
-                @Override
-                public void run() {
-                    File file = new File(dir, code);
-                    if (!file.exists()) {
-                        try {
-                            FileUtils.writeByteArrayToFile(file, data);
-                            logger.debug("cached block {} to file {}", code, file);
-                            size += data.length;
-                            runCleanup();
-                        } catch (IOException ex) {
-                            logger.warn("error writing block in cache", ex);
-                            FileUtils.deleteQuietly(file);
-                        }
-                    }
+        writerThread.submit(() -> {
+            File file = new File(dir, code);
+            if (!file.exists()) {
+                try {
+                    FileUtils.writeByteArrayToFile(file, data);
+                    logger.debug("cached block {} to file {}", code, file);
+                    size += data.length;
+                    runCleanup();
+                } catch (IOException ex) {
+                    logger.warn("error writing block in cache", ex);
+                    FileUtils.deleteQuietly(file);
                 }
-            });
-            return true;
-        } catch (Exception ex) {
-            logger.warn("error caching block", ex);
-            return false;
-        }
+            }
+        });
+        return true;
     }
 
     @Override
@@ -167,13 +149,9 @@ public class FileBlockCache extends BlockCache {
 
     @Override
     public void clear() {
-        writerThread.submit(new Runnable() {
-            @Override
-            public void run() {
-                FileUtils.deleteQuietly(dir);
-                dir.mkdirs();
-            }
-
+        writerThread.submit(() -> {
+            FileUtils.deleteQuietly(dir);
+            dir.mkdirs();
         });
     }
 }

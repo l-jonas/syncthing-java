@@ -156,6 +156,7 @@ public class RelaySessionConnection implements Closeable {
                 try {
                     inputStream.wait(timeout);
                 } catch (InterruptedException ex) {
+                    logger.warn("", ex);
                 }
             }
         }
@@ -193,12 +194,7 @@ public class RelaySessionConnection implements Closeable {
                             }
                             inputStream.notifyAll();
                         }
-                        processorService.submit(new Runnable() {
-                            @Override
-                            public void run() {
-                                eventBus.post(DataReceivedEvent.INSTANCE);
-                            }
-                        });
+                        processorService.submit(() -> eventBus.post(DataReceivedEvent.INSTANCE));
                     } catch (IOException ex) {
                         if (isClosed()) {
                             return;
@@ -212,12 +208,7 @@ public class RelaySessionConnection implements Closeable {
 
             private void closeBg() {
 
-                new Thread() {
-                    @Override
-                    public void run() {
-                        close();
-                    }
-                }.start();
+                new Thread(() -> close()).start();
             }
         });
     }
@@ -255,10 +246,12 @@ public class RelaySessionConnection implements Closeable {
             try {
                 readerExecutorService.awaitTermination(2, TimeUnit.SECONDS);
             } catch (InterruptedException ex) {
+                logger.warn("", ex);
             }
             try {
                 processorService.awaitTermination(2, TimeUnit.SECONDS);
             } catch (InterruptedException ex) {
+                logger.warn("", ex);
             }
             eventBus.post(ConnectionClosedEvent.INSTANCE);
         }

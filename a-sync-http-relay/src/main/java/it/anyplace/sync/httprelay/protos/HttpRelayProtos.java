@@ -67,11 +67,7 @@ public final class HttpRelayProtos {
     }
     private static com.google.protobuf.Internal.EnumLiteMap<HttpRelayPeerMessageType>
         internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<HttpRelayPeerMessageType>() {
-            public HttpRelayPeerMessageType findValueByNumber(int number) {
-              return HttpRelayPeerMessageType.valueOf(number);
-            }
-          };
+            number -> HttpRelayPeerMessageType.valueOf(number);
 
     public final com.google.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {
@@ -100,7 +96,7 @@ public final class HttpRelayProtos {
     private final int index;
     private final int value;
 
-    private HttpRelayPeerMessageType(int index, int value) {
+    HttpRelayPeerMessageType(int index, int value) {
       this.index = index;
       this.value = value;
     }
@@ -176,11 +172,7 @@ public final class HttpRelayProtos {
     }
     private static com.google.protobuf.Internal.EnumLiteMap<HttpRelayServerMessageType>
         internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<HttpRelayServerMessageType>() {
-            public HttpRelayServerMessageType findValueByNumber(int number) {
-              return HttpRelayServerMessageType.valueOf(number);
-            }
-          };
+            number -> HttpRelayServerMessageType.valueOf(number);
 
     public final com.google.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {
@@ -209,7 +201,7 @@ public final class HttpRelayProtos {
     private final int index;
     private final int value;
 
-    private HttpRelayServerMessageType(int index, int value) {
+    HttpRelayServerMessageType(int index, int value) {
       this.index = index;
       this.value = value;
     }

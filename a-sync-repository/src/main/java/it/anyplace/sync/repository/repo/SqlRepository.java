@@ -27,7 +27,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,16 +113,7 @@ public class SqlRepository implements Closeable, IndexRepository, DeviceAddressR
         hikariConfig.setJdbcUrl(jdbcUrl);
         hikariConfig.setMinimumIdle(4);
         HikariDataSource newDataSource;
-        try {
-            newDataSource = new HikariDataSource(hikariConfig);
-        } catch (Exception ex) {
-            logger.error("error loading datasource (we'll try to delete db folder and restart db)", ex);
-            FileUtils.deleteQuietly(dbDir);
-            checkArgument(!dbDir.exists());
-            dbDir.mkdirs();
-            checkArgument(dbDir.isDirectory() && dbDir.canWrite());
-            newDataSource = new HikariDataSource(hikariConfig);
-        }
+        newDataSource = new HikariDataSource(hikariConfig);
         dataSource = newDataSource;
         checkDb();
         recreateTemporaryTables();
@@ -157,21 +147,16 @@ public class SqlRepository implements Closeable, IndexRepository, DeviceAddressR
     private void checkDb() {
         logger.debug("check db");
         try (Connection connection = getConnection()) {
-            try {
-                try (PreparedStatement statement = connection.prepareStatement("SELECT version_number FROM version")) {
-                    ResultSet resultSet = statement.executeQuery();
-                    checkArgument(resultSet.first());
-                    int version = resultSet.getInt(1);
-                    checkArgument(version == VERSION, "database version mismatch, expected %s, found %s", VERSION, version);
-                    logger.info("database check ok, version = {}", version);
-                }
-            } catch (Exception ex) {
-                logger.warn("invalid database, resetting db", ex);
-                initDb();
+            try (PreparedStatement statement = connection.prepareStatement("SELECT version_number FROM version")) {
+                ResultSet resultSet = statement.executeQuery();
+                checkArgument(resultSet.first());
+                int version = resultSet.getInt(1);
+                checkArgument(version == VERSION, "database version mismatch, expected %s, found %s", VERSION, version);
+                logger.info("database check ok, version = {}", version);
             }
-        } catch (Exception ex) {
-            close();
-            throw new RuntimeException(ex);
+        } catch (SQLException ex) {
+            logger.warn("invalid database, resetting db", ex);
+            initDb();
         }
     }
 
@@ -424,12 +409,7 @@ public class SqlRepository implements Closeable, IndexRepository, DeviceAddressR
 
     private FileBlocks readFileBlocks(ResultSet resultSet) throws SQLException, InvalidProtocolBufferException {
         IndexSerializationProtos.Blocks blocks = IndexSerializationProtos.Blocks.parseFrom(resultSet.getBytes("blocks"));
-        List<BlockInfo> blockList = Lists.transform(blocks.getBlocksList(), new Function<IndexSerializationProtos.BlockInfo, BlockInfo>() {
-            @Override
-            public BlockInfo apply(IndexSerializationProtos.BlockInfo record) {
-                return new BlockInfo(record.getOffset(), record.getSize(), BaseEncoding.base16().encode(record.getHash().toByteArray()));
-            }
-        });
+        List<BlockInfo> blockList = Lists.transform(blocks.getBlocksList(), record -> new BlockInfo(record.getOffset(), record.getSize(), BaseEncoding.base16().encode(record.getHash().toByteArray())));
         return new FileBlocks(resultSet.getString("folder"), resultSet.getString("path"), blockList);
     }
 
@@ -449,16 +429,11 @@ public class SqlRepository implements Closeable, IndexRepository, DeviceAddressR
                     prepareStatement.setString(3, newFileBlocks.getHash());
                     prepareStatement.setLong(4, newFileBlocks.getSize());
                     prepareStatement.setBytes(5, IndexSerializationProtos.Blocks.newBuilder()
-                        .addAllBlocks(Iterables.transform(newFileBlocks.getBlocks(), new Function<BlockInfo, IndexSerializationProtos.BlockInfo>() {
-                            @Override
-                            public IndexSerializationProtos.BlockInfo apply(BlockInfo input) {
-                                return IndexSerializationProtos.BlockInfo.newBuilder()
-                                    .setOffset(input.getOffset())
-                                    .setSize(input.getSize())
-                                    .setHash(ByteString.copyFrom(BaseEncoding.base16().decode(input.getHash())))
-                                    .build();
-                            }
-                        })).build().toByteArray());
+                        .addAllBlocks(Iterables.transform(newFileBlocks.getBlocks(), input -> IndexSerializationProtos.BlockInfo.newBuilder()
+                            .setOffset(input.getOffset())
+                            .setSize(input.getSize())
+                            .setHash(ByteString.copyFrom(BaseEncoding.base16().decode(input.getHash())))
+                            .build())).build().toByteArray());
                     prepareStatement.executeUpdate();
                 }
             }

@@ -407,7 +407,7 @@ public class IndexHandler implements Closeable {
             queuedRecords += data.getFilesCount();
             executorService.submit(new ProcessingRunnable() {
                 @Override
-                protected void runProcess() throws Exception {
+                protected void runProcess() {
                     doHandleIndexMessageReceivedEvent(data, clusterConfigInfo, peerDeviceId);
                 }
 
@@ -421,8 +421,12 @@ public class IndexHandler implements Closeable {
             queuedRecords += data.getFilesCount();
             executorService.submit(new ProcessingRunnable() {
                 @Override
-                protected void runProcess() throws Exception {
-                    doHandleIndexMessageReceivedEvent(key, clusterConfigInfo, peerDeviceId);
+                protected void runProcess() {
+                    try {
+                        doHandleIndexMessageReceivedEvent(key, clusterConfigInfo, peerDeviceId);
+                    } catch (IOException ex) {
+                        logger.error("error processing index message", ex);
+                    }
                 }
 
             });
@@ -433,11 +437,7 @@ public class IndexHandler implements Closeable {
             @Override
             public void run() {
                 stopwatch = Stopwatch.createStarted();
-                try {
-                    runProcess();
-                } catch (Exception ex) {
-                    logger.error("error processing index message", ex);
-                }
+                runProcess();
                 queuedMessages--;
 //                lastRecordProcessingTime = stopwatch.elapsed(TimeUnit.MILLISECONDS) - delay;
 //                logger.info("processed a bunch of records, {}*{} remaining", queuedMessages, MAX_RECORD_PER_PROCESS);
@@ -445,7 +445,7 @@ public class IndexHandler implements Closeable {
                 stopwatch = null;
             }
 
-            protected abstract void runProcess() throws Exception;
+            protected abstract void runProcess();
 
 //        private boolean isVersionOlderThanSequence(BlockExchageProtos.FileInfo fileInfo, long localSequence) {
 //            long fileSequence = fileInfo.getSequence();
@@ -486,14 +486,9 @@ public class IndexHandler implements Closeable {
 //                    if (oldIndexInfo != null && isVersionOlderThanSequence(fileInfo, oldIndexInfo.getLocalSequence())) {
 //                        logger.trace("skipping file {}, version older than sequence {}", fileInfo, oldIndexInfo.getLocalSequence());
 //                    } else {
-                    try {
-                        FileInfo newRecord = pushRecord(folder, fileInfo);
-                        if (newRecord != null) {
-                            newRecords.add(newRecord);
-                        }
-                    } catch (Exception ex) {
-                        logger.warn("error processing file record = {}, discarding", fileInfo);
-                        logger.warn("error", ex);
+                    FileInfo newRecord = pushRecord(folder, fileInfo);
+                    if (newRecord != null) {
+                        newRecords.add(newRecord);
                     }
                     sequence = Math.max(fileInfo.getSequence(), sequence);
                     markActive();

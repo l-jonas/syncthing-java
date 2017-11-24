@@ -21,11 +21,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.gson.Gson;
 
-import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.SSLContextBuilder;
@@ -37,6 +34,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -87,19 +87,9 @@ public class GlobalDiscoveryHandler implements Closeable {
         synchronized (this) {
             if (serverList == null) {
                 logger.debug("ranking discovery server addresses");
-                List<DeviceAddress> list = AddressRanker.testAndRank(Lists.transform(configuration.getDiscoveryServers(), new Function<String, DeviceAddress>() {
-                    @Override
-                    public DeviceAddress apply(String input) {
-                        return new DeviceAddress(input, "tcp://" + input + ":443");
-                    }
-                }));
+                List<DeviceAddress> list = AddressRanker.testAndRank(Lists.transform(configuration.getDiscoveryServers(), input -> new DeviceAddress(input, "tcp://" + input + ":443")));
                 logger.info("discovery server addresses = \n\n{}\n", AddressRanker.dumpAddressRanking(list));
-                serverList = Lists.newArrayList(Lists.transform(list, new Function<DeviceAddress, String>() {
-                    @Override
-                    public String apply(DeviceAddress input) {
-                        return input.getDeviceId();
-                    }
-                }));
+                serverList = Lists.newArrayList(Lists.transform(list, input -> input.getDeviceId()));
             }
         }
         for (String server : serverList) {
@@ -125,29 +115,21 @@ public class GlobalDiscoveryHandler implements Closeable {
                 .setSSLSocketFactory(new SSLConnectionSocketFactory(new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy()).build(), SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER))
                 .build();
             HttpGet httpGet = new HttpGet("https://" + server + "/v2/?device=" + deviceId);
-            return httpClient.execute(httpGet, new ResponseHandler<List<DeviceAddress>>() {
-                @Override
-                public List<DeviceAddress> handleResponse(HttpResponse response) throws ClientProtocolException, IOException {
-                    switch (response.getStatusLine().getStatusCode()) {
-                        case HttpStatus.SC_NOT_FOUND:
-                            logger.debug("device not found: {}", deviceId);
-                            return Collections.emptyList();
-                        case HttpStatus.SC_OK:
-                            AnnouncementMessageBean announcementMessageBean = gson.fromJson(EntityUtils.toString(response.getEntity()), AnnouncementMessageBean.class);
-                            List<DeviceAddress> list = Lists.newArrayList(Iterables.transform(firstNonNull(announcementMessageBean.getAddresses(), Collections.emptyList()), new Function<String, DeviceAddress>() {
-                                @Override
-                                public DeviceAddress apply(String address) {
-                                    return new DeviceAddress(deviceId, address);
-                                }
-                            }));
-                            logger.debug("found address list = {}", list);
-                            return list;
-                        default:
-                            throw new IOException("http error " + response.getStatusLine());
-                    }
+            return httpClient.execute(httpGet, response -> {
+                switch (response.getStatusLine().getStatusCode()) {
+                    case HttpStatus.SC_NOT_FOUND:
+                        logger.debug("device not found: {}", deviceId);
+                        return Collections.emptyList();
+                    case HttpStatus.SC_OK:
+                        AnnouncementMessageBean announcementMessageBean = gson.fromJson(EntityUtils.toString(response.getEntity()), AnnouncementMessageBean.class);
+                        List<DeviceAddress> list = Lists.newArrayList(Iterables.transform(firstNonNull(announcementMessageBean.getAddresses(), Collections.emptyList()), address -> new DeviceAddress(deviceId, address)));
+                        logger.debug("found address list = {}", list);
+                        return list;
+                    default:
+                        throw new IOException("http error " + response.getStatusLine());
                 }
             });
-        } catch (Exception ex) {
+        } catch (IOException | NoSuchAlgorithmException | KeyStoreException | KeyManagementException ex) {
             logger.warn("error in global discovery for device = " + deviceId, ex);
         }
         return null;

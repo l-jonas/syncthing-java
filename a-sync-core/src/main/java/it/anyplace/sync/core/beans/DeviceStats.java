@@ -72,7 +72,7 @@ public class DeviceStats {
         return "DeviceStats{" + "deviceId=" + deviceId + ", name=" + name + ", status=" + status + '}';
     }
 
-    public static enum DeviceStatus {
+    public enum DeviceStatus {
         OFFLINE, ONLINE_ACTIVE, ONLINE_INACTIVE
     }
 

@@ -14,7 +14,6 @@
 package it.anyplace.sync.core.beans;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -149,29 +148,19 @@ public class DeviceAddress {
     }
 
     public URI getUriSafe() {
-        try {
             return URI.create(getAddress());
-        } catch (Exception ex) {
-            logger.warn("processing invalid url = {}, ex = {}; stripping params", getAddress(), ex.toString());
-            return URI.create(getAddress().replaceFirst("^([^/]+://[^/]+)(/.*)?$", "$1"));
-        }
+        //} catch (Exception ex) {
+        //    logger.warn("processing invalid url = {}, ex = {}; stripping params", getAddress(), ex.toString());
+        //    return URI.create(getAddress().replaceFirst("^([^/]+://[^/]+)(/.*)?$", "$1"));
+        //}
     }
 
     public @Nullable
     String getUriParam(final String key) {
         Preconditions.checkNotNull(emptyToNull(key));
-        try {
-            NameValuePair record = Iterables.find(URLEncodedUtils.parse(getUriSafe(), StandardCharsets.UTF_8.name()), new Predicate<NameValuePair>() {
-                @Override
-                public boolean apply(NameValuePair input) {
-                    return equal(input.getName(), key);
-                }
-            }, null);
-            return record == null ? null : record.getValue();
-        } catch (Exception ex) {
-            logger.warn("ex", ex);
-            return null;
-        }
+        NameValuePair record = Iterables.find(URLEncodedUtils.parse(getUriSafe(),
+                StandardCharsets.UTF_8.name()), input -> equal(input.getName(), key), null);
+        return record == null ? null : record.getValue();
     }
 
     public enum AddressType {

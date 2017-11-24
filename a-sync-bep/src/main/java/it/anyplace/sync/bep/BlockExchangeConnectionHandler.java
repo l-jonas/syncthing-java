@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.security.cert.CertificateException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -138,121 +139,124 @@ public class BlockExchangeConnectionHandler implements Closeable {
         return isConnected;
     }
 
-    public BlockExchangeConnectionHandler connect() throws Exception {
+    public BlockExchangeConnectionHandler connect() throws IOException, KeystoreHandler.CryptoException {
         checkNotClosed();
         checkArgument(socket == null && !isConnected, "already connected!");
         logger.info("connecting to {}", address.getAddress());
 
         KeystoreHandler keystoreHandler = KeystoreHandler.newLoader().loadAndStore(configuration);
 
-        try {
-            switch (address.getType()) {
-                case TCP:
-                    logger.debug("opening tcp ssl connection");
-                    socket = keystoreHandler.createSocket(address.getSocketAddress(), BEP);
-                    break;
-                case RELAY: {
-                    logger.debug("opening relay connection");
-                    socket = keystoreHandler.wrapSocket(new RelayClient(configuration).openRelayConnection(address), BEP);
-                    break;
-                }
-                case HTTP_RELAY:
-                case HTTPS_RELAY: {
-                    logger.debug("opening http relay connection");
-                    socket = keystoreHandler.wrapSocket(new HttpRelayClient().openRelayConnection(address), BEP);
-                    break;
-                }
-                default:
-                    throw new UnsupportedOperationException("unsupported address type = " + address.getType());
+        switch (address.getType()) {
+            case TCP:
+                logger.debug("opening tcp ssl connection");
+                socket = keystoreHandler.createSocket(address.getSocketAddress(), BEP);
+                break;
+            case RELAY: {
+                logger.debug("opening relay connection");
+                socket = keystoreHandler.wrapSocket(new RelayClient(configuration).openRelayConnection(address), BEP);
+                break;
             }
-            in = new DataInputStream(socket.getInputStream());
-            out = new DataOutputStream(socket.getOutputStream());
-
-            sendHelloMessage(BlockExchageProtos.Hello.newBuilder()
-                .setClientName(configuration.getClientName())
-                .setClientVersion(configuration.getClientVersion())
-                .setDeviceName(configuration.getDeviceName())
-                .build().toByteArray());
-            markActivityOnSocket();
-
-            BlockExchageProtos.Hello hello = receiveHelloMessage();
-            logger.trace("received hello message = {}", hello);
-            ConnectionInfo connectionInfo = new ConnectionInfo();
-            connectionInfo.setClientName(hello.getClientName());
-            connectionInfo.setClientVersion(hello.getClientVersion());
-            connectionInfo.setDeviceName(hello.getDeviceName());
-            logger.info("connected to device = {}", connectionInfo);
-            keystoreHandler.checkSocketCerificate((SSLSocket) socket, address.getDeviceId());
-            {
-                ClusterConfig.Builder clusterConfigBuilder = ClusterConfig.newBuilder();
-                for (String folder : configuration.getFolderNames()) {
-                    Folder.Builder folderBuilder = clusterConfigBuilder.addFoldersBuilder().setId(folder);
-                    {
-                        //our device
-                        Device.Builder deviceBuilder = folderBuilder.addDevicesBuilder()
-                            .setId(ByteString.copyFrom(deviceIdStringToHashData(configuration.getDeviceId())));
-                        if (indexHandler != null) {
-                            deviceBuilder.setIndexId(indexHandler.getSequencer().indexId())
-                                .setMaxSequence(indexHandler.getSequencer().currentSequence());
-                        }
-                    }
-                    {
-                        //other device
-                        Device.Builder deviceBuilder = folderBuilder.addDevicesBuilder()
-                            .setId(ByteString.copyFrom(deviceIdStringToHashData(address.getDeviceId())));
-                        if (indexHandler != null) {
-                            IndexInfo indexSequenceInfo = indexHandler.getIndexRepository().findIndexInfoByDeviceAndFolder(address.getDeviceId(), folder);
-                            if (indexSequenceInfo != null) {
-                                deviceBuilder
-                                    .setIndexId(indexSequenceInfo.getIndexId())
-                                    .setMaxSequence(indexSequenceInfo.getLocalSequence());
-                                logger.info("send delta index info device = {} index = {} max (local) sequence = {}",
-                                    indexSequenceInfo.getDeviceId(),
-                                    indexSequenceInfo.getIndexId(),
-                                    indexSequenceInfo.getLocalSequence());
-                            }
-                        }
-                    }
-                    //TODO other devices??
-                }
-                sendMessage(clusterConfigBuilder.build());
+            case HTTP_RELAY:
+            case HTTPS_RELAY: {
+                logger.debug("opening http relay connection");
+                socket = keystoreHandler.wrapSocket(new HttpRelayClient().openRelayConnection(address), BEP);
+                break;
             }
-            final Object clusterConfigWaitingLock = new Object();
-            synchronized (clusterConfigWaitingLock) {
-                Object listener = new Object() {
-                    @Subscribe
-                    public void handleClusterConfigMessageProcessedEvent(ClusterConfigMessageProcessedEvent event) {
-                        synchronized (clusterConfigWaitingLock) {
-                            clusterConfigWaitingLock.notifyAll();
-                        }
-                    }
-
-                    @Subscribe
-                    public void handleConnectionClosedEvent(ConnectionClosedEvent event) {
-                        synchronized (clusterConfigWaitingLock) {
-                            clusterConfigWaitingLock.notifyAll();
-                        }
-                    }
-                };
-                eventBus.register(listener);
-                startMessageListenerService();
-                while (clusterConfigInfo == null && !isClosed()) {
-                    logger.debug("wait for cluster config");
-                    clusterConfigWaitingLock.wait();
-                }
-                checkNotNull(clusterConfigInfo, "unable to retrieve cluster config from peer!");
-                eventBus.unregister(listener);
-            }
-            for (String folder : configuration.getFolderNames()) {
-                if (hasFolder(folder)) {
-                    sendIndexMessage(folder);
-                }
-            }
-            periodicExecutorService.scheduleWithFixedDelay(this::sendPing, 90, 90, TimeUnit.SECONDS);
-        } catch (Exception ex) {
-            close();
-            throw ex;
+            default:
+                throw new UnsupportedOperationException("unsupported address type = " + address.getType());
         }
+        in = new DataInputStream(socket.getInputStream());
+        out = new DataOutputStream(socket.getOutputStream());
+
+        sendHelloMessage(BlockExchageProtos.Hello.newBuilder()
+            .setClientName(configuration.getClientName())
+            .setClientVersion(configuration.getClientVersion())
+            .setDeviceName(configuration.getDeviceName())
+            .build().toByteArray());
+        markActivityOnSocket();
+
+        BlockExchageProtos.Hello hello = receiveHelloMessage();
+        logger.trace("received hello message = {}", hello);
+        ConnectionInfo connectionInfo = new ConnectionInfo();
+        connectionInfo.setClientName(hello.getClientName());
+        connectionInfo.setClientVersion(hello.getClientVersion());
+        connectionInfo.setDeviceName(hello.getDeviceName());
+        logger.info("connected to device = {}", connectionInfo);
+        try {
+            keystoreHandler.checkSocketCerificate((SSLSocket) socket, address.getDeviceId());
+        } catch (CertificateException e) {
+            throw new IOException(e);
+        }
+        {
+            ClusterConfig.Builder clusterConfigBuilder = ClusterConfig.newBuilder();
+            for (String folder : configuration.getFolderNames()) {
+                Folder.Builder folderBuilder = clusterConfigBuilder.addFoldersBuilder().setId(folder);
+                {
+                    //our device
+                    Device.Builder deviceBuilder = folderBuilder.addDevicesBuilder()
+                        .setId(ByteString.copyFrom(deviceIdStringToHashData(configuration.getDeviceId())));
+                    if (indexHandler != null) {
+                        deviceBuilder.setIndexId(indexHandler.getSequencer().indexId())
+                            .setMaxSequence(indexHandler.getSequencer().currentSequence());
+                    }
+                }
+                {
+                    //other device
+                    Device.Builder deviceBuilder = folderBuilder.addDevicesBuilder()
+                        .setId(ByteString.copyFrom(deviceIdStringToHashData(address.getDeviceId())));
+                    if (indexHandler != null) {
+                        IndexInfo indexSequenceInfo = indexHandler.getIndexRepository().findIndexInfoByDeviceAndFolder(address.getDeviceId(), folder);
+                        if (indexSequenceInfo != null) {
+                            deviceBuilder
+                                .setIndexId(indexSequenceInfo.getIndexId())
+                                .setMaxSequence(indexSequenceInfo.getLocalSequence());
+                            logger.info("send delta index info device = {} index = {} max (local) sequence = {}",
+                                indexSequenceInfo.getDeviceId(),
+                                indexSequenceInfo.getIndexId(),
+                                indexSequenceInfo.getLocalSequence());
+                        }
+                    }
+                }
+                //TODO other devices??
+            }
+            sendMessage(clusterConfigBuilder.build());
+        }
+        final Object clusterConfigWaitingLock = new Object();
+        synchronized (clusterConfigWaitingLock) {
+            Object listener = new Object() {
+                @Subscribe
+                public void handleClusterConfigMessageProcessedEvent(ClusterConfigMessageProcessedEvent event) {
+                    synchronized (clusterConfigWaitingLock) {
+                        clusterConfigWaitingLock.notifyAll();
+                    }
+                }
+
+                @Subscribe
+                public void handleConnectionClosedEvent(ConnectionClosedEvent event) {
+                    synchronized (clusterConfigWaitingLock) {
+                        clusterConfigWaitingLock.notifyAll();
+                    }
+                }
+            };
+            eventBus.register(listener);
+            startMessageListenerService();
+            while (clusterConfigInfo == null && !isClosed()) {
+                logger.debug("wait for cluster config");
+                try {
+                    clusterConfigWaitingLock.wait();
+                } catch (InterruptedException e) {
+                    throw new IOException(e);
+                }
+            }
+            checkNotNull(clusterConfigInfo, "unable to retrieve cluster config from peer!");
+            eventBus.unregister(listener);
+        }
+        for (String folder : configuration.getFolderNames()) {
+            if (hasFolder(folder)) {
+                sendIndexMessage(folder);
+            }
+        }
+        periodicExecutorService.scheduleWithFixedDelay(this::sendPing, 90, 90, TimeUnit.SECONDS);
         isConnected = true;
         return this;
     }
@@ -423,6 +427,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
                 inExecutorService.awaitTermination(2, TimeUnit.SECONDS);
                 messageProcessingService.awaitTermination(2, TimeUnit.SECONDS);
             } catch (InterruptedException ex) {
+                logger.warn("", ex);
             }
         }
     }
@@ -469,84 +474,75 @@ public class BlockExchangeConnectionHandler implements Closeable {
                     logger.trace("received message = {}", message.getRight());
                     messageProcessingService.submit(() -> {
                         logger.debug("processing message type = {} {}", message.getLeft(), getIdForMessage(message.getRight()));
-                        try {
-                            switch (message.getLeft()) {
-                                case INDEX:
-                                    eventBus.post(new IndexMessageReceivedEvent((Index) message.getValue()));
-                                    break;
-                                case INDEX_UPDATE:
-                                    eventBus.post(new IndexUpdateMessageReceivedEvent((IndexUpdate) message.getValue()));
-                                    break;
-                                case REQUEST:
-                                    eventBus.post(new RequestMessageReceivedEvent((Request) message.getValue()));
-                                    break;
-                                case RESPONSE:
-                                    eventBus.post(new ResponseMessageReceivedEvent((Response) message.getValue()));
-                                    break;
-                                case PING:
-                                    logger.debug("ping message received");
-                                    break;
-                                case CLOSE:
-                                    logger.info("received close message = {}", message.getValue());
-                                    closeBg();
-                                    break;
-                                case CLUSTER_CONFIG: {
-                                    checkArgument(clusterConfigInfo == null, "received cluster config message twice!");
-                                    clusterConfigInfo = new ClusterConfigInfo();
-                                    ClusterConfig clusterConfig = (ClusterConfig) message.getValue();
-                                    for (Folder folder : firstNonNull(clusterConfig.getFoldersList(), Collections.<Folder>emptyList())) {
-                                        ClusterConfigFolderInfo.Builder builder = ClusterConfigFolderInfo.newBuilder()
-                                            .setFolder(folder.getId())
-                                            .setLabel(folder.getLabel());
-                                        Map<String, Device> devicesById = Maps.uniqueIndex(firstNonNull(folder.getDevicesList(), Collections.emptyList()),
-                                                input -> hashDataToDeviceIdString(input.getId().toByteArray()));
-                                        Device otherDevice = devicesById.get(address.getDeviceId()),
-                                            ourDevice = devicesById.get(configuration.getDeviceId());
-                                        if (otherDevice != null) {
-                                            builder.setAnnounced(true);
-                                        }
-                                        final ClusterConfigFolderInfo folderInfo;
-                                        if (ourDevice != null) {
-                                            folderInfo = builder.setShared(true).build();
-                                            logger.info("folder shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
-                                            if (!configuration.getFolderNames().contains(folderInfo.getFolder())) {
-                                                configuration.edit().addFolders(new FolderInfo(folderInfo.getFolder(), folderInfo.getLabel()));
-                                                logger.info("new folder shared = {}", folderInfo);
-                                                eventBus.post(new NewFolderSharedEvent() {
-                                                    @Override
-                                                    public String getFolder() {
-                                                        return folderInfo.getFolder();
-                                                    }
-
-                                                });
-                                            }
-                                        } else {
-                                            folderInfo = builder.build();
-                                            logger.info("folder not shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
-                                        }
-                                        clusterConfigInfo.putFolderInfo(folderInfo);
-                                        configuration.edit().addPeers(Iterables.filter(Iterables.transform(firstNonNull(folder.getDevicesList(), Collections.emptyList()), device -> {
-                                            String deviceId = hashDataToDeviceIdString(device.getId().toByteArray()),
-                                                name = device.hasName() ? device.getName() : null;
-                                            return new DeviceInfo(deviceId, name);
-                                        }), s -> !equal(s.getDeviceId(), configuration.getDeviceId())));
-                                    }
-                                    configuration.edit().persistLater();
-                                    eventBus.post(new ClusterConfigMessageProcessedEvent(clusterConfig));
-                                }
+                        switch (message.getLeft()) {
+                            case INDEX:
+                                eventBus.post(new IndexMessageReceivedEvent((Index) message.getValue()));
                                 break;
+                            case INDEX_UPDATE:
+                                eventBus.post(new IndexUpdateMessageReceivedEvent((IndexUpdate) message.getValue()));
+                                break;
+                            case REQUEST:
+                                eventBus.post(new RequestMessageReceivedEvent((Request) message.getValue()));
+                                break;
+                            case RESPONSE:
+                                eventBus.post(new ResponseMessageReceivedEvent((Response) message.getValue()));
+                                break;
+                            case PING:
+                                logger.debug("ping message received");
+                                break;
+                            case CLOSE:
+                                logger.info("received close message = {}", message.getValue());
+                                closeBg();
+                                break;
+                            case CLUSTER_CONFIG: {
+                                checkArgument(clusterConfigInfo == null, "received cluster config message twice!");
+                                clusterConfigInfo = new ClusterConfigInfo();
+                                ClusterConfig clusterConfig = (ClusterConfig) message.getValue();
+                                for (Folder folder : firstNonNull(clusterConfig.getFoldersList(), Collections.<Folder>emptyList())) {
+                                    ClusterConfigFolderInfo.Builder builder = ClusterConfigFolderInfo.newBuilder()
+                                        .setFolder(folder.getId())
+                                        .setLabel(folder.getLabel());
+                                    Map<String, Device> devicesById = Maps.uniqueIndex(firstNonNull(folder.getDevicesList(), Collections.emptyList()),
+                                            input -> hashDataToDeviceIdString(input.getId().toByteArray()));
+                                    Device otherDevice = devicesById.get(address.getDeviceId()),
+                                        ourDevice = devicesById.get(configuration.getDeviceId());
+                                    if (otherDevice != null) {
+                                        builder.setAnnounced(true);
+                                    }
+                                    final ClusterConfigFolderInfo folderInfo;
+                                    if (ourDevice != null) {
+                                        folderInfo = builder.setShared(true).build();
+                                        logger.info("folder shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
+                                        if (!configuration.getFolderNames().contains(folderInfo.getFolder())) {
+                                            configuration.edit().addFolders(new FolderInfo(folderInfo.getFolder(), folderInfo.getLabel()));
+                                            logger.info("new folder shared = {}", folderInfo);
+                                            eventBus.post(new NewFolderSharedEvent() {
+                                                @Override
+                                                public String getFolder() {
+                                                    return folderInfo.getFolder();
+                                                }
+
+                                            });
+                                        }
+                                    } else {
+                                        folderInfo = builder.build();
+                                        logger.info("folder not shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
+                                    }
+                                    clusterConfigInfo.putFolderInfo(folderInfo);
+                                    configuration.edit().addPeers(Iterables.filter(Iterables.transform(firstNonNull(folder.getDevicesList(), Collections.emptyList()), device -> {
+                                        String deviceId = hashDataToDeviceIdString(device.getId().toByteArray()),
+                                            name = device.hasName() ? device.getName() : null;
+                                        return new DeviceInfo(deviceId, name);
+                                    }), s -> !equal(s.getDeviceId(), configuration.getDeviceId())));
+                                }
+                                configuration.edit().persistLater();
+                                eventBus.post(new ClusterConfigMessageProcessedEvent(clusterConfig));
                             }
-                        } catch (Exception ex) {
-                            if (messageProcessingService.isShutdown()) {
-                                return;
-                            }
-                            logger.error("error processing message", ex);
-                            closeBg();
-                            throw ex;
+                            break;
                         }
                     });
                 }
-            } catch (Exception ex) {
+            } catch (IOException ex) {
                 if (inExecutorService.isShutdown()) {
                     return;
                 }

@@ -54,17 +54,14 @@ public class DevicesHandler implements Closeable {
         checkNotNull(configuration);
         this.configuration = configuration;
         loadDevicesFromConfiguration();
-        scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                for (DeviceStats deviceStats : Lists.newArrayList(deviceStatsMap.values())) {
-                    switch (deviceStats.getStatus()) {
-                        case ONLINE_ACTIVE:
-                            if (new Date().getTime() - deviceStats.getLastActive().getTime() > 5 * 1000) {
-                                pushDeviceStats(deviceStats.copyBuilder().setStatus(DeviceStatus.ONLINE_INACTIVE).build());
-                            }
-                            break;
-                    }
+        scheduledExecutorService.scheduleAtFixedRate(() -> {
+            for (DeviceStats deviceStats : Lists.newArrayList(deviceStatsMap.values())) {
+                switch (deviceStats.getStatus()) {
+                    case ONLINE_ACTIVE:
+                        if (new Date().getTime() - deviceStats.getLastActive().getTime() > 5 * 1000) {
+                            pushDeviceStats(deviceStats.copyBuilder().setStatus(DeviceStatus.ONLINE_INACTIVE).build());
+                        }
+                        break;
                 }
             }
         }, 5, 5, TimeUnit.SECONDS);
@@ -129,12 +126,7 @@ public class DevicesHandler implements Closeable {
 
     private void pushDeviceStats(final DeviceStats deviceStats) {
         deviceStatsMap.put(deviceStats.getDeviceId(), deviceStats);
-        eventBus.post(new DeviceStatsUpdateEvent() {
-            @Override
-            public List<DeviceStats> getChangedDeviceStats() {
-                return Collections.singletonList(deviceStats);
-            }
-        });
+        eventBus.post((DeviceStatsUpdateEvent) () -> Collections.singletonList(deviceStats));
     }
 
     public interface DeviceStatsUpdateEvent {

@@ -13,6 +13,9 @@
  */
 package it.anyplace.sync.core.utils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -22,10 +25,13 @@ import java.util.concurrent.TimeUnit;
  */
 public class ExecutorUtils {
 
+    private static final Logger logger = LoggerFactory.getLogger(ExecutorUtils.class);
+
     public static void awaitTerminationSafe(ExecutorService executorService) {
         try {
             executorService.awaitTermination(2, TimeUnit.SECONDS);
         } catch (InterruptedException ex) {
+            logger.warn("", ex);
         }
 
     }

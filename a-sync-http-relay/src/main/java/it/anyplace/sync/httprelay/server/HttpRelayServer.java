@@ -60,18 +60,13 @@ public class HttpRelayServer implements Closeable {
 
     public HttpRelayServer(InetSocketAddress relayServerAddress) {
         this.relayServerAddress = relayServerAddress;
-        try {
-            this.configuration = ConfigurationService.newLoader().loadFrom(new File(System.getProperty("user.home"), ".config/a-sync-http-relay.properties"));
-        } catch (Exception ex) {
-            logger.warn("error loading config", ex);
-            this.configuration = ConfigurationService.newLoader().load();
-        }
+        this.configuration = ConfigurationService.newLoader().loadFrom(new File(System.getProperty("user.home"), ".config/a-sync-http-relay.properties"));
         KeystoreHandler.newLoader().loadAndStore(configuration);
     }
 
     private final Map<String, RelaySessionConnection> relayConnectionsBySessionId = Maps.newConcurrentMap();
 
-    private RelaySessionConnection openConnection(String deviceId) throws Exception {
+    private RelaySessionConnection openConnection(String deviceId) throws IOException, KeystoreHandler.CryptoException {
         RelayClient relayClient = new RelayClient(configuration);
         SessionInvitation sessionInvitation = relayClient.getSessionInvitation(relayServerAddress, deviceId);
         RelayConnection relayConnection = relayClient.openConnectionSessionMode(sessionInvitation);
@@ -113,7 +108,7 @@ public class HttpRelayServer implements Closeable {
                     HttpRelayProtos.HttpRelayPeerMessage peerMessage = HttpRelayProtos.HttpRelayPeerMessage.parseFrom(request.getInputStream());
                     logger.debug("handle peer message type = {} session id = {} sequence = {}", peerMessage.getMessageType(), peerMessage.getSessionId(), peerMessage.getSequence());
                     serverMessage = handleMessage(peerMessage);
-                } catch (Exception ex) {
+                } catch (IOException | KeystoreHandler.CryptoException ex) {
                     logger.error("error", ex);
                     serverMessage = HttpRelayProtos.HttpRelayServerMessage.newBuilder()
                         .setMessageType(HttpRelayProtos.HttpRelayServerMessageType.ERROR)
@@ -124,7 +119,7 @@ public class HttpRelayServer implements Closeable {
                 try {
                     serverMessage.writeTo(response.getOutputStream());
                     response.getOutputStream().flush();
-                } catch (Exception ex) {
+                } catch (IOException ex) {
                     logger.error("error", ex);
                 }
             }
@@ -133,7 +128,7 @@ public class HttpRelayServer implements Closeable {
         logger.info("http relay server READY on port {}", port);
     }
 
-    private HttpRelayProtos.HttpRelayServerMessage handleMessage(HttpRelayProtos.HttpRelayPeerMessage message) throws Exception {
+    private HttpRelayProtos.HttpRelayServerMessage handleMessage(HttpRelayProtos.HttpRelayPeerMessage message) throws IOException, KeystoreHandler.CryptoException {
         switch (message.getMessageType()) {
             case CONNECT: {
                 String deviceId = message.getDeviceId();

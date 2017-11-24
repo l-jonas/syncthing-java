@@ -17,6 +17,9 @@ import com.google.common.base.Function;
 import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Closeable;
 import java.util.Iterator;
 import java.util.PriorityQueue;
@@ -35,13 +38,9 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class DeviceAddressSupplier implements Closeable, Iterable<DeviceAddress> {
 
+    private final Logger logger = LoggerFactory.getLogger(getClass());
     private final DiscoveryHandler discoveryHandler;
-    private final Queue<DeviceAddress> deviceAddressQeue = new PriorityQueue<>(11, Ordering.natural().onResultOf(new Function<DeviceAddress, Integer>() {
-        @Override
-        public Integer apply(DeviceAddress deviceAddress) {
-            return deviceAddress.getScore();
-        }
-    }));
+    private final Queue<DeviceAddress> deviceAddressQeue = new PriorityQueue<>(11, Ordering.natural().onResultOf((Function<DeviceAddress, Integer>) deviceAddress -> deviceAddress.getScore()));
     private final Object queueLock = new Object();
     private final Object discoveryHandlerListener = new Object() {
         @Subscribe
@@ -104,6 +103,7 @@ public class DeviceAddressSupplier implements Closeable, Iterable<DeviceAddress>
                     try {
                         next = getDeviceAddressOrWait();
                     } catch (InterruptedException ex) {
+                        logger.warn("", ex);
                     }
                     hasNext = next != null;
                 }

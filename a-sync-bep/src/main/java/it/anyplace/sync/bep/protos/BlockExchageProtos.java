@@ -103,11 +103,7 @@ public final class BlockExchageProtos {
     }
     private static com.google.protobuf.Internal.EnumLiteMap<MessageType>
         internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<MessageType>() {
-            public MessageType findValueByNumber(int number) {
-              return MessageType.valueOf(number);
-            }
-          };
+            number -> MessageType.valueOf(number);
 
     public final com.google.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {
@@ -185,11 +181,7 @@ public final class BlockExchageProtos {
     }
     private static com.google.protobuf.Internal.EnumLiteMap<MessageCompression>
         internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<MessageCompression>() {
-            public MessageCompression findValueByNumber(int number) {
-              return MessageCompression.valueOf(number);
-            }
-          };
+            number -> MessageCompression.valueOf(number);
 
     public final com.google.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {
@@ -276,11 +268,7 @@ public final class BlockExchageProtos {
     }
     private static com.google.protobuf.Internal.EnumLiteMap<Compression>
         internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<Compression>() {
-            public Compression findValueByNumber(int number) {
-              return Compression.valueOf(number);
-            }
-          };
+            number -> Compression.valueOf(number);
 
     public final com.google.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {
@@ -385,11 +373,7 @@ public final class BlockExchageProtos {
     }
     private static com.google.protobuf.Internal.EnumLiteMap<FileInfoType>
         internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<FileInfoType>() {
-            public FileInfoType findValueByNumber(int number) {
-              return FileInfoType.valueOf(number);
-            }
-          };
+            number -> FileInfoType.valueOf(number);
 
     public final com.google.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {
@@ -485,11 +469,7 @@ public final class BlockExchageProtos {
     }
     private static com.google.protobuf.Internal.EnumLiteMap<ErrorCode>
         internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<ErrorCode>() {
-            public ErrorCode findValueByNumber(int number) {
-              return ErrorCode.valueOf(number);
-            }
-          };
+            number -> ErrorCode.valueOf(number);
 
     public final com.google.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {
@@ -567,11 +547,7 @@ public final class BlockExchageProtos {
     }
     private static com.google.protobuf.Internal.EnumLiteMap<FileDownloadProgressUpdateType>
         internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<FileDownloadProgressUpdateType>() {
-            public FileDownloadProgressUpdateType findValueByNumber(int number) {
-              return FileDownloadProgressUpdateType.valueOf(number);
-            }
-          };
+            number -> FileDownloadProgressUpdateType.valueOf(number);
 
     public final com.google.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {

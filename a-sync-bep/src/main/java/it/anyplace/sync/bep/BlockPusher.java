@@ -129,143 +129,124 @@ public class BlockPusher {
         checkArgument(connectionHandler.hasFolder(folder), "supplied connection handler %s will not share folder %s", connectionHandler, folder);
         checkArgument(fileInfo == null || equal(fileInfo.getFolder(), folder));
         checkArgument(fileInfo == null || equal(fileInfo.getPath(), path));
-        try {
-            final ExecutorService monitoringProcessExecutorService = Executors.newCachedThreadPool();
-            final long fileSize = dataSource.getSize();
-            final Set<String> sentBlocks = Sets.newConcurrentHashSet();
-            final AtomicReference<Exception> uploadError = new AtomicReference<>();
-            final AtomicBoolean isCompleted = new AtomicBoolean(false);
-            final Object updateLock = new Object();
-            final Object listener = new Object() {
-                @Subscribe
-                public void handleRequestMessageReceivedEvent(RequestMessageReceivedEvent event) {
-                    BlockExchageProtos.Request request = event.getMessage();
-                    if (equal(request.getFolder(), folder) && equal(request.getName(), path)) {
+        final ExecutorService monitoringProcessExecutorService = Executors.newCachedThreadPool();
+        final long fileSize = dataSource.getSize();
+        final Set<String> sentBlocks = Sets.newConcurrentHashSet();
+        final AtomicReference<Exception> uploadError = new AtomicReference<>();
+        final AtomicBoolean isCompleted = new AtomicBoolean(false);
+        final Object updateLock = new Object();
+        final Object listener = new Object() {
+            @Subscribe
+            public void handleRequestMessageReceivedEvent(RequestMessageReceivedEvent event) {
+                BlockExchageProtos.Request request = event.getMessage();
+                if (equal(request.getFolder(), folder) && equal(request.getName(), path)) {
+                    final String hash = BaseEncoding.base16().encode(request.getHash().toByteArray());
+                    logger.debug("handling block request = {}:{}-{} ({})", request.getName(), request.getOffset(), request.getSize(), hash);
+                    byte[] data = dataSource.getBlock(request.getOffset(), request.getSize(), hash);
+                    checkNotNull(data, "data not found for hash = %s", hash);
+                    final Future future = connectionHandler.sendMessage(Response.newBuilder()
+                        .setCode(BlockExchageProtos.ErrorCode.NO_ERROR)
+                        .setData(ByteString.copyFrom(data))
+                        .setId(request.getId())
+                        .build());
+                    monitoringProcessExecutorService.submit(() -> {
                         try {
-                            final String hash = BaseEncoding.base16().encode(request.getHash().toByteArray());
-                            logger.debug("handling block request = {}:{}-{} ({})", request.getName(), request.getOffset(), request.getSize(), hash);
-                            byte[] data = dataSource.getBlock(request.getOffset(), request.getSize(), hash);
-                            checkNotNull(data, "data not found for hash = %s", hash);
-                            final Future future = connectionHandler.sendMessage(Response.newBuilder()
-                                .setCode(BlockExchageProtos.ErrorCode.NO_ERROR)
-                                .setData(ByteString.copyFrom(data))
-                                .setId(request.getId())
-                                .build());
-                            monitoringProcessExecutorService.submit(() -> {
-                                try {
-                                    future.get();
-                                    sentBlocks.add(hash);
-                                    synchronized (updateLock) {
-                                        updateLock.notifyAll();
-                                    }
-                                    //TODO retry on error, register error and throw on watcher
-                                } catch (InterruptedException ex) {
-                                    //return and do nothing
-                                } catch (ExecutionException ex) {
-                                    uploadError.set(ex);
-                                    synchronized (updateLock) {
-                                        updateLock.notifyAll();
-                                    }
-                                }
-                            });
-                        } catch (Exception ex) {
-                            logger.error("error handling block request", ex);
-                            connectionHandler.sendMessage(Response.newBuilder()
-                                .setCode(BlockExchageProtos.ErrorCode.GENERIC)
-                                .setId(request.getId())
-                                .build());
+                            future.get();
+                            sentBlocks.add(hash);
+                            synchronized (updateLock) {
+                                updateLock.notifyAll();
+                            }
+                            //TODO retry on error, register error and throw on watcher
+                        } catch (InterruptedException ex) {
+                            //return and do nothing
+                        } catch (ExecutionException ex) {
                             uploadError.set(ex);
+                            synchronized (updateLock) {
+                                updateLock.notifyAll();
+                            }
+                        }
+                    });
+                }
+            }
+        };
+        connectionHandler.getEventBus().register(listener);
+        logger.debug("send index update for file = {}", path);
+        final Object indexListener = new Object() {
+
+            @Subscribe
+            public void handleIndexRecordAquiredEvent(IndexHandler.IndexRecordAquiredEvent event) {
+                if (equal(event.getFolder(), folder)) {
+                    for (FileInfo fileInfo : event.getNewRecords()) {
+                        if (equal(fileInfo.getPath(), path) && equal(fileInfo.getHash(), dataSource.getHash())) { //TODO check not invalid
+//                                sentBlocks.addAll(dataSource.getHashes());
+                            isCompleted.set(true);
                             synchronized (updateLock) {
                                 updateLock.notifyAll();
                             }
                         }
                     }
                 }
-            };
-            connectionHandler.getEventBus().register(listener);
-            logger.debug("send index update for file = {}", path);
-            final Object indexListener = new Object() {
-
-                @Subscribe
-                public void handleIndexRecordAquiredEvent(IndexHandler.IndexRecordAquiredEvent event) {
-                    if (equal(event.getFolder(), folder)) {
-                        for (FileInfo fileInfo : event.getNewRecords()) {
-                            if (equal(fileInfo.getPath(), path) && equal(fileInfo.getHash(), dataSource.getHash())) { //TODO check not invalid
-//                                sentBlocks.addAll(dataSource.getHashes());
-                                isCompleted.set(true);
-                                synchronized (updateLock) {
-                                    updateLock.notifyAll();
-                                }
-                            }
-                        }
-                    }
-                }
-            };
-            if (indexHandler != null) {
-                indexHandler.getEventBus().register(indexListener);
             }
-            final IndexUpdate indexUpdate = sendIndexUpdate(folder, BlockExchageProtos.FileInfo.newBuilder()
-                .setName(path)
-                .setSize(fileSize)
-                .setType(BlockExchageProtos.FileInfoType.FILE)
-                .addAllBlocks(dataSource.getBlocks()), fileInfo == null ? null : fileInfo.getVersionList()).getRight();
-            return new FileUploadObserver() {
-                @Override
-                public void close() {
-                    logger.debug("closing upload process");
-                    try {
-                        connectionHandler.getEventBus().unregister(listener);
-                        monitoringProcessExecutorService.shutdown();
-                        if (indexHandler != null) {
-                            indexHandler.getEventBus().unregister(indexListener);
-                        }
-                    } catch (Exception ex) {
-                    }
-                    if (closeConnection && connectionHandler != null) {
-                        connectionHandler.close();
-                    }
-                    if (indexHandler != null) {
-                        FileInfo fileInfo1 = indexHandler.pushRecord(indexUpdate.getFolder(), Iterables.getOnlyElement(indexUpdate.getFilesList()));
-                        logger.info("sent file info record = {}", fileInfo1);
-                    }
-                }
-
-                @Override
-                public double getProgress() {
-                    return isCompleted() ? 1d : sentBlocks.size() / ((double) dataSource.getHashes().size());
-                }
-
-                @Override
-                public String getProgressMessage() {
-                    return (Math.round(getProgress() * 1000d) / 10d) + "% " + sentBlocks.size() + "/" + dataSource.getHashes().size();
-                }
-
-                @Override
-                public boolean isCompleted() {
-//                    return sentBlocks.size() == dataSource.getHashes().size();
-                    return isCompleted.get();
-                }
-
-                @Override
-                public double waitForProgressUpdate() throws InterruptedException {
-                    synchronized (updateLock) {
-                        updateLock.wait();
-                    }
-                    if (uploadError.get() != null) {
-                        throw new RuntimeException(uploadError.get());
-                    }
-                    return getProgress();
-                }
-
-                @Override
-                public DataSource getDataSource() {
-                    return dataSource;
-                }
-
-            };
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
+        };
+        if (indexHandler != null) {
+            indexHandler.getEventBus().register(indexListener);
         }
+        final IndexUpdate indexUpdate = sendIndexUpdate(folder, BlockExchageProtos.FileInfo.newBuilder()
+            .setName(path)
+            .setSize(fileSize)
+            .setType(BlockExchageProtos.FileInfoType.FILE)
+            .addAllBlocks(dataSource.getBlocks()), fileInfo == null ? null : fileInfo.getVersionList()).getRight();
+        return new FileUploadObserver() {
+            @Override
+            public void close() {
+                logger.debug("closing upload process");
+                connectionHandler.getEventBus().unregister(listener);
+                monitoringProcessExecutorService.shutdown();
+                if (indexHandler != null) {
+                    indexHandler.getEventBus().unregister(indexListener);
+                }
+                if (closeConnection) {
+                    connectionHandler.close();
+                }
+                if (indexHandler != null) {
+                    FileInfo fileInfo1 = indexHandler.pushRecord(indexUpdate.getFolder(), Iterables.getOnlyElement(indexUpdate.getFilesList()));
+                    logger.info("sent file info record = {}", fileInfo1);
+                }
+            }
+
+            @Override
+            public double getProgress() {
+                return isCompleted() ? 1d : sentBlocks.size() / ((double) dataSource.getHashes().size());
+            }
+
+            @Override
+            public String getProgressMessage() {
+                return (Math.round(getProgress() * 1000d) / 10d) + "% " + sentBlocks.size() + "/" + dataSource.getHashes().size();
+            }
+
+            @Override
+            public boolean isCompleted() {
+//                    return sentBlocks.size() == dataSource.getHashes().size();
+                return isCompleted.get();
+            }
+
+            @Override
+            public double waitForProgressUpdate() throws InterruptedException {
+                synchronized (updateLock) {
+                    updateLock.wait();
+                }
+                if (uploadError.get() != null) {
+                    throw new RuntimeException(uploadError.get());
+                }
+                return getProgress();
+            }
+
+            @Override
+            public DataSource getDataSource() {
+                return dataSource;
+            }
+
+        };
     }
 
     private Pair<Future, IndexUpdate> sendIndexUpdate(String folder, BlockExchageProtos.FileInfo.Builder fileInfoBuilder, @Nullable Iterable<Version> oldVersions) {

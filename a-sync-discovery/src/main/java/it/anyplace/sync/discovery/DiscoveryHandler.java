@@ -13,7 +13,6 @@
  */
 package it.anyplace.sync.discovery;
 
-import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -78,17 +77,10 @@ public class DiscoveryHandler implements Closeable {
     private void updateAddressesBg() {
         if (shouldLoadFromDb) {
             shouldLoadFromDb = false;
-            executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        List<DeviceAddress> list = DiscoveryHandler.this.deviceAddressRepository.findAllDeviceAddress();
-                        logger.info("received device address list from database");
-                        processDeviceAddressBg(list);
-                    } catch (Exception ex) {
-                        logger.error("error loading device addresses from db", ex);
-                    }
-                }
+            executorService.submit(() -> {
+                List<DeviceAddress> list = DiscoveryHandler.this.deviceAddressRepository.findAllDeviceAddress();
+                logger.info("received device address list from database");
+                processDeviceAddressBg(list);
             });
         }
         if (shouldStartLocalDiscovery) {
@@ -98,20 +90,12 @@ public class DiscoveryHandler implements Closeable {
         }
         if (shouldLoadFromGlobal) {
             shouldLoadFromGlobal = false; //TODO timeout for reload
-            executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        for (String deviceId : DiscoveryHandler.this.configuration.getPeerIds()) {
-                            List<DeviceAddress> list = globalDiscoveryHandler.query(deviceId);
-                            logger.info("received device address list from global discovery");
-                            processDeviceAddressBg(list);
-                        }
-                    } catch (Exception ex) {
-                        logger.error("error loading device addresses from db", ex);
-                    }
+            executorService.submit(() -> {
+                for (String deviceId : DiscoveryHandler.this.configuration.getPeerIds()) {
+                    List<DeviceAddress> list = globalDiscoveryHandler.query(deviceId);
+                    logger.info("received device address list from global discovery");
+                    processDeviceAddressBg(list);
                 }
-
             });
         }
     }
@@ -120,26 +104,16 @@ public class DiscoveryHandler implements Closeable {
         if (isClosed) {
             logger.debug("discarding device addresses, discovery handler already closed");
         } else {
-            executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        logger.info("processing device address list");
-                        List<DeviceAddress> list = Lists.newArrayList(deviceAddresses);
-                        final Set<String> peers = Sets.newHashSet(configuration.getPeerIds());
-                        Iterables.removeIf(list, new Predicate<DeviceAddress>() { //do not process address already processed
-                            @Override
-                            public boolean apply(DeviceAddress deviceAddress) {
-                                return !peers.contains(deviceAddress.getDeviceId()) || deviceAddressMap.containsKey(Pair.of(deviceAddress.getDeviceId(), deviceAddress.getAddress()));
-                            }
-                        });
-                        list = AddressRanker.testAndRank(list);
-                        for (DeviceAddress deviceAddress : list) {
-                            putDeviceAddress(deviceAddress);
-                        }
-                    } catch (Exception ex) {
-                        logger.error("error processing device addresses", ex);
-                    }
+            executorService.submit(() -> {
+                logger.info("processing device address list");
+                List<DeviceAddress> list = Lists.newArrayList(deviceAddresses);
+                final Set<String> peers = Sets.newHashSet(configuration.getPeerIds());
+                //do not process address already processed
+                Iterables.removeIf(list, deviceAddress ->
+                        !peers.contains(deviceAddress.getDeviceId()) || deviceAddressMap.containsKey(Pair.of(deviceAddress.getDeviceId(), deviceAddress.getAddress())));
+                list = AddressRanker.testAndRank(list);
+                for (DeviceAddress deviceAddress : list) {
+                    putDeviceAddress(deviceAddress);
                 }
             });
         }
@@ -168,12 +142,7 @@ public class DiscoveryHandler implements Closeable {
     }
 
     public List<DeviceAddress> getAllWorkingDeviceAddresses() {
-        return Lists.newArrayList(Iterables.filter(deviceAddressMap.values(), new Predicate<DeviceAddress>() {
-            @Override
-            public boolean apply(DeviceAddress deviceAddress) {
-                return deviceAddress.isWorking();
-            }
-        }));
+        return Lists.newArrayList(Iterables.filter(deviceAddressMap.values(), deviceAddress -> deviceAddress.isWorking()));
     }
 
     @Override

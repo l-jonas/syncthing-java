@@ -13,7 +13,6 @@
  */
 package it.anyplace.sync.discovery.utils;
 
-import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Stopwatch;
 import com.google.common.cache.CacheBuilder;
@@ -38,7 +37,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -88,13 +86,7 @@ public class AddressRanker implements Closeable {
         logger.trace("testing and ranking peer addresses");
         List<Future<DeviceAddress>> futures = Lists.newArrayList();
         for (final DeviceAddress deviceAddress : preprocessDeviceAddresses(sourceAddresses)) {
-            futures.add(executorService.submit(new Callable<DeviceAddress>() {
-
-                @Override
-                public DeviceAddress call() {
-                    return testAndRank(deviceAddress);
-                }
-            }));
+            futures.add(executorService.submit(() -> testAndRank(deviceAddress)));
         }
         for (Future<DeviceAddress> future : futures) {
             try {
@@ -108,21 +100,11 @@ public class AddressRanker implements Closeable {
                 logger.warn("test address timeout : {}", ex.toString());
             }
         }
-        Collections.sort(targetAddresses, Ordering.natural().onResultOf(new Function<DeviceAddress, Comparable>() {
-            @Override
-            public Comparable apply(DeviceAddress a) {
-                return a.getScore();
-            }
-        }));
+        Collections.sort(targetAddresses, Ordering.natural().onResultOf(a -> a.getScore()));
     }
 
     public static String dumpAddressRanking(List<DeviceAddress> list) {
-        return Joiner.on("\n").join(Lists.transform(list, new Function<DeviceAddress, String>() {
-            @Override
-            public String apply(DeviceAddress a) {
-                return "\t" + a.getDeviceId() + "\t" + a.getAddress();
-            }
-        }));
+        return Joiner.on("\n").join(Lists.transform(list, a -> "\t" + a.getDeviceId() + "\t" + a.getAddress()));
     }
 
     public String dumpAddressRanking() {
@@ -144,19 +126,13 @@ public class AddressRanker implements Closeable {
             logger.trace("dropping unsupported address = {}", deviceAddress);
             return null;
         }
-        try {
-            int baseScore = BASE_SCORE_MAP.get(deviceAddress.getType());
-            int ping = testTcpConnection(deviceAddress.getSocketAddress());
-            if (ping < 0) {
-                logger.trace("dropping unreacheable address = {}", deviceAddress);
-                return null;
-            } else {
-                return deviceAddress.copyBuilder().setScore(ping + baseScore).build();
-            }
-        } catch (Exception ex) {
-            logger.warn("error testing device address = {}, discarding address", deviceAddress);
-            logger.warn("error testing device address, discarding address", ex);
+        int baseScore = BASE_SCORE_MAP.get(deviceAddress.getType());
+        int ping = testTcpConnection(deviceAddress.getSocketAddress());
+        if (ping < 0) {
+            logger.trace("dropping unreacheable address = {}", deviceAddress);
             return null;
+        } else {
+            return deviceAddress.copyBuilder().setScore(ping + baseScore).build();
         }
     }
 
@@ -182,6 +158,7 @@ public class AddressRanker implements Closeable {
         try {
             executorService.awaitTermination(2, TimeUnit.SECONDS);
         } catch (InterruptedException ex) {
+            logger.warn("", ex);
         }
     }
 

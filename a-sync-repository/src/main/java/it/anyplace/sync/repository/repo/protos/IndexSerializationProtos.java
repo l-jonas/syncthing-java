@@ -76,11 +76,7 @@ public final class IndexSerializationProtos {
     }
     private static com.google.protobuf.Internal.EnumLiteMap<FileInfoType>
         internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<FileInfoType>() {
-            public FileInfoType findValueByNumber(int number) {
-              return FileInfoType.valueOf(number);
-            }
-          };
+            number -> FileInfoType.valueOf(number);
 
     public final com.google.protobuf.Descriptors.EnumValueDescriptor
         getValueDescriptor() {
@@ -109,7 +105,7 @@ public final class IndexSerializationProtos {
     private final int index;
     private final int value;
 
-    private FileInfoType(int index, int value) {
+    FileInfoType(int index, int value) {
       this.index = index;
       this.value = value;
     }

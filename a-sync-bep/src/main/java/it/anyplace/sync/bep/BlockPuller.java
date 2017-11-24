@@ -13,7 +13,6 @@
  */
 package it.anyplace.sync.bep;
 
-import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -84,24 +83,19 @@ public class BlockPuller {
             @Subscribe
             public void handleResponseMessageReceivedEvent(ResponseMessageReceivedEvent event) {
                 synchronized (lock) {
-                    try {
-                        if (!requestIds.contains(event.getMessage().getId())) {
-                            return;
-                        }
-                        checkArgument(equal(event.getMessage().getCode(), ErrorCode.NO_ERROR), "received error response, code = %s", event.getMessage().getCode());
-                        byte[] data = event.getMessage().getData().toByteArray();
-                        String hash = BaseEncoding.base16().encode(Hashing.sha256().hashBytes(data).asBytes());
-                        blockCache.pushBlock(data);
-                        if (missingHashes.remove(hash)) {
-                            blocksByHash.put(hash, data);
-                            logger.debug("aquired block, hash = {}", hash);
-                            lock.notify();
-                        } else {
-                            logger.warn("received not-needed block, hash = {}", hash);
-                        }
-                    } catch (Exception ex) {
-                        error.set(ex);
+                    if (!requestIds.contains(event.getMessage().getId())) {
+                        return;
+                    }
+                    checkArgument(equal(event.getMessage().getCode(), ErrorCode.NO_ERROR), "received error response, code = %s", event.getMessage().getCode());
+                    byte[] data = event.getMessage().getData().toByteArray();
+                    String hash = BaseEncoding.base16().encode(Hashing.sha256().hashBytes(data).asBytes());
+                    blockCache.pushBlock(data);
+                    if (missingHashes.remove(hash)) {
+                        blocksByHash.put(hash, data);
+                        logger.debug("aquired block, hash = {}", hash);
                         lock.notify();
+                    } else {
+                        logger.warn("received not-needed block, hash = {}", hash);
                     }
                 }
             }
@@ -162,47 +156,39 @@ public class BlockPuller {
                 missingHashes.clear();
                 hashList.clear();
                 blocksByHash.clear();
-                try {
-                    connectionHandler.getEventBus().unregister(listener);
-                } catch (Exception ex) {
-                }
+                connectionHandler.getEventBus().unregister(listener);
                 if (closeConnection) {
                     connectionHandler.close();
                 }
             }
         };
-        try {
-            synchronized (lock) {
-                hashList.addAll(Lists.transform(fileBlocks.getBlocks(), BlockInfo::getHash));
-                missingHashes.addAll(hashList);
-                for (String hash : missingHashes) {
-                    byte[] block = blockCache.pullBlock(hash);
-                    if (block != null) {
-                        blocksByHash.put(hash, block);
-                        missingHashes.remove(hash);
-                    }
+        synchronized (lock) {
+            hashList.addAll(Lists.transform(fileBlocks.getBlocks(), BlockInfo::getHash));
+            missingHashes.addAll(hashList);
+            for (String hash : missingHashes) {
+                byte[] block = blockCache.pullBlock(hash);
+                if (block != null) {
+                    blocksByHash.put(hash, block);
+                    missingHashes.remove(hash);
                 }
-                connectionHandler.getEventBus().register(listener);
-                for (BlockInfo block : fileBlocks.getBlocks()) {
-                    if (missingHashes.contains(block.getHash())) {
-                        int requestId = Math.abs(new Random().nextInt());
-                        requestIds.add(requestId);
-                        connectionHandler.sendMessage(Request.newBuilder()
-                            .setId(requestId)
-                            .setFolder(fileBlocks.getFolder())
-                            .setName(fileBlocks.getPath())
-                            .setOffset(block.getOffset())
-                            .setSize(block.getSize())
-                            .setHash(ByteString.copyFrom(BaseEncoding.base16().decode(block.getHash())))
-                            .build());
-                        logger.debug("sent request for block, hash = {}", block.getHash());
-                    }
-                }
-                return fileDownloadObserver;
             }
-        } catch (Exception ex) {
-            fileDownloadObserver.close();
-            throw ex;
+            connectionHandler.getEventBus().register(listener);
+            for (BlockInfo block : fileBlocks.getBlocks()) {
+                if (missingHashes.contains(block.getHash())) {
+                    int requestId = Math.abs(new Random().nextInt());
+                    requestIds.add(requestId);
+                    connectionHandler.sendMessage(Request.newBuilder()
+                        .setId(requestId)
+                        .setFolder(fileBlocks.getFolder())
+                        .setName(fileBlocks.getPath())
+                        .setOffset(block.getOffset())
+                        .setSize(block.getSize())
+                        .setHash(ByteString.copyFrom(BaseEncoding.base16().decode(block.getHash())))
+                        .build());
+                    logger.debug("sent request for block, hash = {}", block.getHash());
+                }
+            }
+            return fileDownloadObserver;
         }
     }
 

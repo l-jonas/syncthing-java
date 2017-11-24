@@ -23,6 +23,7 @@ import com.google.common.eventbus.AsyncEventBus;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
 
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
@@ -31,6 +32,8 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.BindException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -50,7 +53,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import it.anyplace.sync.core.beans.DeviceAddress;
 import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
-import it.anyplace.sync.discovery.protocol.ld.protos.LocalDiscoveryProtos;
 import it.anyplace.sync.discovery.protocol.ld.protos.LocalDiscoveryProtos.Announce;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
@@ -102,6 +104,7 @@ public class LocalDiscorveryHandler implements Closeable {
                 try {
                     lock.wait(MAX_WAIT);
                 } catch (InterruptedException ex) {
+                    logger.warn("", ex);
                 }
                 synchronized (localDiscoveryRecords) {
                     return Lists.newArrayList(Iterables.concat(Iterables.transform(deviceIds, Functions.forMap(localDiscoveryRecords.asMap()))));
@@ -125,44 +128,38 @@ public class LocalDiscorveryHandler implements Closeable {
     }
 
     public Future sendAnnounceMessage() {
-        return processingExecutorService.submit(new Callable<Object>() {
-
-            @Override
-            public Object call() throws Exception {
-                for (int i = 0; i < 10 && !isListening; i++) { //wait for listening
-                    Thread.sleep(100);
-                }
-                if (!isListening) {
-                    logger.warn("skipping announce message, udp listening is not active");
-                    return null;
-                }
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                new DataOutputStream(out).writeInt(MAGIC);
-                Announce.newBuilder()
-                    .setId(ByteString.copyFrom(deviceIdStringToHashData(configuration.getDeviceId())))
-                    .setInstanceId(configuration.getInstanceId())
-                    .build().writeTo(out);
-                byte[] data = out.toByteArray();
-                Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
-                while (networkInterfaces.hasMoreElements()) {
-                    NetworkInterface networkInterface = networkInterfaces.nextElement();
-                    for (InterfaceAddress interfaceAddress : networkInterface.getInterfaceAddresses()) {
-                        InetAddress broadcastAddress = interfaceAddress.getBroadcast();
-                        logger.trace("interface = {} address = {} broadcast = {}", networkInterface, interfaceAddress, broadcastAddress);
-                        if (broadcastAddress != null) {
-                            logger.debug("sending broadcast announce on {}", broadcastAddress);
-                            try (DatagramSocket broadcastSocket = new DatagramSocket()) {
-                                broadcastSocket.setBroadcast(true);
-                                DatagramPacket datagramPacket = new DatagramPacket(data, data.length, broadcastAddress, UDP_PORT);
-                                broadcastSocket.send(datagramPacket);
-                            } catch (Exception ex) {
-                                logger.warn("error sending datagram", ex);
-                            }
+        return processingExecutorService.submit(() -> {
+            for (int i = 0; i < 10 && !isListening; i++) { //wait for listening
+                Thread.sleep(100);
+            }
+            if (!isListening) {
+                logger.warn("skipping announce message, udp listening is not active");
+                return null;
+            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            new DataOutputStream(out).writeInt(MAGIC);
+            Announce.newBuilder()
+                .setId(ByteString.copyFrom(deviceIdStringToHashData(configuration.getDeviceId())))
+                .setInstanceId(configuration.getInstanceId())
+                .build().writeTo(out);
+            byte[] data = out.toByteArray();
+            Enumeration<NetworkInterface> networkInterfaces = NetworkInterface.getNetworkInterfaces();
+            while (networkInterfaces.hasMoreElements()) {
+                NetworkInterface networkInterface = networkInterfaces.nextElement();
+                for (InterfaceAddress interfaceAddress : networkInterface.getInterfaceAddresses()) {
+                    InetAddress broadcastAddress = interfaceAddress.getBroadcast();
+                    logger.trace("interface = {} address = {} broadcast = {}", networkInterface, interfaceAddress, broadcastAddress);
+                    if (broadcastAddress != null) {
+                        logger.debug("sending broadcast announce on {}", broadcastAddress);
+                        try (DatagramSocket broadcastSocket = new DatagramSocket()) {
+                            broadcastSocket.setBroadcast(true);
+                            DatagramPacket datagramPacket = new DatagramPacket(data, data.length, broadcastAddress, UDP_PORT);
+                            broadcastSocket.send(datagramPacket);
                         }
                     }
                 }
-                return null;
             }
+            return null;
         });
     }
 
@@ -184,63 +181,57 @@ public class LocalDiscorveryHandler implements Closeable {
                     logger.trace("waiting for message on socket addr = {}", datagramSocket.getLocalSocketAddress());
                     isListening = true;
                     datagramSocket.receive(datagramPacket);
-                    processingExecutorService.submit(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                final String sourceAddress = datagramPacket.getAddress().getHostAddress();
-                                ByteBuffer byteBuffer = ByteBuffer.wrap(datagramPacket.getData(), datagramPacket.getOffset(), datagramPacket.getLength());
-                                int magic = byteBuffer.getInt(); //4 bytes
-                                checkArgument(magic == MAGIC, "magic mismatch, expected %s, got %s", MAGIC, magic);
-                                final LocalDiscoveryProtos.Announce announce = LocalDiscoveryProtos.Announce.parseFrom(ByteString.copyFrom(byteBuffer));
-                                final String deviceId = hashDataToDeviceIdString(announce.getId().toByteArray());
-                                if (!equal(deviceId, configuration.getDeviceId())) {
+                    processingExecutorService.submit(() -> {
+                        try {
+                            final String sourceAddress = datagramPacket.getAddress().getHostAddress();
+                            ByteBuffer byteBuffer = ByteBuffer.wrap(datagramPacket.getData(), datagramPacket.getOffset(), datagramPacket.getLength());
+                            int magic = byteBuffer.getInt(); //4 bytes
+                            checkArgument(magic == MAGIC, "magic mismatch, expected %s, got %s", MAGIC, magic);
+                            final Announce announce = Announce.parseFrom(ByteString.copyFrom(byteBuffer));
+                            final String deviceId = hashDataToDeviceIdString(announce.getId().toByteArray());
+                            if (!equal(deviceId, configuration.getDeviceId())) {
 //                                logger.debug("received local announce from device id = {}", deviceId);
-                                    final List<DeviceAddress> deviceAddresses = Lists.newArrayList(Iterables.transform(firstNonNull(announce.getAddressesList(), Collections.emptyList()), new Function<String, DeviceAddress>() {
-                                        @Override
-                                        public DeviceAddress apply(String address) {
+                                final List<DeviceAddress> deviceAddresses = Lists.newArrayList(Iterables.transform(firstNonNull(announce.getAddressesList(), Collections.emptyList()), address -> {
 //                                /*
 //                                When interpreting addresses with an unspecified address, e.g., tcp://0.0.0.0:22000 or tcp://:42424, the source address of the discovery announcement is to be used.
 //                                 */
-                                            return DeviceAddress.newBuilder().setAddress(address.replaceFirst("tcp://(0.0.0.0|):", "tcp://" + sourceAddress + ":"))
-                                                .setDeviceId(deviceId)
-                                                .setInstanceId(announce.getInstanceId())
-                                                .setProducer(DeviceAddress.AddressProducer.LOCAL_DISCOVERY)
-                                                .build();
-                                        }
-                                    }));
-                                    boolean isNew;
-                                    synchronized (localDiscoveryRecords) {
-                                        isNew = !localDiscoveryRecords.removeAll(deviceId).isEmpty();
-                                        localDiscoveryRecords.putAll(deviceId, deviceAddresses);
+                                    return DeviceAddress.newBuilder().setAddress(address.replaceFirst("tcp://(0.0.0.0|):", "tcp://" + sourceAddress + ":"))
+                                        .setDeviceId(deviceId)
+                                        .setInstanceId(announce.getInstanceId())
+                                        .setProducer(DeviceAddress.AddressProducer.LOCAL_DISCOVERY)
+                                        .build();
+                                }));
+                                boolean isNew;
+                                synchronized (localDiscoveryRecords) {
+                                    isNew = !localDiscoveryRecords.removeAll(deviceId).isEmpty();
+                                    localDiscoveryRecords.putAll(deviceId, deviceAddresses);
+                                }
+                                eventBus.post(new MessageReceivedEvent() {
+                                    @Override
+                                    public List<DeviceAddress> getDeviceAddresses() {
+                                        return Collections.unmodifiableList(deviceAddresses);
                                     }
-                                    eventBus.post(new MessageReceivedEvent() {
-                                        @Override
-                                        public List<DeviceAddress> getDeviceAddresses() {
-                                            return Collections.unmodifiableList(deviceAddresses);
-                                        }
 
+                                    @Override
+                                    public String getDeviceId() {
+                                        return deviceId;
+                                    }
+                                });
+                                if (isNew) {
+                                    eventBus.post(new NewLocalPeerEvent() {
                                         @Override
                                         public String getDeviceId() {
                                             return deviceId;
                                         }
                                     });
-                                    if (isNew) {
-                                        eventBus.post(new NewLocalPeerEvent() {
-                                            @Override
-                                            public String getDeviceId() {
-                                                return deviceId;
-                                            }
-                                        });
-                                    }
                                 }
-                            } catch (Exception ex) {
-                                logger.warn("error processing datagram", ex);
                             }
+                        } catch (InvalidProtocolBufferException ex) {
+                            logger.warn("error processing datagram", ex);
                         }
                     });
                     listeningExecutorService.submit(this);
-                } catch (Exception ex) {
+                } catch (IOException ex) {
                     isListening = false;
                     if (listeningExecutorService.isShutdown()) {
                         return;
@@ -248,7 +239,7 @@ public class LocalDiscorveryHandler implements Closeable {
                     if (datagramSocket != null) {
                         logger.warn("error receiving datagram", ex);
                         listeningExecutorService.submit(this);
-                    } else if (ex instanceof java.net.BindException) {
+                    } else if (ex instanceof BindException) {
                         logger.warn("error opening udp server socket : {}", ex.toString());
                     } else {
                         logger.warn("error opening udp server socket", ex);

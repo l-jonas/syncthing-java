@@ -45,16 +45,14 @@ public class HttpService implements Closeable {
                 public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
                     logger.info("ws!!");
 
-                    new Thread() {
-                        @Override
-                        public void run() {
-                            try {
-                                Thread.sleep(200);
-                            } catch (InterruptedException ex) {
-                            }
-                            close();
+                    new Thread(() -> {
+                        try {
+                            Thread.sleep(200);
+                        } catch (InterruptedException ex) {
+                            logger.warn("", ex);
                         }
-                    }.start();
+                        close();
+                    }).start();
 
                     response.setContentType("application/json");
                     response.getWriter().write("{success:true}");
