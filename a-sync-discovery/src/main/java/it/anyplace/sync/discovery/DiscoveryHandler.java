@@ -37,8 +37,8 @@ import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
 import it.anyplace.sync.core.interfaces.DeviceAddressRepository;
 import it.anyplace.sync.core.utils.ExecutorUtils;
-import it.anyplace.sync.discovery.protocol.gd.GlobalDiscoveryHandler;
-import it.anyplace.sync.discovery.protocol.ld.LocalDiscorveryHandler;
+import it.anyplace.sync.discovery.protocol.GlobalDiscoveryHandler;
+import it.anyplace.sync.discovery.protocol.LocalDiscoveryHandler;
 import it.anyplace.sync.discovery.utils.AddressRanker;
 
 /**
@@ -50,7 +50,7 @@ public class DiscoveryHandler implements Closeable {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final ConfigurationService configuration;
     private final GlobalDiscoveryHandler globalDiscoveryHandler;
-    private final LocalDiscorveryHandler localDiscorveryHandler;
+    private final LocalDiscoveryHandler localDiscoveryHandler;
     private final DeviceAddressRepository deviceAddressRepository;
     private final EventBus eventBus = new EventBus();
     private final ExecutorService executorService = Executors.newCachedThreadPool();
@@ -61,18 +61,20 @@ public class DiscoveryHandler implements Closeable {
         logger.info("init");
         this.configuration = configuration;
         this.deviceAddressRepository = deviceAddressRepository;
-        localDiscorveryHandler = new LocalDiscorveryHandler(configuration);
+        localDiscoveryHandler = new LocalDiscoveryHandler(configuration);
         globalDiscoveryHandler = new GlobalDiscoveryHandler(configuration);
-        localDiscorveryHandler.getEventBus().register(new Object() {
+        localDiscoveryHandler.getEventBus().register(new Object() {
             @Subscribe
-            public void handleMessageReceivedEvent(LocalDiscorveryHandler.MessageReceivedEvent event) {
+            public void handleMessageReceivedEvent(LocalDiscoveryHandler.MessageReceivedEvent event) {
                 logger.info("received device address list from local discovery");
                 processDeviceAddressBg(event.getDeviceAddresses());
             }
         });
     }
 
-    boolean shouldLoadFromDb = true, shouldLoadFromGlobal = true, shouldStartLocalDiscovery = true;
+    private boolean shouldLoadFromDb = true;
+    private boolean shouldLoadFromGlobal = true;
+    private boolean shouldStartLocalDiscovery = true;
 
     private void updateAddressesBg() {
         if (shouldLoadFromDb) {
@@ -85,8 +87,8 @@ public class DiscoveryHandler implements Closeable {
         }
         if (shouldStartLocalDiscovery) {
             shouldStartLocalDiscovery = false;
-            localDiscorveryHandler.startListener();
-            localDiscorveryHandler.sendAnnounceMessage();
+            localDiscoveryHandler.startListener();
+            localDiscoveryHandler.sendAnnounceMessage();
         }
         if (shouldLoadFromGlobal) {
             shouldLoadFromGlobal = false; //TODO timeout for reload
@@ -142,15 +144,15 @@ public class DiscoveryHandler implements Closeable {
     }
 
     public List<DeviceAddress> getAllWorkingDeviceAddresses() {
-        return Lists.newArrayList(Iterables.filter(deviceAddressMap.values(), deviceAddress -> deviceAddress.isWorking()));
+        return Lists.newArrayList(Iterables.filter(deviceAddressMap.values(), DeviceAddress::isWorking));
     }
 
     @Override
     public void close() {
         if (!isClosed) {
             isClosed = true;
-            if (localDiscorveryHandler != null) {
-                localDiscorveryHandler.close();
+            if (localDiscoveryHandler != null) {
+                localDiscoveryHandler.close();
             }
             if (globalDiscoveryHandler != null) {
                 globalDiscoveryHandler.close();

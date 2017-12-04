@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -44,8 +45,8 @@ import it.anyplace.sync.core.beans.FileInfo;
 import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.security.KeystoreHandler;
 import it.anyplace.sync.discovery.DeviceAddressSupplier;
-import it.anyplace.sync.discovery.protocol.gd.GlobalDiscoveryHandler;
-import it.anyplace.sync.discovery.protocol.ld.LocalDiscorveryHandler;
+import it.anyplace.sync.discovery.protocol.GlobalDiscoveryHandler;
+import it.anyplace.sync.discovery.protocol.LocalDiscoveryHandler;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -125,7 +126,7 @@ public class Main {
         if (cmd.hasOption("d")) {
             String deviceId = cmd.getOptionValue("d");
             logger.info("discovery device id = {}", deviceId);
-            List<DeviceAddress> deviceAddresses = new LocalDiscorveryHandler(configuration).queryAndClose(deviceId);
+            Collection<DeviceAddress> deviceAddresses = new LocalDiscoveryHandler(configuration).queryAndClose(deviceId);
             logger.info("local response = {}", deviceAddresses);
         }
 

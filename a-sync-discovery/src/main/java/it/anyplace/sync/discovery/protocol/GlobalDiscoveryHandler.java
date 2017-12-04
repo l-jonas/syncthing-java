@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package it.anyplace.sync.discovery.protocol.gd;
+package it.anyplace.sync.discovery.protocol;
 
 import com.google.common.base.Function;
 import com.google.common.cache.CacheBuilder;
