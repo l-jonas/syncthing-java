@@ -13,27 +13,10 @@
  */
 package it.anyplace.sync.client;
 
-import com.google.common.base.Predicate;
-import com.google.common.base.Supplier;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import javax.annotation.Nullable;
-
 import it.anyplace.sync.bep.BlockExchangeConnectionHandler;
 import it.anyplace.sync.bep.BlockPuller;
 import it.anyplace.sync.bep.BlockPuller.FileDownloadObserver;
@@ -50,6 +33,18 @@ import it.anyplace.sync.devices.DevicesHandler;
 import it.anyplace.sync.discovery.DeviceAddressSupplier;
 import it.anyplace.sync.discovery.DiscoveryHandler;
 import it.anyplace.sync.repository.repo.SqlRepository;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -106,14 +101,6 @@ public class SyncthingClient implements Closeable {
         }
     }
 
-    private void returnToPool(BlockExchangeConnectionHandler connectionHandler) {
-        synchronized (pool) {
-            if (!connectionHandler.isClosed()) {
-                pool.add(connectionHandler);
-            }
-        }
-    }
-
     private BlockExchangeConnectionHandler openConnection(DeviceAddress deviceAddress) throws IOException, KeystoreHandler.CryptoException {
         final BlockExchangeConnectionHandler connectionHandler = new BlockExchangeConnectionHandler(configuration, deviceAddress);
         connectionHandler.setIndexHandler(indexHandler);
@@ -145,7 +132,7 @@ public class SyncthingClient implements Closeable {
         }
     }
 
-    public BlockExchangeConnectionHandler getConnection(DeviceAddress deviceAddress) throws IOException, KeystoreHandler.CryptoException {
+    private BlockExchangeConnectionHandler getConnection(DeviceAddress deviceAddress) throws IOException, KeystoreHandler.CryptoException {
         BlockExchangeConnectionHandler connectionHandlerFromPool = borrowFromPool(deviceAddress);
         if (connectionHandlerFromPool != null) {
             return connectionHandlerFromPool;
@@ -154,144 +141,147 @@ public class SyncthingClient implements Closeable {
         }
     }
 
-    public BlockExchangeConnectionHandler connectToBestPeer() {
-        try (DeviceAddressSupplier deviceAddressSupplier = discoveryHandler.newDeviceAddressSupplier()) {
-            for (DeviceAddress deviceAddress : deviceAddressSupplier) {
+    public interface OnConnectionAcquiredListener {
+        void onConnectionAcquired(BlockExchangeConnectionHandler connection);
+    }
+
+    private interface OnConnectingCompleteListener {
+        void onConnectingComplete();
+    }
+
+    public interface OnIndexUpdateCompleteListener {
+        void onIndexUpdateComplete(Set<String> successes, Set<String> failures);
+    }
+
+    public interface OnErrorListener {
+        // TODO: should pass some kind of error info
+        void onError();
+    }
+
+    public interface OnFileUploadObserverReadyListener {
+        void onFileUploadObserverReady(FileUploadObserver fileUploadObserver);
+    }
+
+    public interface OnFileDownloadObserverReadyListener {
+        void onFileDownloadObserverReady(FileDownloadObserver fileDownloadObserver);
+    }
+
+    public interface OnIndexEditObserverReadyListener {
+        void onIndexEditObserverReady(BlockPusher.IndexEditObserver indexEditObserver);
+    }
+
+    // TODO: there should be only one connect() method
+    private void getPeerConnection(OnConnectionAcquiredListener listener, OnConnectingCompleteListener completeListener) {
+        new Thread(() -> {
+            DeviceAddressSupplier addressesSupplier = discoveryHandler.newDeviceAddressSupplier();
+            Set<String> connectedDevices = Sets.newHashSet();
+            for (final DeviceAddress deviceAddress : addressesSupplier) {
+                if (connectedDevices.contains(deviceAddress.getDeviceId())) {
+                    continue;
+                }
                 try {
-                    logger.debug("connecting to device = {}", deviceAddress);
-                    BlockExchangeConnectionHandler connectionHandler = getConnection(deviceAddress);
-                    logger.info("aquired connection to device = {}", deviceAddress);
-                    return connectionHandler;
+                    BlockExchangeConnectionHandler connection = getConnection(deviceAddress);
+                    connectedDevices.add(deviceAddress.getDeviceId());
+                    listener.onConnectionAcquired(connection);
                 } catch (IOException | KeystoreHandler.CryptoException ex) {
                     logger.warn("error connecting to device = {}", deviceAddress);
                     logger.warn("error connecting to device", ex);
                 }
             }
-        }
-        throw new RuntimeException("unable to aquire connection");
+            completeListener.onConnectingComplete();
+            addressesSupplier.close();
+        }).start();
     }
 
-//    public List<DeviceAddress> getPeerAddressesRanked() {
-//        logger.debug("retrieving all peer addresses");
-//        List<DeviceAddress> list = Lists.newArrayList();
-//        for (String deviceId : configuration.getPeerIds()) {
-//            list.addAll(globalDiscoveryHandler.query(deviceId));
-//        }
-//        Iterables.addAll(list, Iterables.filter(localDiscorveryHandler.waitForAddresses().getDeviceAddresses(), new Predicate<DeviceAddress>() {
-//            @Override
-//            public boolean apply(DeviceAddress a) {
-//                return configuration.getPeerIds().contains(a.getDeviceId());
-//            }
-//        }));
-//        list = AddressRanker.testAndRank(list);
-//        logger.info("peer addresses = \n\n{}\n", AddressRanker.dumpAddressRanking(list));
-//        return list;
-//    }
-    /**
-     * the supplier throws npe if connection cannot be aquired
-     *
-     * @return
-     */
-    public Supplier<BlockExchangeConnectionHandler> getPeerConnectionsSupplier() {
-        return new Supplier<BlockExchangeConnectionHandler>() {
-            private final Supplier<BlockExchangeConnectionHandler> supplier = getPeerConnectionsSupplierSafe();
-
-            @Override
-            public BlockExchangeConnectionHandler get() {
-                BlockExchangeConnectionHandler connectionHandler = supplier.get();
-                checkNotNull(connectionHandler, "unable to aquire connection");
-                return connectionHandler;
+    public void updateIndexFromPeers(OnIndexUpdateCompleteListener listener) {
+        // TODO: if there is already an index update in progress, do nothing
+        //       this should probably be handled in IndexHandler
+        //       at the moment, this is handled on the Android side
+        Set<String> indexUpdateComplete = Sets.newHashSet();
+        getPeerConnection(connection -> {
+            try {
+                indexHandler.waitForRemoteIndexAquired(connection);
+                indexUpdateComplete.add(connection.getDeviceId());
+            } catch (InterruptedException ex) {
+                logger.warn("exception while waiting for index", ex);
             }
-        };
+        }, () -> {
+            Set<String> indexUpdateFailed = Sets.difference(configuration.getPeerIds(), indexUpdateComplete);
+            listener.onIndexUpdateComplete(indexUpdateComplete, indexUpdateFailed);
+        });
     }
 
-    /**
-     *
-     * the supplier returns null if connection cannot be aquired
-     *
-     * @return
-     */
-    public Supplier<BlockExchangeConnectionHandler> getPeerConnectionsSupplierSafe() {
-        return new Supplier<BlockExchangeConnectionHandler>() {
-
-            private final DeviceAddressSupplier deviceAddresses = discoveryHandler.newDeviceAddressSupplier(); //TODO close after use
-            private final Set<String> deviceIds = Sets.newHashSet();
-
-            @Override
-            public BlockExchangeConnectionHandler get() {
-                for (final DeviceAddress deviceAddress : deviceAddresses) {
-                    if (deviceIds.contains(deviceAddress.getDeviceId())) {
-                        continue;
-                    }
-                    try {
-                        BlockExchangeConnectionHandler connection = getConnection(deviceAddress);
-                        deviceIds.add(deviceAddress.getDeviceId());
-                        return connection;
-                    } catch (IOException | KeystoreHandler.CryptoException ex) {
-                        logger.warn("error connecting to device = {}", deviceAddress);
-                        logger.warn("error connecting to device", ex);
-                    }
-                }
-                return null;
-            }
-        };
-    }
-
-    public IndexHandler waitForRemoteIndexAquired() {
-        Supplier<BlockExchangeConnectionHandler> supplier = getPeerConnectionsSupplierSafe();
-        while (true) {
-            try (BlockExchangeConnectionHandler connection = supplier.get()) {
-                if (connection == null) {
-                    return indexHandler;
-                } else {
-                    try {
-                        indexHandler.waitForRemoteIndexAquired(connection);
-                    } catch (InterruptedException ex) {
-                        logger.warn("exception while waiting for index", ex);
-                    }
-                }
-            }
-        }
-    }
-
-    public BlockExchangeConnectionHandler getConnectionForFolder(String folder) {
-        Supplier<BlockExchangeConnectionHandler> supplier = getPeerConnectionsSupplier();
-        while (true) {
-            BlockExchangeConnectionHandler connectionHandler = supplier.get();
-            if (connectionHandler.hasFolder(folder)) {
-                return connectionHandler;
+    private void getConnectionForFolder(String folder, OnConnectionAcquiredListener listener, OnErrorListener errorListener) {
+        AtomicBoolean isConnected = new AtomicBoolean(false);
+        getPeerConnection(connection -> {
+            if (connection.hasFolder(folder)) {
+                listener.onConnectionAcquired(connection);
+                isConnected.set(true);
             } else {
-                connectionHandler.close();
+                connection.close();
             }
-        }
+        }, () -> {
+            if (!isConnected.get()) {
+                errorListener.onError();
+            }
+        });
     }
 
-    public FileDownloadObserver pullFile(BlockExchangeConnectionHandler connectionHandler, String folder, String path) throws InterruptedException {
-        Pair<FileInfo, FileBlocks> fileInfoAndBlocks = indexHandler.waitForRemoteIndexAquired(connectionHandler).getFileInfoAndBlocksByPath(folder, path);
-        checkNotNull(fileInfoAndBlocks, "file not found in local index for folder = %s path = %s", folder, path);
-        return new BlockPuller(configuration, connectionHandler).pullBlocks(fileInfoAndBlocks.getValue());
+    public void pullFile(String folder, String path, OnFileDownloadObserverReadyListener listener,
+                                         OnErrorListener errorListener) {
+        getConnectionForFolder(folder, connection -> {
+            try {
+                Pair<FileInfo, FileBlocks> fileInfoAndBlocks = indexHandler.waitForRemoteIndexAquired(connection).getFileInfoAndBlocksByPath(folder, path);
+                checkNotNull(fileInfoAndBlocks, "file not found in local index for folder = %s path = %s", folder, path);
+                FileDownloadObserver observer = new BlockPuller(configuration, connection, false).pullBlocks(fileInfoAndBlocks.getValue());
+                listener.onFileDownloadObserverReady(observer);
+            } catch (InterruptedException e) {
+                logger.warn("Failed to pull file", e);
+                errorListener.onError();
+            }
+        }, errorListener);
     }
 
-    public FileDownloadObserver pullFile(String folder, String path) throws InterruptedException {
-        BlockExchangeConnectionHandler connectionHandler = getConnectionForFolder(folder);
-        Pair<FileInfo, FileBlocks> fileInfoAndBlocks = indexHandler.waitForRemoteIndexAquired(connectionHandler).getFileInfoAndBlocksByPath(folder, path);
-        checkNotNull(fileInfoAndBlocks, "file not found in local index for folder = %s path = %s", folder, path);
-        return new BlockPuller(configuration, connectionHandler, true).pullBlocks(fileInfoAndBlocks.getValue());
+    public void pushFile(InputStream data, String folder, String path, OnFileUploadObserverReadyListener listener,
+                                       OnErrorListener errorListener) {
+        getConnectionForFolder(folder, connection -> {
+            try {
+                BlockPusher pusher = new BlockPusher(configuration, connection, false);
+                pusher.withIndexHandler(indexHandler);
+                FileInfo fileInfo = indexHandler.waitForRemoteIndexAquired(connection).getFileInfoByPath(folder, path);
+                FileUploadObserver observer = pusher.pushFile(data, fileInfo, folder, path);
+                listener.onFileUploadObserverReady(observer);
+            } catch (InterruptedException e) {
+                logger.warn("Failed to pull file", e);
+                errorListener.onError();
+            }
+        }, errorListener);
     }
 
-    public FileUploadObserver pushFile(InputStream data, String folder, String path) throws InterruptedException {
-        BlockExchangeConnectionHandler connectionHandler = getConnectionForFolder(folder);
-        return new BlockPusher(configuration, connectionHandler, true).withIndexHandler(indexHandler).pushFile(data, indexHandler.waitForRemoteIndexAquired(connectionHandler).getFileInfoByPath(folder, path), folder, path);
+    public void pushDir(String folder, String path, OnIndexEditObserverReadyListener listener,
+                                                 OnErrorListener errorListener) {
+        getConnectionForFolder(folder, connection -> {
+            BlockPusher pusher = new BlockPusher(configuration, connection, false);
+            pusher.withIndexHandler(indexHandler);
+            BlockPusher.IndexEditObserver observer = pusher.pushDir(folder, path);
+            listener.onIndexEditObserverReady(observer);
+        }, errorListener);
     }
 
-    public BlockPusher.IndexEditObserver pushDir(String folder, String path) {
-        BlockExchangeConnectionHandler connectionHandler = getConnectionForFolder(folder);
-        return new BlockPusher(configuration, connectionHandler, true).withIndexHandler(indexHandler).pushDir(folder, path);
-    }
-
-    public BlockPusher.IndexEditObserver pushDelete(String folder, String path) throws InterruptedException {
-        BlockExchangeConnectionHandler connectionHandler = getConnectionForFolder(folder);
-        return new BlockPusher(configuration, connectionHandler, true).withIndexHandler(indexHandler).pushDelete(indexHandler.waitForRemoteIndexAquired(connectionHandler).getFileInfoByPath(folder, path), folder, path);
+    public void pushDelete(String folder, String path, OnIndexEditObserverReadyListener listener,
+                                                    OnErrorListener errorListener) {
+        getConnectionForFolder(folder, connection -> {
+            try {
+                BlockPusher pusher = new BlockPusher(configuration, connection, false);
+                pusher.withIndexHandler(indexHandler);
+                FileInfo fileInfo = indexHandler.waitForRemoteIndexAquired(connection).getFileInfoByPath(folder, path);
+                BlockPusher.IndexEditObserver observer = pusher.pushDelete(fileInfo, folder, path);
+                listener.onIndexEditObserverReady(observer);
+            } catch (InterruptedException e) {
+                logger.warn("Failed to push delete", e);
+                errorListener.onError();
+            }
+        }, errorListener);
     }
 
     public DiscoveryHandler getDiscoveryHandler() {
@@ -306,7 +296,7 @@ public class SyncthingClient implements Closeable {
     public void close() {
         devicesHandler.close();
         discoveryHandler.close();
-        for (BlockExchangeConnectionHandler connectionHandler : Lists.newArrayList(connections)) {
+        for (BlockExchangeConnectionHandler connectionHandler : connections) {
             connectionHandler.close();
         }
         indexHandler.close();

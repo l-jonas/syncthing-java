@@ -13,30 +13,7 @@
  */
 package it.anyplace.sync.client;
 
-import com.google.common.base.Function;
 import com.google.common.collect.Lists;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Options;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-
-import it.anyplace.sync.bep.BlockExchangeConnectionHandler;
-import it.anyplace.sync.bep.BlockPusher;
-import it.anyplace.sync.bep.BlockPusher.IndexEditObserver;
 import it.anyplace.sync.bep.IndexBrowser;
 import it.anyplace.sync.bep.IndexFinder;
 import it.anyplace.sync.core.beans.DeviceAddress;
@@ -47,6 +24,21 @@ import it.anyplace.sync.core.security.KeystoreHandler;
 import it.anyplace.sync.discovery.DeviceAddressSupplier;
 import it.anyplace.sync.discovery.protocol.GlobalDiscoveryHandler;
 import it.anyplace.sync.discovery.protocol.LocalDiscoveryHandler;
+import org.apache.commons.cli.*;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -74,7 +66,6 @@ public class Main {
         options.addOption("L", "list-remote", false, "list folder (root) content from network");
         options.addOption("I", "list-info", false, "dump folder info from network");
         options.addOption("li", "list-info", false, "list folder info from local db");
-//        options.addOption("l", "list-local", false, "list folder content from local (saved) index");
         options.addOption("s", "search", true, "search local index for <term>");
         options.addOption("D", "delete", true, "push delete to network");
         options.addOption("M", "mkdir", true, "push directory create to network");
@@ -93,6 +84,7 @@ public class Main {
         ConfigurationService configuration = ConfigurationService.newLoader().loadFrom(configFile);
         FileUtils.cleanDirectory(configuration.getTemp());
         KeystoreHandler.newLoader().loadAndStore(configuration);
+        SyncthingClient syncthingClient = new SyncthingClient(configuration);
         if (cmd.hasOption("c")) {
             logger.info("configuration =\n{}", configuration.newWriter().dumpToString());
         } else {
@@ -102,12 +94,7 @@ public class Main {
 
         if (cmd.hasOption("sp")) {
             List<String> peers = Lists.newArrayList(Lists.transform(Arrays.asList(cmd.getOptionValue("sp").split(",")),
-                new Function<String, String>() {
-                @Override
-                public String apply(String input) {
-                    return input.trim();
-                }
-            }));
+                    String::trim));
             logger.info("set peers = {}", peers);
             configuration.edit().setPeers(Collections.emptyList());
             for (String peer : peers) {
@@ -131,23 +118,29 @@ public class Main {
         }
 
         if (cmd.hasOption("p")) {
-            String path = cmd.getOptionValue("p");
-            logger.info("file path = {}", path);
-            String folder = path.split(":")[0];
-            path = path.split(":")[1];
-            try (SyncthingClient client = new SyncthingClient(configuration); BlockExchangeConnectionHandler connectionHandler = client.connectToBestPeer()) {
-                InputStream inputStream = client.pullFile(connectionHandler, folder, path).waitForComplete().getInputStream();
-                String fileName = client.getIndexHandler().getFileInfoByPath(folder, path).getFileName();
-                File file;
-                if (cmd.hasOption("o")) {
-                    File param = new File(cmd.getOptionValue("o"));
-                    file = param.isDirectory() ? new File(param, fileName) : param;
-                } else {
-                    file = new File(fileName);
+            String folderAndPath = cmd.getOptionValue("p");
+            logger.info("file path = {}", folderAndPath);
+            String folder = folderAndPath.split(":")[0];
+            String path = folderAndPath.split(":")[1];
+            CountDownLatch latch = new CountDownLatch(1);
+            syncthingClient.pullFile(folder, path, observer -> {
+                try {
+                    InputStream inputStream = observer.waitForComplete().getInputStream();
+                    String fileName = syncthingClient.getIndexHandler().getFileInfoByPath(folder, path).getFileName();
+                    File file;
+                    if (cmd.hasOption("o")) {
+                        File param = new File(cmd.getOptionValue("o"));
+                        file = param.isDirectory() ? new File(param, fileName) : param;
+                    } else {
+                        file = new File(fileName);
+                    }
+                    FileUtils.copyInputStreamToFile(inputStream, file);
+                    logger.info("saved file to = {}", file.getAbsolutePath());
+                } catch (InterruptedException | IOException e) {
+                    logger.warn("", e);
                 }
-                FileUtils.copyInputStreamToFile(inputStream, file);
-                logger.info("saved file to = {}", file.getAbsolutePath());
-            }
+            }, () -> logger.warn("Failed to pull file"));
+            latch.await();
         }
         if (cmd.hasOption("P")) {
             String path = cmd.getOptionValue("P");
@@ -156,83 +149,93 @@ public class Main {
             logger.info("file path = {}", path);
             String folder = path.split(":")[0];
             path = path.split(":")[1];
-            try (SyncthingClient client = new SyncthingClient(configuration);
-                BlockPusher.FileUploadObserver fileUploadObserver = client.pushFile(new FileInputStream(file), folder, path)) {
+            CountDownLatch latch = new CountDownLatch(1);
+            syncthingClient.pushFile(new FileInputStream(file), folder, path, fileUploadObserver -> {
                 while (!fileUploadObserver.isCompleted()) {
-                    fileUploadObserver.waitForProgressUpdate();
+                    try {
+                        fileUploadObserver.waitForProgressUpdate();
+                    } catch (InterruptedException e) {
+                        logger.warn("", e);
+                    }
                     logger.debug("upload progress {}", fileUploadObserver.getProgressMessage());
                 }
-                logger.info("uploaded file to network");
-            }
+                latch.countDown();
+            }, () -> logger.warn("Failed to upload file"));
+            latch.await();
+            logger.info("uploaded file to network");
         }
         if (cmd.hasOption("D")) {
             String path = cmd.getOptionValue("D");
             String folder = path.split(":")[0];
             path = path.split(":")[1];
             logger.info("delete path = {}", path);
-            try (SyncthingClient client = new SyncthingClient(configuration);
-                IndexEditObserver observer = client.pushDelete(folder, path)) {
-                observer.waitForComplete();
-                logger.info("deleted path");
-            }
+            CountDownLatch latch = new CountDownLatch(1);
+            syncthingClient.pushDelete(folder, path, observer -> {
+                try {
+                    observer.waitForComplete();
+                } catch (InterruptedException e) {
+                    logger.warn("", e);
+                }
+                latch.countDown();
+            }, () -> logger.warn("Failed to delete path"));
+            latch.await();
+            logger.info("deleted path");
         }
         if (cmd.hasOption("M")) {
             String path = cmd.getOptionValue("M");
             String folder = path.split(":")[0];
             path = path.split(":")[1];
             logger.info("dir path = {}", path);
-            try (SyncthingClient client = new SyncthingClient(configuration);
-                IndexEditObserver observer = client.pushDir(folder, path)) {
-                observer.waitForComplete();
-                logger.info("uploaded dir to network");
-            }
+            CountDownLatch latch = new CountDownLatch(1);
+            syncthingClient.pushDir(folder, path, observer -> {
+                try {
+                    observer.waitForComplete();
+                } catch (InterruptedException e) {
+                    logger.warn("", e);
+                }
+                latch.countDown();
+            }, () -> logger.warn("Failed to push directory"));
+            latch.await();
+            logger.info("uploaded dir to network");
         }
         if (cmd.hasOption("L")) {
-            try (SyncthingClient client = new SyncthingClient(configuration)) {
-                client.waitForRemoteIndexAquired();
-                for (String folder : client.getIndexHandler().getFolderList()) {
-                    try (IndexBrowser indexBrowser = client.getIndexHandler().newIndexBrowserBuilder().setFolder(folder).build()) {
-                        logger.info("list folder = {}", indexBrowser.getFolder());
-                        for (FileInfo fileInfo : indexBrowser.listFiles()) {
-                            logger.info("\t\t{} {} {}", fileInfo.getType().name().substring(0, 1), fileInfo.getPath(), fileInfo.describeSize());
-                        }
+            updateIndex(syncthingClient);
+            for (String folder : syncthingClient.getIndexHandler().getFolderList()) {
+                try (IndexBrowser indexBrowser = syncthingClient.getIndexHandler().newIndexBrowserBuilder().setFolder(folder).build()) {
+                    logger.info("list folder = {}", indexBrowser.getFolder());
+                    for (FileInfo fileInfo : indexBrowser.listFiles()) {
+                        logger.info("\t\t{} {} {}", fileInfo.getType().name().substring(0, 1), fileInfo.getPath(), fileInfo.describeSize());
                     }
                 }
             }
         }
         if (cmd.hasOption("I")) {
-            try (SyncthingClient client = new SyncthingClient(configuration)) {
-                if (cmd.hasOption("a")) {
-                    String deviceId = cmd.getOptionValue("a").substring(0, 63), address = cmd.getOptionValue("a").substring(64);
-                    try (BlockExchangeConnectionHandler connection = client.getConnection(DeviceAddress.newBuilder().setDeviceId(deviceId).setAddress(address).build())) {
-                        client.getIndexHandler().waitForRemoteIndexAquired(connection);
-                    }
-                } else {
-                    client.waitForRemoteIndexAquired();
-                }
-                StringBuilder folderInfo = new StringBuilder();
-                for (String folder : client.getIndexHandler().getFolderList()) {
-                    folderInfo.append("\n\t\tfolder info : ")
-                            .append(client.getIndexHandler().getFolderInfo(folder));
-                    folderInfo.append("\n\t\tfolder stats : ")
-                            .append(client.getIndexHandler().newFolderBrowser().getFolderStats(folder).dumpInfo())
-                            .append("\n");
-                }
-                logger.info("folders:\n{}\n", folderInfo.toString());
+            if (cmd.hasOption("a")) {
+                String deviceId = cmd.getOptionValue("a").substring(0, 63), address = cmd.getOptionValue("a").substring(64);
+                updateIndex(syncthingClient);
+            } else {
+                updateIndex(syncthingClient);
             }
+            StringBuilder folderInfo = new StringBuilder();
+            for (String folder : syncthingClient.getIndexHandler().getFolderList()) {
+                folderInfo.append("\n\t\tfolder info : ")
+                        .append(syncthingClient.getIndexHandler().getFolderInfo(folder));
+                folderInfo.append("\n\t\tfolder stats : ")
+                        .append(syncthingClient.getIndexHandler().newFolderBrowser().getFolderStats(folder).dumpInfo())
+                        .append("\n");
+            }
+            logger.info("folders:\n{}\n", folderInfo.toString());
         }
         if (cmd.hasOption("li")) {
-            try (SyncthingClient client = new SyncthingClient(configuration)) {
-                String folderInfo = "";
-                for (String folder : client.getIndexHandler().getFolderList()) {
-                    folderInfo += "\n\t\tfolder info : " + client.getIndexHandler().getFolderInfo(folder);
-                    folderInfo += "\n\t\tfolder stats : " + client.getIndexHandler().newFolderBrowser().getFolderStats(folder).dumpInfo() + "\n";
-                }
-                logger.info("folders:\n{}\n", folderInfo);
+            String folderInfo = "";
+            for (String folder : syncthingClient.getIndexHandler().getFolderList()) {
+                folderInfo += "\n\t\tfolder info : " + syncthingClient.getIndexHandler().getFolderInfo(folder);
+                folderInfo += "\n\t\tfolder stats : " + syncthingClient.getIndexHandler().newFolderBrowser().getFolderStats(folder).dumpInfo() + "\n";
             }
+            logger.info("folders:\n{}\n", folderInfo);
         }
         if (cmd.hasOption("lp")) {
-            try (SyncthingClient client = new SyncthingClient(configuration); DeviceAddressSupplier deviceAddressSupplier = client.getDiscoveryHandler().newDeviceAddressSupplier()) {
+            try (DeviceAddressSupplier deviceAddressSupplier = syncthingClient.getDiscoveryHandler().newDeviceAddressSupplier()) {
                 String deviceAddressesStr = "";
                 for (DeviceAddress deviceAddress : Lists.newArrayList(deviceAddressSupplier)) {
                     deviceAddressesStr += "\n\t\t" + deviceAddress.getDeviceId() + " : " + deviceAddress.getAddress();
@@ -242,8 +245,8 @@ public class Main {
         }
         if (cmd.hasOption("s")) {
             String term = cmd.getOptionValue("s");
-            try (SyncthingClient client = new SyncthingClient(configuration); IndexFinder indexFinder = client.getIndexHandler().newIndexFinderBuilder().build()) {
-                client.waitForRemoteIndexAquired();
+            try (IndexFinder indexFinder = syncthingClient.getIndexHandler().newIndexFinderBuilder().build()) {
+                updateIndex(syncthingClient);
                 logger.info("search term = '{}'", term);
                 IndexFinder.SearchCompletedEvent event = indexFinder.doSearch(term);
                 if (event.hasGoodResults()) {
@@ -258,11 +261,18 @@ public class Main {
                 }
             }
         }
-//        if (cmd.hasOption("l")) {
-//            String indexDump = new IndexHandler(configuration).dumpIndex();
-//            logger.info("index dump = \n\n{}\n", indexDump);
-//        }
         IOUtils.closeQuietly(configuration);
+        syncthingClient.close();
+    }
+
+    private static void updateIndex(SyncthingClient client) throws InterruptedException {
+        CountDownLatch latch = new CountDownLatch(1);
+        client.updateIndexFromPeers((successes, failures) -> {
+            logger.info("Index update successful: {}", successes);
+            logger.info("Index update failed: {}", failures);
+            latch.countDown();
+        });
+        latch.await();
     }
 
 }
