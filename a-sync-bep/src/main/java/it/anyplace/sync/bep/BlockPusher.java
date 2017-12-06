@@ -20,47 +20,29 @@ import com.google.common.eventbus.Subscribe;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
 import com.google.protobuf.ByteString;
-
+import it.anyplace.sync.bep.BlockExchageProtos.*;
+import it.anyplace.sync.bep.BlockExchageProtos.Vector;
+import it.anyplace.sync.bep.BlockExchangeConnectionHandler.RequestMessageReceivedEvent;
+import it.anyplace.sync.core.beans.FileInfo;
+import it.anyplace.sync.core.beans.FileInfo.Version;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.utils.BlockUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
-import java.io.Closeable;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
+import javax.annotation.Nullable;
+import java.io.*;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-
-import javax.annotation.Nullable;
-
-import it.anyplace.sync.bep.BlockExchangeConnectionHandler.RequestMessageReceivedEvent;
-import it.anyplace.sync.bep.protos.BlockExchageProtos;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.BlockInfo;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Counter;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.FileInfoType;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.IndexUpdate;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Response;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Vector;
-import it.anyplace.sync.core.beans.FileInfo;
-import it.anyplace.sync.core.beans.FileInfo.Version;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.utils.BlockUtils;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Objects.equal;
@@ -73,7 +55,7 @@ import static it.anyplace.sync.core.utils.FileUtils.createTempFile;
  *
  * @author aleph
  */
-public class BlockPusher {
+public final class BlockPusher {
 
     public final static int BLOCK_SIZE = 128 * 1024;
     private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -298,7 +280,7 @@ public class BlockPusher {
         public abstract DataSource getDataSource();
     }
 
-    public class IndexEditObserver implements Closeable {
+    public final class IndexEditObserver implements Closeable {
 
         private final Future future;
         private final IndexUpdate indexUpdate;
@@ -351,7 +333,7 @@ public class BlockPusher {
 
     }
 
-    public static class ByteArrayDataSource extends DataSource {
+    public static final class ByteArrayDataSource extends DataSource {
 
         private final byte[] data;
 
@@ -366,7 +348,7 @@ public class BlockPusher {
 
     }
 
-    public static class FileDataSource extends DataSource {
+    public static final class FileDataSource extends DataSource {
 
         private final File file;
 

@@ -14,16 +14,14 @@
 package it.anyplace.sync.core.interfaces;
 
 import com.google.common.eventbus.EventBus;
-
-import java.util.Date;
-import java.util.List;
-
-import javax.annotation.Nullable;
-
 import it.anyplace.sync.core.beans.FileBlocks;
 import it.anyplace.sync.core.beans.FileInfo;
 import it.anyplace.sync.core.beans.FolderStats;
 import it.anyplace.sync.core.beans.IndexInfo;
+
+import javax.annotation.Nullable;
+import java.util.Date;
+import java.util.List;
 
 /**
  *

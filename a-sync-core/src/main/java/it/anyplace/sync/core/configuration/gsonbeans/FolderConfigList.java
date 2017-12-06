@@ -21,7 +21,7 @@ import java.util.List;
  *
  * @author aleph
  */
-public class FolderConfigList {
+public final class FolderConfigList {
 
     private List<FolderConfig> folders = Lists.newArrayList();
 

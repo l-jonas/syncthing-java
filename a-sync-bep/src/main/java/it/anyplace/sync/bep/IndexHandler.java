@@ -22,39 +22,27 @@ import com.google.common.collect.Sets;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.google.common.io.BaseEncoding;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
-import javax.annotation.Nullable;
-
 import it.anyplace.sync.bep.BlockExchangeConnectionHandler.AnyIndexMessageReceivedEvent;
 import it.anyplace.sync.bep.BlockExchangeConnectionHandler.ClusterConfigInfo;
 import it.anyplace.sync.bep.BlockExchangeConnectionHandler.ClusterConfigMessageProcessedEvent;
-import it.anyplace.sync.bep.protos.BlockExchageProtos;
-import it.anyplace.sync.core.beans.BlockInfo;
-import it.anyplace.sync.core.beans.FileBlocks;
-import it.anyplace.sync.core.beans.FileInfo;
+import it.anyplace.sync.core.beans.*;
 import it.anyplace.sync.core.beans.FileInfo.Version;
-import it.anyplace.sync.core.beans.FolderInfo;
-import it.anyplace.sync.core.beans.IndexInfo;
 import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.interfaces.IndexRepository;
 import it.anyplace.sync.core.interfaces.Sequencer;
 import it.anyplace.sync.core.interfaces.TempRepository;
 import it.anyplace.sync.core.utils.ExecutorUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -65,7 +53,7 @@ import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdS
  *
  * @author aleph
  */
-public class IndexHandler implements Closeable {
+public final class IndexHandler implements Closeable {
 
     private final static long DEFAULT_INDEX_TIMEOUT = 30;
     private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -361,7 +349,7 @@ public class IndexHandler implements Closeable {
 
     }
 
-    private class IndexMessageProcessor {
+    private final class IndexMessageProcessor {
 
         private final Logger logger = LoggerFactory.getLogger(getClass());
         private final ExecutorService executorService = Executors.newSingleThreadExecutor();

@@ -21,7 +21,8 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
-
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.interfaces.RelayConnection;
 import org.apache.commons.lang3.tuple.Pair;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v1CertificateBuilder;
@@ -34,43 +35,20 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.*;
+import javax.security.auth.x500.X500Principal;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.security.GeneralSecurityException;
-import java.security.KeyManagementException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.Security;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertPath;
+import java.security.*;
+import java.security.cert.*;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLPeerUnverifiedException;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-import javax.security.auth.x500.X500Principal;
-
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.interfaces.RelayConnection;
 
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -81,9 +59,9 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  *
  * @author aleph
  */
-public class KeystoreHandler {
+public final class KeystoreHandler {
 
-    public static class CryptoException extends GeneralSecurityException {
+    public static final class CryptoException extends GeneralSecurityException {
         CryptoException(Throwable t) {
             super(t);
         }
@@ -271,7 +249,7 @@ public class KeystoreHandler {
         return new Loader();
     }
 
-    public static class Loader {
+    public static final class Loader {
 
         private final Logger logger = LoggerFactory.getLogger(getClass());
         private final static Cache<String, KeystoreHandler> keystoreHandlersCacheByHash = CacheBuilder.newBuilder()

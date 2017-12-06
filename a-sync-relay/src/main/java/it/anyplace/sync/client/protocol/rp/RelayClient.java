@@ -16,38 +16,30 @@ package it.anyplace.sync.client.protocol.rp;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.io.BaseEncoding;
-
-import org.apache.commons.io.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.nio.ByteBuffer;
-
 import it.anyplace.sync.client.protocol.rp.beans.SessionInvitation;
 import it.anyplace.sync.core.beans.DeviceAddress;
 import it.anyplace.sync.core.beans.DeviceAddress.AddressType;
 import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.interfaces.RelayConnection;
 import it.anyplace.sync.core.security.KeystoreHandler;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.ByteBuffer;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static it.anyplace.sync.core.security.KeystoreHandler.RELAY;
-import static it.anyplace.sync.core.security.KeystoreHandler.deviceIdStringToHashData;
-import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdString;
+import static it.anyplace.sync.core.security.KeystoreHandler.*;
 
 /**
  *
  * @author aleph
  */
-public class RelayClient {
+public final class RelayClient {
 
     private final static int MAGIC = 0x9E79BC40,
         JOIN_SESSION_REQUEST = 3,
@@ -152,7 +144,7 @@ public class RelayClient {
         }
     }
 
-    private static class RelayDataOutputStream extends DataOutputStream {
+    private static final class RelayDataOutputStream extends DataOutputStream {
 
         public RelayDataOutputStream(OutputStream out) {
             super(out);
@@ -166,7 +158,7 @@ public class RelayClient {
 
     }
 
-    private static class RelayDataInputStream extends DataInputStream {
+    private static final class RelayDataInputStream extends DataInputStream {
 
         public RelayDataInputStream(InputStream in) {
             super(in);
@@ -184,7 +176,7 @@ public class RelayClient {
         }
     }
 
-    private static class Response {
+    private static final class Response {
 
         private final int code;
         private final String message;
@@ -209,7 +201,7 @@ public class RelayClient {
 
     }
 
-    private static class MessageReader {
+    private static final class MessageReader {
 
         private final int type;
         private final ByteBuffer buffer;

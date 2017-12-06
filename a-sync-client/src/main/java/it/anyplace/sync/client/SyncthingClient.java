@@ -53,7 +53,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * @author aleph
  */
-public class SyncthingClient implements Closeable {
+public final class SyncthingClient implements Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final ConfigurationService configuration;

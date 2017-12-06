@@ -17,16 +17,13 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Strings;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-
+import it.anyplace.sync.core.utils.PathUtils;
 import org.apache.commons.io.FileUtils;
 
+import javax.annotation.Nullable;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-
-import javax.annotation.Nullable;
-
-import it.anyplace.sync.core.utils.PathUtils;
 
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -39,7 +36,7 @@ import static it.anyplace.sync.core.utils.PathUtils.ROOT_PATH;
  *
  * @author aleph
  */
-public class FileInfo {
+public final class FileInfo {
 
     private final String folder, fileName, path, parent, hash;
     private final Long size;
@@ -137,7 +134,7 @@ public class FileInfo {
         return equal(getType(), FileType.FILE);
     }
 
-    public static class Version {
+    public static final class Version {
 
         private final long id, value;
 
@@ -165,7 +162,7 @@ public class FileInfo {
         return new Builder();
     }
 
-    public static class Builder {
+    public static final class Builder {
 
         private String folder, path, hash;
         private Long size;

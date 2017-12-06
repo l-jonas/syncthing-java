@@ -19,7 +19,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * @author aleph
  */
-public class BlockInfo {
+public final class BlockInfo {
 
     private final long offset;
     private final int size;

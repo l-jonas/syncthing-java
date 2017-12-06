@@ -1,4 +1,4 @@
-package it.anyplace.sync.bep.protos;
+package it.anyplace.sync.bep;
 
 message Hello {
    optional string device_name    = 1;

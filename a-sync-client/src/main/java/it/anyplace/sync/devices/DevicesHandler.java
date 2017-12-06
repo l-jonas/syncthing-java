@@ -17,20 +17,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.Closeable;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 import it.anyplace.sync.core.beans.DeviceAddress;
 import it.anyplace.sync.core.beans.DeviceInfo;
 import it.anyplace.sync.core.beans.DeviceStats;
@@ -39,10 +25,18 @@ import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.events.DeviceAddressActiveEvent;
 import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
 import it.anyplace.sync.core.utils.ExecutorUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-public class DevicesHandler implements Closeable {
+public final class DevicesHandler implements Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final Map<String, DeviceStats> deviceStatsMap = Collections.synchronizedMap(Maps.<String, DeviceStats>newHashMap());

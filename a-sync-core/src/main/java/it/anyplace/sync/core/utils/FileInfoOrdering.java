@@ -16,12 +16,11 @@ package it.anyplace.sync.core.utils;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.collect.ComparisonChain;
+import it.anyplace.sync.core.beans.FileInfo;
 
 import java.util.Comparator;
 
-import it.anyplace.sync.core.beans.FileInfo;
-
-public class FileInfoOrdering {
+public final class FileInfoOrdering {
 
     private final static Function<FileInfo, Boolean> isParentFunction = Functions.forPredicate(fileInfo -> PathUtils.isParent(fileInfo.getPath()));
 

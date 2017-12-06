@@ -17,12 +17,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
-
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -32,8 +32,6 @@ import java.util.Date;
 import java.util.Map;
 import java.util.Objects;
 
-import javax.annotation.Nullable;
-
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Strings.emptyToNull;
@@ -42,7 +40,7 @@ import static com.google.common.base.Strings.emptyToNull;
  *
  * @author aleph
  */
-public class DeviceAddress {
+public final class DeviceAddress {
 
     private final static Logger logger = LoggerFactory.getLogger(DeviceAddress.class);
     private final String deviceId;
@@ -213,7 +211,7 @@ public class DeviceAddress {
         return new Builder(deviceId, instanceId, address, producer, score, lastModified);
     }
 
-    public static class Builder {
+    public static final class Builder {
 
         private String deviceId;
         private Long instanceId;

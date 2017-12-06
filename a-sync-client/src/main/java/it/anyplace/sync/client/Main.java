@@ -46,7 +46,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author aleph
  */
-public class Main {
+public final class Main {
 
     private final static Logger logger = LoggerFactory.getLogger(Main.class);
 

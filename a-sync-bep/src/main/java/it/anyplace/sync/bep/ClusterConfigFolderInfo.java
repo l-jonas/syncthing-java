@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package it.anyplace.sync.bep.beans;
+package it.anyplace.sync.bep;
 
 import javax.annotation.Nullable;
 
@@ -23,7 +23,7 @@ import static com.google.common.base.Strings.emptyToNull;
  *
  * @author aleph
  */
-public class ClusterConfigFolderInfo {
+public final class ClusterConfigFolderInfo {
 
     private final String folder;
     private final String label;
@@ -63,7 +63,7 @@ public class ClusterConfigFolderInfo {
         return new Builder();
     }
 
-    public static class Builder {
+    public static final class Builder {
 
         private String folder, label;
         private boolean announced = false, shared = false;

@@ -13,13 +13,13 @@
  */
 package it.anyplace.sync.core.beans;
 
-import javax.annotation.Nullable;
-
 import it.anyplace.sync.core.security.KeystoreHandler;
+
+import javax.annotation.Nullable;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-public class DeviceInfo {
+public final class DeviceInfo {
 
     private final String deviceId;
     private final String name;

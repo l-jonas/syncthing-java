@@ -16,18 +16,15 @@ package it.anyplace.sync.discovery;
 import com.google.common.base.Function;
 import com.google.common.collect.Ordering;
 import com.google.common.eventbus.Subscribe;
-
+import it.anyplace.sync.core.beans.DeviceAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.util.Iterator;
 import java.util.PriorityQueue;
 import java.util.Queue;
-
-import javax.annotation.Nullable;
-
-import it.anyplace.sync.core.beans.DeviceAddress;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -36,7 +33,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * @author aleph
  */
-public class DeviceAddressSupplier implements Closeable, Iterable<DeviceAddress> {
+public final class DeviceAddressSupplier implements Closeable, Iterable<DeviceAddress> {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final DiscoveryHandler discoveryHandler;

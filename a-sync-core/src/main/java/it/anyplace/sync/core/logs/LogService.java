@@ -15,7 +15,7 @@ package it.anyplace.sync.core.logs;
 
 import com.google.common.eventbus.EventBus;
 
-public class LogService  {
+public final class LogService  {
     
 //    private final  EventBus eventBus=new EventBus();
 

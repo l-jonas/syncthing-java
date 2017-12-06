@@ -21,7 +21,7 @@ import java.util.Date;
  *
  * @author aleph
  */
-public class FolderStats extends FolderInfo {
+public final class FolderStats extends FolderInfo {
 
     private final long fileCount, dirCount, size;
     private final Date lastUpdate;
@@ -76,7 +76,7 @@ public class FolderStats extends FolderInfo {
         return new Builder();
     }
 
-    public static class Builder {
+    public static final class Builder {
 
         private long fileCount, dirCount, size;
         private Date lastUpdate = new Date(0);

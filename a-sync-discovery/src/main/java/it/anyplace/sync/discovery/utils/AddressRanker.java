@@ -22,11 +22,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
-
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.beans.DeviceAddress.AddressType;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -37,17 +39,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import javax.annotation.Nullable;
-
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.core.beans.DeviceAddress.AddressType;
+import java.util.concurrent.*;
 
 import static com.google.common.base.Objects.equal;
 
@@ -55,7 +47,7 @@ import static com.google.common.base.Objects.equal;
  *
  * @author aleph
  */
-public class AddressRanker implements Closeable {
+public final class AddressRanker implements Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final ExecutorService executorService = Executors.newCachedThreadPool();

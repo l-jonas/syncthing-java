@@ -13,7 +13,7 @@
  */
 package it.anyplace.sync.core.configuration.gsonbeans;
 
-public class DeviceConfig {
+public final class DeviceConfig {
     private String deviceId, name;
 
     public String getDeviceId() {

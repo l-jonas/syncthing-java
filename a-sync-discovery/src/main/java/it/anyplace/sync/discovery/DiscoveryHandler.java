@@ -19,7 +19,14 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
-
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
+import it.anyplace.sync.core.interfaces.DeviceAddressRepository;
+import it.anyplace.sync.core.utils.ExecutorUtils;
+import it.anyplace.sync.discovery.protocol.GlobalDiscoveryHandler;
+import it.anyplace.sync.discovery.protocol.LocalDiscoveryHandler;
+import it.anyplace.sync.discovery.utils.AddressRanker;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,20 +39,11 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
-import it.anyplace.sync.core.interfaces.DeviceAddressRepository;
-import it.anyplace.sync.core.utils.ExecutorUtils;
-import it.anyplace.sync.discovery.protocol.GlobalDiscoveryHandler;
-import it.anyplace.sync.discovery.protocol.LocalDiscoveryHandler;
-import it.anyplace.sync.discovery.utils.AddressRanker;
-
 /**
  *
  * @author aleph
  */
-public class DiscoveryHandler implements Closeable {
+public final class DiscoveryHandler implements Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final ConfigurationService configuration;

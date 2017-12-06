@@ -24,7 +24,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * @author aleph
  */
-public class SessionInvitation {
+public final class SessionInvitation {
 
     private final String from, key;
     private final InetAddress address;
@@ -70,7 +70,7 @@ public class SessionInvitation {
         return new InetSocketAddress(getAddress(), getPort());
     }
 
-    public static class Builder {
+    public static final class Builder {
 
         private String from, key;
         private InetAddress address;

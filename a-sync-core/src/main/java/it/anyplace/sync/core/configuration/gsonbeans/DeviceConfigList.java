@@ -17,7 +17,7 @@ import com.google.common.collect.Lists;
 
 import java.util.List;
 
-public class DeviceConfigList {
+public final class DeviceConfigList {
 
     private List<DeviceConfig> devices = Lists.newArrayList();
 

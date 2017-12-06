@@ -21,7 +21,13 @@ import com.google.common.eventbus.Subscribe;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
 import com.google.protobuf.ByteString;
-
+import it.anyplace.sync.bep.BlockExchageProtos.ErrorCode;
+import it.anyplace.sync.bep.BlockExchageProtos.Request;
+import it.anyplace.sync.bep.BlockExchangeConnectionHandler.ResponseMessageReceivedEvent;
+import it.anyplace.sync.core.beans.BlockInfo;
+import it.anyplace.sync.core.beans.FileBlocks;
+import it.anyplace.sync.core.cache.BlockCache;
+import it.anyplace.sync.core.configuration.ConfigurationService;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,20 +36,8 @@ import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.InputStream;
 import java.io.SequenceInputStream;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
-
-import it.anyplace.sync.bep.BlockExchangeConnectionHandler.ResponseMessageReceivedEvent;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.ErrorCode;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Request;
-import it.anyplace.sync.core.beans.BlockInfo;
-import it.anyplace.sync.core.beans.FileBlocks;
-import it.anyplace.sync.core.cache.BlockCache;
-import it.anyplace.sync.core.configuration.ConfigurationService;
 
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -53,7 +47,7 @@ import static it.anyplace.sync.bep.BlockPusher.BLOCK_SIZE;
  *
  * @author aleph
  */
-public class BlockPuller {
+public final class BlockPuller {
 
     private BlockCache blockCache;
     private final Logger logger = LoggerFactory.getLogger(getClass());

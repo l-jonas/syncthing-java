@@ -13,23 +13,28 @@
  */
 package it.anyplace.sync.bep;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.ImmutableBiMap;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
+import com.google.common.collect.*;
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessage;
-
+import it.anyplace.sync.bep.BlockExchageProtos.*;
+import it.anyplace.sync.client.protocol.rp.RelayClient;
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.beans.DeviceInfo;
+import it.anyplace.sync.core.beans.FolderInfo;
+import it.anyplace.sync.core.beans.IndexInfo;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.events.DeviceAddressActiveEvent;
+import it.anyplace.sync.core.security.KeystoreHandler;
+import it.anyplace.sync.httprelay.client.HttpRelayClient;
 import net.jpountz.lz4.LZ4Factory;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLSocket;
 import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -42,42 +47,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import javax.net.ssl.SSLSocket;
-
-import it.anyplace.sync.bep.beans.ClusterConfigFolderInfo;
-import it.anyplace.sync.bep.protos.BlockExchageProtos;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.ClusterConfig;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Device;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Folder;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Index;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.IndexUpdate;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Ping;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Request;
-import it.anyplace.sync.bep.protos.BlockExchageProtos.Response;
-import it.anyplace.sync.client.protocol.rp.RelayClient;
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.core.beans.DeviceInfo;
-import it.anyplace.sync.core.beans.FolderInfo;
-import it.anyplace.sync.core.beans.IndexInfo;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.events.DeviceAddressActiveEvent;
-import it.anyplace.sync.core.security.KeystoreHandler;
-import it.anyplace.sync.httprelay.client.HttpRelayClient;
+import java.util.concurrent.*;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static it.anyplace.sync.core.security.KeystoreHandler.BEP;
-import static it.anyplace.sync.core.security.KeystoreHandler.deviceIdStringToHashData;
-import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdString;
+import static it.anyplace.sync.core.security.KeystoreHandler.*;
 
 /*
  * To change this template, choose Tools | Templates
@@ -87,7 +63,7 @@ import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdS
  *
  * @author aleph
  */
-public class BlockExchangeConnectionHandler implements Closeable {
+public final class BlockExchangeConnectionHandler implements Closeable {
 
     private final static int MAGIC = 0x2EA7D90B;
 
@@ -591,7 +567,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
         public abstract String getFolder();
     }
 
-    public class IndexMessageReceivedEvent extends AnyIndexMessageReceivedEvent<Index> {
+    public final class IndexMessageReceivedEvent extends AnyIndexMessageReceivedEvent<Index> {
 
         private IndexMessageReceivedEvent(Index message) {
             super(message);
@@ -609,7 +585,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
 
     }
 
-    public class IndexUpdateMessageReceivedEvent extends AnyIndexMessageReceivedEvent<IndexUpdate> {
+    public final class IndexUpdateMessageReceivedEvent extends AnyIndexMessageReceivedEvent<IndexUpdate> {
 
         private IndexUpdateMessageReceivedEvent(IndexUpdate message) {
             super(message);
@@ -627,7 +603,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
 
     }
 
-    public class RequestMessageReceivedEvent extends MessageReceivedEvent<Request> {
+    public final class RequestMessageReceivedEvent extends MessageReceivedEvent<Request> {
 
         private RequestMessageReceivedEvent(Request message) {
             super(message);
@@ -635,7 +611,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
 
     }
 
-    public class ResponseMessageReceivedEvent extends MessageReceivedEvent<Response> {
+    public final class ResponseMessageReceivedEvent extends MessageReceivedEvent<Response> {
 
         private ResponseMessageReceivedEvent(Response message) {
             super(message);
@@ -643,7 +619,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
 
     }
 
-    public class ClusterConfigMessageProcessedEvent extends MessageReceivedEvent<ClusterConfig> {
+    public final class ClusterConfigMessageProcessedEvent extends MessageReceivedEvent<ClusterConfig> {
 
         private ClusterConfigMessageProcessedEvent(ClusterConfig message) {
             super(message);
@@ -660,7 +636,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
         return "BlockExchangeConnectionHandler{" + "address=" + address + ", lastActive=" + (getLastActive() / 1000d) + "secs ago}";
     }
 
-    private static class ConnectionInfo {
+    private static final class ConnectionInfo {
 
         private String deviceName, clientName, clientVersion;
 
@@ -695,7 +671,7 @@ public class BlockExchangeConnectionHandler implements Closeable {
 
     }
 
-    public class ClusterConfigInfo {
+    public final class ClusterConfigInfo {
 
         private final Map<String, ClusterConfigFolderInfo> folderInfoById = Maps.newConcurrentMap();
 

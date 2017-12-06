@@ -13,7 +13,6 @@
  */
 package it.anyplace.sync.repository.repo;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -26,41 +25,26 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.Closeable;
-import java.io.File;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Types;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
-import javax.annotation.Nullable;
-
-import it.anyplace.sync.core.beans.BlockInfo;
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.core.beans.FileBlocks;
-import it.anyplace.sync.core.beans.FileInfo;
+import it.anyplace.sync.core.beans.*;
 import it.anyplace.sync.core.beans.FileInfo.FileType;
 import it.anyplace.sync.core.beans.FileInfo.Version;
-import it.anyplace.sync.core.beans.FolderStats;
-import it.anyplace.sync.core.beans.IndexInfo;
 import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.interfaces.DeviceAddressRepository;
 import it.anyplace.sync.core.interfaces.IndexRepository;
 import it.anyplace.sync.core.interfaces.Sequencer;
 import it.anyplace.sync.core.interfaces.TempRepository;
 import it.anyplace.sync.repository.repo.protos.IndexSerializationProtos;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import java.io.Closeable;
+import java.io.File;
+import java.sql.*;
+import java.util.*;
+import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -74,7 +58,7 @@ import static org.apache.http.util.TextUtils.isBlank;
  *
  * @author aleph
  */
-public class SqlRepository implements Closeable, IndexRepository, DeviceAddressRepository, TempRepository {
+public final class SqlRepository implements Closeable, IndexRepository, DeviceAddressRepository, TempRepository {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final static int VERSION = 13;
@@ -749,7 +733,7 @@ public class SqlRepository implements Closeable, IndexRepository, DeviceAddressR
     }
 
     //SEQUENCER
-    private class IndexRepoSequencer implements Sequencer {
+    private final class IndexRepoSequencer implements Sequencer {
 
         private Long indexId, currentSequence;
 

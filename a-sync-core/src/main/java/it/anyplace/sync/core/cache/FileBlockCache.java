@@ -18,19 +18,17 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Ordering;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
-
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import javax.annotation.Nullable;
 
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -39,7 +37,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author aleph
  */
-public class FileBlockCache extends BlockCache {
+public final class FileBlockCache extends BlockCache {
 
     private final static ExecutorService writerThread = Executors.newSingleThreadExecutor();
 

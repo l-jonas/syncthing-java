@@ -13,14 +13,15 @@
  */
 package it.anyplace.sync.discovery.protocol;
 
-import com.google.common.base.Function;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.gson.Gson;
-
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.discovery.utils.AddressRanker;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
@@ -32,6 +33,7 @@ import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.security.KeyManagementException;
@@ -42,19 +44,13 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import javax.annotation.Nullable;
-
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.discovery.utils.AddressRanker;
-
 import static com.google.common.base.MoreObjects.firstNonNull;
 
 /**
  *
  * @author aleph
  */
-public class GlobalDiscoveryHandler implements Closeable {
+public final class GlobalDiscoveryHandler implements Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final ConfigurationService configuration;
@@ -175,7 +171,7 @@ public class GlobalDiscoveryHandler implements Closeable {
 //        }
     }
 
-    public static class AnnouncementMessageBean {
+    public static final class AnnouncementMessageBean {
 
         private List<String> addresses;
 

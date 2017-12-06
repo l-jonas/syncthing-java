@@ -21,33 +21,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.io.BaseEncoding;
 import com.google.gson.Gson;
-
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.Closeable;
-import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.StringWriter;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
-import javax.annotation.Nullable;
-
 import it.anyplace.sync.core.beans.DeviceInfo;
 import it.anyplace.sync.core.beans.FolderInfo;
 import it.anyplace.sync.core.configuration.gsonbeans.DeviceConfig;
@@ -55,6 +28,17 @@ import it.anyplace.sync.core.configuration.gsonbeans.DeviceConfigList;
 import it.anyplace.sync.core.configuration.gsonbeans.FolderConfig;
 import it.anyplace.sync.core.configuration.gsonbeans.FolderConfigList;
 import it.anyplace.sync.core.utils.ExecutorUtils;
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import java.io.*;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -62,7 +46,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.emptyToNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-public class ConfigurationService implements Closeable {
+public final class ConfigurationService implements Closeable {
 
     private final static String DEVICE_NAME = "devicename",
         FOLDERS = "folders",
@@ -273,7 +257,7 @@ public class ConfigurationService implements Closeable {
         ExecutorUtils.awaitTerminationSafe(executorService);
     }
 
-    public class StorageInfo {
+    public final class StorageInfo {
 
         public long getAvailableSpace() {
             return getDatabase().getFreeSpace();
@@ -317,7 +301,7 @@ public class ConfigurationService implements Closeable {
         return new Editor();
     }
 
-    public class Editor {
+    public final class Editor {
 
         private Editor() {
 
@@ -425,7 +409,7 @@ public class ConfigurationService implements Closeable {
         return new Writer();
     }
 
-    public static class Loader {
+    public static final class Loader {
 
         private final Logger logger = LoggerFactory.getLogger(getClass());
         private final Properties customProperties = new Properties();
@@ -471,7 +455,7 @@ public class ConfigurationService implements Closeable {
         }
     }
 
-    public class Writer {
+    public final class Writer {
 
         private Writer() {
         }

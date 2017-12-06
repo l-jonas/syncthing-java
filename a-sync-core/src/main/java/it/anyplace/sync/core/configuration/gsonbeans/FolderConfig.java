@@ -17,7 +17,7 @@ package it.anyplace.sync.core.configuration.gsonbeans;
  *
  * @author aleph
  */
-public class FolderConfig {
+public final class FolderConfig {
 
     private String folder, label;
 

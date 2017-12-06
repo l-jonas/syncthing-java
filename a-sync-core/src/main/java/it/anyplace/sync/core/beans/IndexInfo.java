@@ -68,7 +68,7 @@ public class IndexInfo extends FolderInfo {
         return "FolderIndexInfo{" + "indexId=" + indexId + ", folder=" + getFolder() + ", deviceId=" + deviceId + ", localSequence=" + localSequence + ", maxSequence=" + maxSequence + '}';
     }
 
-    public static class Builder {
+    public static final class Builder {
 
         private long indexId;
         private String deviceId, folder;

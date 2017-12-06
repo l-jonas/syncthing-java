@@ -16,7 +16,8 @@ package it.anyplace.sync.httprelay.client;
 import com.google.common.base.Strings;
 import com.google.common.collect.Queues;
 import com.google.protobuf.ByteString;
-
+import it.anyplace.sync.core.interfaces.RelayConnection;
+import it.anyplace.sync.httprelay.protos.HttpRelayProtos;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
@@ -26,27 +27,9 @@ import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.Socket;
-import java.net.SocketAddress;
-import java.net.URI;
-import java.net.UnknownHostException;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import it.anyplace.sync.core.interfaces.RelayConnection;
-import it.anyplace.sync.httprelay.protos.HttpRelayProtos;
+import java.io.*;
+import java.net.*;
+import java.util.concurrent.*;
 
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -56,7 +39,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * @author aleph
  */
-public class HttpRelayConnection implements RelayConnection, Closeable {
+public final class HttpRelayConnection implements RelayConnection, Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final ExecutorService outgoingExecutorService = Executors.newSingleThreadExecutor(),

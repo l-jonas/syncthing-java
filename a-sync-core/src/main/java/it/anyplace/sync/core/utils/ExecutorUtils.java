@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @author aleph
  */
-public class ExecutorUtils {
+public final class ExecutorUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(ExecutorUtils.class);
 

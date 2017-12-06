@@ -13,9 +13,9 @@
  */
 package it.anyplace.sync.core.events;
 
-import java.util.List;
-
 import it.anyplace.sync.core.beans.DeviceAddress;
+
+import java.util.List;
 
 public interface DeviceAddressReceivedEvent {
 

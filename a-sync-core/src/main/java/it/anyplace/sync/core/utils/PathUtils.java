@@ -14,7 +14,6 @@
 package it.anyplace.sync.core.utils;
 
 import com.google.common.base.Strings;
-
 import org.apache.commons.io.FilenameUtils;
 
 import static com.google.common.base.Objects.equal;
@@ -24,7 +23,7 @@ import static com.google.common.base.Preconditions.checkArgument;
  *
  * @author aleph
  */
-public class PathUtils {
+public final class PathUtils {
 
     public static final String ROOT_PATH = "", PATH_SEPARATOR = "/", PARENT_PATH = "..";
 

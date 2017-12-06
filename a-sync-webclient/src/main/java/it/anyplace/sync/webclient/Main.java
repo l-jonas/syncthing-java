@@ -13,27 +13,22 @@
  */
 package it.anyplace.sync.webclient;
 
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Options;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.security.KeystoreHandler;
+import org.apache.commons.cli.*;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.awt.Desktop;
+import java.awt.*;
 import java.io.File;
 import java.net.URI;
-
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.security.KeystoreHandler;
 
 /**
  *
  * @author aleph
  */
-public class Main {
+public final class Main {
 
     private final static Logger logger = LoggerFactory.getLogger(Main.class);
 

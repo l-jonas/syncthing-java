@@ -19,7 +19,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.emptyToNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-public class DeviceStats {
+public final class DeviceStats {
 
     private final String deviceId, name;
 
@@ -76,7 +76,7 @@ public class DeviceStats {
         OFFLINE, ONLINE_ACTIVE, ONLINE_INACTIVE
     }
 
-    public static class Builder {
+    public static final class Builder {
 
         private String deviceId, name;
 

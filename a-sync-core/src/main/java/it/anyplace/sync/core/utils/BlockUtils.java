@@ -13,21 +13,19 @@
  */
 package it.anyplace.sync.core.utils;
 
-import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
+import it.anyplace.sync.core.beans.BlockInfo;
 
 import java.util.List;
-
-import it.anyplace.sync.core.beans.BlockInfo;
 
 /**
  *
  * @author aleph
  */
-public class BlockUtils {
+public final class BlockUtils {
 
     public static String hashBlocks(List<BlockInfo> blocks) {
         return BaseEncoding.base16().encode(Hashing.sha256().hashBytes(Joiner.on(",").join(Iterables.transform(blocks, input -> input.getHash())).getBytes()).asBytes());

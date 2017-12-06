@@ -4,6 +4,8 @@
  */
 package it.anyplace.sync.webclient;
 
+import it.anyplace.sync.client.SyncthingClient;
+import it.anyplace.sync.core.configuration.ConfigurationService;
 import org.apache.commons.io.IOUtils;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
@@ -15,17 +17,13 @@ import org.eclipse.jetty.util.resource.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
-import java.io.IOException;
-
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.Closeable;
+import java.io.IOException;
 
-import it.anyplace.sync.client.SyncthingClient;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-
-public class HttpService implements Closeable {
+public final class HttpService implements Closeable {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 

@@ -22,7 +22,10 @@ import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-
+import it.anyplace.sync.core.beans.DeviceAddress;
+import it.anyplace.sync.core.configuration.ConfigurationService;
+import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
+import it.anyplace.sync.discovery.protocol.LocalDiscoveryProtos.Announce;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,11 +34,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.InterfaceAddress;
-import java.net.NetworkInterface;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
@@ -45,18 +44,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
-import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.core.configuration.ConfigurationService;
-import it.anyplace.sync.core.events.DeviceAddressReceivedEvent;
-import it.anyplace.sync.discovery.protocol.LocalDiscoveryProtos.Announce;
-
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkArgument;
 import static it.anyplace.sync.core.security.KeystoreHandler.deviceIdStringToHashData;
 import static it.anyplace.sync.core.security.KeystoreHandler.hashDataToDeviceIdString;
 
-public class LocalDiscoveryHandler implements Closeable {
+public final class LocalDiscoveryHandler implements Closeable {
 
     private final static int MAGIC = 0x2EA7D90B;
     private final static int LISTENING_PORT = 21027;

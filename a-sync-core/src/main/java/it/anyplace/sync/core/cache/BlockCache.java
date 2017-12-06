@@ -13,9 +13,9 @@
  */
 package it.anyplace.sync.core.cache;
 
-import javax.annotation.Nullable;
-
 import it.anyplace.sync.core.configuration.ConfigurationService;
+
+import javax.annotation.Nullable;
 
 /**
  *
@@ -51,7 +51,7 @@ public abstract class BlockCache {
         
     }
 
-    private static class DummyBlockCache extends BlockCache {
+    private static final class DummyBlockCache extends BlockCache {
 
         @Override
         public String pushBlock(byte[] data) {

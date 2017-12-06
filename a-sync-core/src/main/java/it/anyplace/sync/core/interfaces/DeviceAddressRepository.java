@@ -13,9 +13,9 @@
  */
 package it.anyplace.sync.core.interfaces;
 
-import java.util.List;
-
 import it.anyplace.sync.core.beans.DeviceAddress;
+
+import java.util.List;
 
 /**
  *
