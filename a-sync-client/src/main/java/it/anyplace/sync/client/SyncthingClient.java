@@ -13,7 +13,6 @@
  */
 package it.anyplace.sync.client;
 
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.eventbus.Subscribe;
@@ -37,16 +36,15 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.KeyStoreException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -61,7 +59,6 @@ public final class SyncthingClient implements Closeable {
     private final SqlRepository sqlRepository;
     private final IndexHandler indexHandler;
     private final List<BlockExchangeConnectionHandler> connections = Collections.synchronizedList(Lists.<BlockExchangeConnectionHandler>newArrayList());
-    private final List<BlockExchangeConnectionHandler> pool = Lists.newArrayList();
     private final DevicesHandler devicesHandler;
 
     public SyncthingClient(ConfigurationService configuration) {
@@ -84,23 +81,6 @@ public final class SyncthingClient implements Closeable {
         return devicesHandler;
     }
 
-    private @Nullable
-    BlockExchangeConnectionHandler borrowFromPool(final DeviceAddress deviceAddress) {
-        synchronized (pool) {
-            BlockExchangeConnectionHandler connectionHandler = Iterables.find(pool, input -> equal(deviceAddress, input.getAddress()), null);
-            if (connectionHandler != null) {
-                pool.remove(connectionHandler);
-                if (connectionHandler.isClosed()) { //TODO check live
-                    return borrowFromPool(deviceAddress);
-                } else {
-                    return connectionHandler;
-                }
-            } else {
-                return null;
-            }
-        }
-    }
-
     private BlockExchangeConnectionHandler openConnection(DeviceAddress deviceAddress) throws IOException, KeystoreHandler.CryptoException {
         final BlockExchangeConnectionHandler connectionHandler = new BlockExchangeConnectionHandler(configuration, deviceAddress);
         connectionHandler.setIndexHandler(indexHandler);
@@ -111,9 +91,6 @@ public final class SyncthingClient implements Closeable {
             @Subscribe
             public void handleConnectionClosedEvent(BlockExchangeConnectionHandler.ConnectionClosedEvent event) {
                 connections.remove(connectionHandler);
-                synchronized (pool) {
-                    pool.remove(connectionHandler);
-                }
             }
 
             @Subscribe
@@ -129,15 +106,6 @@ public final class SyncthingClient implements Closeable {
             return openConnection(deviceAddress);
         } else {
             return connectionHandler;
-        }
-    }
-
-    private BlockExchangeConnectionHandler getConnection(DeviceAddress deviceAddress) throws IOException, KeystoreHandler.CryptoException {
-        BlockExchangeConnectionHandler connectionHandlerFromPool = borrowFromPool(deviceAddress);
-        if (connectionHandlerFromPool != null) {
-            return connectionHandlerFromPool;
-        } else {
-            return openConnection(deviceAddress);
         }
     }
 
@@ -170,8 +138,33 @@ public final class SyncthingClient implements Closeable {
         void onIndexEditObserverReady(BlockPusher.IndexEditObserver indexEditObserver);
     }
 
-    // TODO: there should be only one connect() method
-    private void getPeerConnection(OnConnectionAcquiredListener listener, OnConnectingCompleteListener completeListener) {
+    private BlockExchangeConnectionHandler getDeviceConnection(DeviceAddress address) throws IOException, KeystoreHandler.CryptoException {
+        for (BlockExchangeConnectionHandler c : connections) {
+            if (c.getAddress().equals(address)) {
+                return c;
+            }
+        }
+        return openConnection(address);
+    }
+
+    private void getConnectionForFolder(String folder, OnConnectionAcquiredListener listener, OnErrorListener errorListener) {
+        AtomicBoolean isConnected = new AtomicBoolean(false);
+        getPeerConnections(connection -> {
+            if (connection.hasFolder(folder)) {
+                listener.onConnectionAcquired(connection);
+                isConnected.set(true);
+            } else {
+                connection.close();
+            }
+        }, () -> {
+            if (!isConnected.get()) {
+                errorListener.onError();
+            }
+        });
+    }
+
+    // TODO: should get rid of this and just have getDeviceConnection() connect to single device
+    private void getPeerConnections(OnConnectionAcquiredListener listener, OnConnectingCompleteListener completeListener) {
         new Thread(() -> {
             DeviceAddressSupplier addressesSupplier = discoveryHandler.newDeviceAddressSupplier();
             Set<String> connectedDevices = Sets.newHashSet();
@@ -180,12 +173,11 @@ public final class SyncthingClient implements Closeable {
                     continue;
                 }
                 try {
-                    BlockExchangeConnectionHandler connection = getConnection(deviceAddress);
+                    BlockExchangeConnectionHandler connection = getDeviceConnection(deviceAddress);
                     connectedDevices.add(deviceAddress.getDeviceId());
                     listener.onConnectionAcquired(connection);
-                } catch (IOException | KeystoreHandler.CryptoException ex) {
-                    logger.warn("error connecting to device = {}", deviceAddress);
-                    logger.warn("error connecting to device", ex);
+                } catch (IOException | KeystoreHandler.CryptoException e) {
+                    logger.warn("error connecting to device = {}", deviceAddress, e);
                 }
             }
             completeListener.onConnectingComplete();
@@ -198,7 +190,7 @@ public final class SyncthingClient implements Closeable {
         //       this should probably be handled in IndexHandler
         //       at the moment, this is handled on the Android side
         Set<String> indexUpdateComplete = Sets.newHashSet();
-        getPeerConnection(connection -> {
+        getPeerConnections(connection -> {
             try {
                 indexHandler.waitForRemoteIndexAquired(connection);
                 indexUpdateComplete.add(connection.getDeviceId());
@@ -208,22 +200,6 @@ public final class SyncthingClient implements Closeable {
         }, () -> {
             Set<String> indexUpdateFailed = Sets.difference(configuration.getPeerIds(), indexUpdateComplete);
             listener.onIndexUpdateComplete(indexUpdateComplete, indexUpdateFailed);
-        });
-    }
-
-    private void getConnectionForFolder(String folder, OnConnectionAcquiredListener listener, OnErrorListener errorListener) {
-        AtomicBoolean isConnected = new AtomicBoolean(false);
-        getPeerConnection(connection -> {
-            if (connection.hasFolder(folder)) {
-                listener.onConnectionAcquired(connection);
-                isConnected.set(true);
-            } else {
-                connection.close();
-            }
-        }, () -> {
-            if (!isConnected.get()) {
-                errorListener.onError();
-            }
         });
     }
 
