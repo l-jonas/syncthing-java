@@ -1,0 +1,5 @@
+
+description = ''
+dependencies {
+  compile project(':a-sync-parent:a-sync-core')
+}

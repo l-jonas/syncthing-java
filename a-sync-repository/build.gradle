@@ -1,0 +1,7 @@
+
+description = ''
+dependencies {
+  compile project(':a-sync-parent:a-sync-core')
+    compile group: 'com.h2database', name: 'h2', version:'1.4.193'
+    compile group: 'com.zaxxer', name: 'HikariCP-java7', version:'2.4.9'
+}
