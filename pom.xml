@@ -16,7 +16,6 @@
         <module>a-sync-http-relay-server</module>
         <module>a-sync-repository</module>
         <module>a-sync-discovery</module>
-        <module>a-sync-webclient</module>
     </modules>
     
     <build>
