@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package it.anyplace.sync.httprelay.client;
+package it.anyplace.sync.httprelay;
 
 import it.anyplace.sync.core.beans.DeviceAddress;
 import it.anyplace.sync.core.beans.DeviceAddress.AddressType;

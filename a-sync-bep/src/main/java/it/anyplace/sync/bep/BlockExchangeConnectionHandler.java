@@ -18,7 +18,7 @@ import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessage;
-import it.anyplace.sync.bep.BlockExchageProtos.*;
+import it.anyplace.sync.bep.BlockExchangeProtos.*;
 import it.anyplace.sync.client.protocol.rp.RelayClient;
 import it.anyplace.sync.core.beans.DeviceAddress;
 import it.anyplace.sync.core.beans.DeviceInfo;
@@ -27,7 +27,7 @@ import it.anyplace.sync.core.beans.IndexInfo;
 import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.events.DeviceAddressActiveEvent;
 import it.anyplace.sync.core.security.KeystoreHandler;
-import it.anyplace.sync.httprelay.client.HttpRelayClient;
+import it.anyplace.sync.httprelay.HttpRelayClient;
 import net.jpountz.lz4.LZ4Factory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -144,14 +144,14 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         in = new DataInputStream(socket.getInputStream());
         out = new DataOutputStream(socket.getOutputStream());
 
-        sendHelloMessage(BlockExchageProtos.Hello.newBuilder()
+        sendHelloMessage(BlockExchangeProtos.Hello.newBuilder()
             .setClientName(configuration.getClientName())
             .setClientVersion(configuration.getClientVersion())
             .setDeviceName(configuration.getDeviceName())
             .build().toByteArray());
         markActivityOnSocket();
 
-        BlockExchageProtos.Hello hello = receiveHelloMessage();
+        BlockExchangeProtos.Hello hello = receiveHelloMessage();
         logger.trace("received hello message = {}", hello);
         ConnectionInfo connectionInfo = new ConnectionInfo();
         connectionInfo.setClientName(hello.getClientName());
@@ -247,7 +247,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         new Thread(this::close).start();
     }
 
-    private BlockExchageProtos.Hello receiveHelloMessage() throws IOException {
+    private BlockExchangeProtos.Hello receiveHelloMessage() throws IOException {
         logger.trace("receiving hello message");
         int magic = in.readInt();
         checkArgument(magic == MAGIC, "magic mismatch, expected %s, got %s", MAGIC, magic);
@@ -256,7 +256,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         byte[] buffer = new byte[length];
         in.readFully(buffer);
         logger.trace("received hello message");
-        return BlockExchageProtos.Hello.parseFrom(buffer);
+        return BlockExchangeProtos.Hello.parseFrom(buffer);
     }
 
     private Future sendHelloMessage(final byte[] payload) {
@@ -295,22 +295,22 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         sendPing().get();
     }
 
-    private final static BiMap<BlockExchageProtos.MessageType, Class<? extends GeneratedMessage>> messageTypes = ImmutableBiMap.<BlockExchageProtos.MessageType, Class<? extends GeneratedMessage>>builder()
-        .put(BlockExchageProtos.MessageType.CLOSE, BlockExchageProtos.Close.class)
-        .put(BlockExchageProtos.MessageType.CLUSTER_CONFIG, BlockExchageProtos.ClusterConfig.class)
-        .put(BlockExchageProtos.MessageType.DOWNLOAD_PROGRESS, BlockExchageProtos.DownloadProgress.class)
-        .put(BlockExchageProtos.MessageType.INDEX, BlockExchageProtos.Index.class)
-        .put(BlockExchageProtos.MessageType.INDEX_UPDATE, BlockExchageProtos.IndexUpdate.class)
-        .put(BlockExchageProtos.MessageType.PING, BlockExchageProtos.Ping.class)
-        .put(BlockExchageProtos.MessageType.REQUEST, BlockExchageProtos.Request.class)
-        .put(BlockExchageProtos.MessageType.RESPONSE, BlockExchageProtos.Response.class)
+    private final static BiMap<BlockExchangeProtos.MessageType, Class<? extends GeneratedMessage>> messageTypes = ImmutableBiMap.<BlockExchangeProtos.MessageType, Class<? extends GeneratedMessage>>builder()
+        .put(BlockExchangeProtos.MessageType.CLOSE, BlockExchangeProtos.Close.class)
+        .put(BlockExchangeProtos.MessageType.CLUSTER_CONFIG, BlockExchangeProtos.ClusterConfig.class)
+        .put(BlockExchangeProtos.MessageType.DOWNLOAD_PROGRESS, BlockExchangeProtos.DownloadProgress.class)
+        .put(BlockExchangeProtos.MessageType.INDEX, BlockExchangeProtos.Index.class)
+        .put(BlockExchangeProtos.MessageType.INDEX_UPDATE, BlockExchangeProtos.IndexUpdate.class)
+        .put(BlockExchangeProtos.MessageType.PING, BlockExchangeProtos.Ping.class)
+        .put(BlockExchangeProtos.MessageType.REQUEST, BlockExchangeProtos.Request.class)
+        .put(BlockExchangeProtos.MessageType.RESPONSE, BlockExchangeProtos.Response.class)
         .build();
 
     private void markActivityOnSocket() {
         lastActive = System.currentTimeMillis();
     }
 
-    private Pair<BlockExchageProtos.MessageType, GeneratedMessage> receiveMessage() throws IOException {
+    private Pair<BlockExchangeProtos.MessageType, GeneratedMessage> receiveMessage() throws IOException {
         logger.trace("receiving message");
         int headerLength = in.readShort();
         while (headerLength == 0) {
@@ -321,7 +321,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         checkArgument(headerLength > 0, "invalid lenght, must be >0, got %s", headerLength);
         byte[] headerBuffer = new byte[headerLength];
         in.readFully(headerBuffer);
-        BlockExchageProtos.Header header = BlockExchageProtos.Header.parseFrom(headerBuffer);
+        BlockExchangeProtos.Header header = BlockExchangeProtos.Header.parseFrom(headerBuffer);
         logger.trace("message type = {} compression = {}", header.getType(), header.getCompression());
         int messageLength;
         while ((messageLength = in.readInt()) == 0) {
@@ -331,7 +331,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         byte[] messageBuffer = new byte[messageLength];
         in.readFully(messageBuffer);
         markActivityOnSocket();
-        if (equal(header.getCompression(), BlockExchageProtos.MessageCompression.LZ4)) {
+        if (equal(header.getCompression(), BlockExchangeProtos.MessageCompression.LZ4)) {
             int uncompressedLength = ByteBuffer.wrap(messageBuffer).getInt();
             messageBuffer = LZ4Factory.fastestInstance().fastDecompressor().decompress(messageBuffer, 4, uncompressedLength);
         }
@@ -347,8 +347,8 @@ public final class BlockExchangeConnectionHandler implements Closeable {
     public Future sendMessage(final GeneratedMessage message) {
         checkNotClosed();
         checkArgument(messageTypes.containsValue(message.getClass()));
-        final BlockExchageProtos.Header header = BlockExchageProtos.Header.newBuilder()
-            .setCompression(BlockExchageProtos.MessageCompression.NONE)
+        final BlockExchangeProtos.Header header = BlockExchangeProtos.Header.newBuilder()
+            .setCompression(BlockExchangeProtos.MessageCompression.NONE)
             .setType(messageTypes.inverse().get(message.getClass()))
             .build();
         final byte[] headerData = header.toByteArray(), messageData = message.toByteArray(); //TODO compression
@@ -445,7 +445,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         inExecutorService.submit(() -> {
             try {
                 while (!Thread.interrupted()) {
-                    final Pair<BlockExchageProtos.MessageType, GeneratedMessage> message = receiveMessage();
+                    final Pair<BlockExchangeProtos.MessageType, GeneratedMessage> message = receiveMessage();
                     logger.debug("received message type = {} {}", message.getLeft(), getIdForMessage(message.getRight()));
                     logger.trace("received message = {}", message.getRight());
                     messageProcessingService.submit(() -> {
@@ -562,7 +562,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
             super(message);
         }
 
-        public abstract List<BlockExchageProtos.FileInfo> getFilesList();
+        public abstract List<BlockExchangeProtos.FileInfo> getFilesList();
 
         public abstract String getFolder();
     }
@@ -574,7 +574,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         }
 
         @Override
-        public List<BlockExchageProtos.FileInfo> getFilesList() {
+        public List<BlockExchangeProtos.FileInfo> getFilesList() {
             return getMessage().getFilesList();
         }
 
@@ -592,7 +592,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         }
 
         @Override
-        public List<BlockExchageProtos.FileInfo> getFilesList() {
+        public List<BlockExchangeProtos.FileInfo> getFilesList() {
             return getMessage().getFilesList();
         }
 

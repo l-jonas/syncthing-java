@@ -14,7 +14,7 @@
 package it.anyplace.sync.relay.server;
 
 import it.anyplace.sync.core.beans.DeviceAddress;
-import it.anyplace.sync.httprelay.server.HttpRelayServer;
+import it.anyplace.sync.httprelay.HttpRelayServer;
 import org.apache.commons.cli.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

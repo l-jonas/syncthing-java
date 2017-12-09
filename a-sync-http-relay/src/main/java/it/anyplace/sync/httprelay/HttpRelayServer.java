@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package it.anyplace.sync.httprelay.server;
+package it.anyplace.sync.httprelay;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
@@ -22,8 +22,7 @@ import it.anyplace.sync.client.protocol.rp.beans.SessionInvitation;
 import it.anyplace.sync.core.configuration.ConfigurationService;
 import it.anyplace.sync.core.interfaces.RelayConnection;
 import it.anyplace.sync.core.security.KeystoreHandler;
-import it.anyplace.sync.httprelay.protos.HttpRelayProtos;
-import it.anyplace.sync.httprelay.server.RelaySessionConnection.ConnectionClosedEvent;
+import it.anyplace.sync.httprelay.RelaySessionConnection.ConnectionClosedEvent;
 import org.apache.commons.io.IOUtils;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;

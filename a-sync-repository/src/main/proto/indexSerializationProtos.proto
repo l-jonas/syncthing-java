@@ -1,4 +1,4 @@
-package it.anyplace.sync.core.repo.protos;
+package it.anyplace.sync.repository.repo;
 
 message Index {
    optional int64 version = 1;

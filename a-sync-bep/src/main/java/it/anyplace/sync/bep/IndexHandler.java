@@ -133,11 +133,11 @@ public final class IndexHandler implements Closeable {
     @Subscribe
     public void handleClusterConfigMessageProcessedEvent(ClusterConfigMessageProcessedEvent event) {
         synchronized (writeAccessLock) {
-            for (BlockExchageProtos.Folder folderRecord : event.getMessage().getFoldersList()) {
+            for (BlockExchangeProtos.Folder folderRecord : event.getMessage().getFoldersList()) {
                 String folder = folderRecord.getId();
                 FolderInfo folderInfo = updateFolderInfo(folder, folderRecord.getLabel());
                 logger.debug("aquired folder info from cluster config = {}", folderInfo);
-                for (BlockExchageProtos.Device deviceRecord : folderRecord.getDevicesList()) {
+                for (BlockExchangeProtos.Device deviceRecord : folderRecord.getDevicesList()) {
                     String deviceId = hashDataToDeviceIdString(deviceRecord.getId().toByteArray());
                     if (deviceRecord.hasIndexId() && deviceRecord.hasMaxSequence()) {
                         IndexInfo folderIndexInfo = updateIndexInfo(folder, deviceId, deviceRecord.getIndexId(), deviceRecord.getMaxSequence(), null);
@@ -154,7 +154,7 @@ public final class IndexHandler implements Closeable {
     }
 
     public @Nullable
-    FileInfo pushRecord(String folder, BlockExchageProtos.FileInfo bepFileInfo) {
+    FileInfo pushRecord(String folder, BlockExchangeProtos.FileInfo bepFileInfo) {
         FileBlocks fileBlocks = null;
         FileInfo.Builder builder = FileInfo.newBuilder()
             .setFolder(folder)
@@ -366,9 +366,9 @@ public final class IndexHandler implements Closeable {
             markActive();
             ClusterConfigInfo clusterConfigInfo = event.getConnectionHandler().getClusterConfigInfo();
             String peerDeviceId = event.getConnectionHandler().getDeviceId();
-//            List<BlockExchageProtos.FileInfo> fileList = event.getFilesList();
+//            List<BlockExchangeProtos.FileInfo> fileList = event.getFilesList();
 //            for (int index = 0; index < fileList.size(); index += MAX_RECORD_PER_PROCESS) {
-//                BlockExchageProtos.IndexUpdate data = BlockExchageProtos.IndexUpdate.newBuilder()
+//                BlockExchangeProtos.IndexUpdate data = BlockExchangeProtos.IndexUpdate.newBuilder()
 //                    .addAllFiles(Iterables.limit(Iterables.skip(fileList, index), MAX_RECORD_PER_PROCESS))
 //                    .setFolder(event.getFolder())
 //                    .build();
@@ -378,7 +378,7 @@ public final class IndexHandler implements Closeable {
 //                    processBg(data, clusterConfigInfo, peerDeviceId);
 //                }
 //            }
-            BlockExchageProtos.IndexUpdate data = BlockExchageProtos.IndexUpdate.newBuilder()
+            BlockExchangeProtos.IndexUpdate data = BlockExchangeProtos.IndexUpdate.newBuilder()
                 .addAllFiles(event.getFilesList())
                 .setFolder(event.getFolder())
                 .build();
@@ -389,7 +389,7 @@ public final class IndexHandler implements Closeable {
             }
         }
 
-        private void processBg(final BlockExchageProtos.IndexUpdate data, final ClusterConfigInfo clusterConfigInfo, final String peerDeviceId) {
+        private void processBg(final BlockExchangeProtos.IndexUpdate data, final ClusterConfigInfo clusterConfigInfo, final String peerDeviceId) {
             logger.debug("received index message event, queuing for processing");
             queuedMessages++;
             queuedRecords += data.getFilesCount();
@@ -402,7 +402,7 @@ public final class IndexHandler implements Closeable {
             });
         }
 
-        private void storeAndProcessBg(final BlockExchageProtos.IndexUpdate data, final ClusterConfigInfo clusterConfigInfo, final String peerDeviceId) {
+        private void storeAndProcessBg(final BlockExchangeProtos.IndexUpdate data, final ClusterConfigInfo clusterConfigInfo, final String peerDeviceId) {
             final String key = tempRepository.pushTempData(data.toByteArray());
             logger.debug("received index message event, stored to temp record {}, queuing for processing", key);
             queuedMessages++;
@@ -435,7 +435,7 @@ public final class IndexHandler implements Closeable {
 
             protected abstract void runProcess();
 
-//        private boolean isVersionOlderThanSequence(BlockExchageProtos.FileInfo fileInfo, long localSequence) {
+//        private boolean isVersionOlderThanSequence(BlockExchangeProtos.FileInfo fileInfo, long localSequence) {
 //            long fileSequence = fileInfo.getSequence();
 //            //TODO should we check last version instead of sequence? verify
 //            return fileSequence < localSequence;
@@ -444,11 +444,11 @@ public final class IndexHandler implements Closeable {
                 logger.debug("processing index message event from temp record {}", key);
                 markActive();
                 byte[] data = tempRepository.popTempData(key);
-                BlockExchageProtos.IndexUpdate message = BlockExchageProtos.IndexUpdate.parseFrom(data);
+                BlockExchangeProtos.IndexUpdate message = BlockExchangeProtos.IndexUpdate.parseFrom(data);
                 doHandleIndexMessageReceivedEvent(message, clusterConfigInfo, peerDeviceId);
             }
 
-            protected void doHandleIndexMessageReceivedEvent(BlockExchageProtos.IndexUpdate message, ClusterConfigInfo clusterConfigInfo, String peerDeviceId) {
+            protected void doHandleIndexMessageReceivedEvent(BlockExchangeProtos.IndexUpdate message, ClusterConfigInfo clusterConfigInfo, String peerDeviceId) {
 //            synchronized (writeAccessLock) {
 //                if (addProcessingDelayForInterface) {
 //                    delay = Math.min(MAX_DELAY, Math.max(MIN_DELAY, lastRecordProcessingTime * DELAY_FACTOR));
@@ -469,7 +469,7 @@ public final class IndexHandler implements Closeable {
 //                IndexInfo oldIndexInfo = indexRepository.findIndexInfoByDeviceAndFolder(deviceId, folder);
 //            Stopwatch stopwatch = Stopwatch.createStarted();
                 logger.debug("processing {} index records for folder {}", message.getFilesList().size(), folder);
-                for (BlockExchageProtos.FileInfo fileInfo : message.getFilesList()) {
+                for (BlockExchangeProtos.FileInfo fileInfo : message.getFilesList()) {
                     markActive();
 //                    if (oldIndexInfo != null && isVersionOlderThanSequence(fileInfo, oldIndexInfo.getLocalSequence())) {
 //                        logger.trace("skipping file {}, version older than sequence {}", fileInfo, oldIndexInfo.getLocalSequence());

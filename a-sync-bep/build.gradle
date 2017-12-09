@@ -1,5 +1,6 @@
+
 dependencies {
-  compile project(':a-sync-parent:a-sync-core')
-  compile project(':a-sync-parent:a-sync-relay')
-  compile project(':a-sync-parent:a-sync-http-relay')
+    compile project(':a-sync-parent:a-sync-core')
+    compile project(':a-sync-parent:a-sync-relay')
+    compile project(':a-sync-parent:a-sync-http-relay')
 }

@@ -33,7 +33,7 @@ import it.anyplace.sync.core.interfaces.DeviceAddressRepository;
 import it.anyplace.sync.core.interfaces.IndexRepository;
 import it.anyplace.sync.core.interfaces.Sequencer;
 import it.anyplace.sync.core.interfaces.TempRepository;
-import it.anyplace.sync.repository.repo.protos.IndexSerializationProtos;
+import it.anyplace.sync.repository.repo.IndexSerializationProtos;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

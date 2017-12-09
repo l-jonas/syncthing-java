@@ -11,13 +11,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package it.anyplace.sync.httprelay.client;
+package it.anyplace.sync.httprelay;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Queues;
 import com.google.protobuf.ByteString;
 import it.anyplace.sync.core.interfaces.RelayConnection;
-import it.anyplace.sync.httprelay.protos.HttpRelayProtos;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;

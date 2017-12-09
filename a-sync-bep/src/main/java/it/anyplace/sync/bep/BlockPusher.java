@@ -20,8 +20,8 @@ import com.google.common.eventbus.Subscribe;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
 import com.google.protobuf.ByteString;
-import it.anyplace.sync.bep.BlockExchageProtos.*;
-import it.anyplace.sync.bep.BlockExchageProtos.Vector;
+import it.anyplace.sync.bep.BlockExchangeProtos.*;
+import it.anyplace.sync.bep.BlockExchangeProtos.Vector;
 import it.anyplace.sync.bep.BlockExchangeConnectionHandler.RequestMessageReceivedEvent;
 import it.anyplace.sync.core.beans.FileInfo;
 import it.anyplace.sync.core.beans.FileInfo.Version;
@@ -82,7 +82,7 @@ public final class BlockPusher {
     public IndexEditObserver pushDelete(FileInfo fileInfo, String folder, String path) {
         checkArgument(connectionHandler.hasFolder(fileInfo.getFolder()), "supplied connection handler %s will not share folder %s", connectionHandler, fileInfo.getFolder());
         checkNotNull(fileInfo, "must provide file info for delete of path = %s", path);
-        return new IndexEditObserver(sendIndexUpdate(folder, BlockExchageProtos.FileInfo.newBuilder()
+        return new IndexEditObserver(sendIndexUpdate(folder, BlockExchangeProtos.FileInfo.newBuilder()
             .setName(path)
             .setType(FileInfoType.valueOf(fileInfo.getType().name()))
             .setDeleted(true), fileInfo.getVersionList()));
@@ -90,9 +90,9 @@ public final class BlockPusher {
 
     public IndexEditObserver pushDir(String folder, String path) {
         checkArgument(connectionHandler.hasFolder(folder), "supplied connection handler %s will not share folder %s", connectionHandler, folder);
-        return new IndexEditObserver(sendIndexUpdate(folder, BlockExchageProtos.FileInfo.newBuilder()
+        return new IndexEditObserver(sendIndexUpdate(folder, BlockExchangeProtos.FileInfo.newBuilder()
             .setName(path)
-            .setType(BlockExchageProtos.FileInfoType.DIRECTORY), null));
+            .setType(BlockExchangeProtos.FileInfoType.DIRECTORY), null));
     }
 
     public FileUploadObserver pushFile(InputStream inputStream, @Nullable FileInfo fileInfo, final String folder, final String path) {
@@ -120,14 +120,14 @@ public final class BlockPusher {
         final Object listener = new Object() {
             @Subscribe
             public void handleRequestMessageReceivedEvent(RequestMessageReceivedEvent event) {
-                BlockExchageProtos.Request request = event.getMessage();
+                BlockExchangeProtos.Request request = event.getMessage();
                 if (equal(request.getFolder(), folder) && equal(request.getName(), path)) {
                     final String hash = BaseEncoding.base16().encode(request.getHash().toByteArray());
                     logger.debug("handling block request = {}:{}-{} ({})", request.getName(), request.getOffset(), request.getSize(), hash);
                     byte[] data = dataSource.getBlock(request.getOffset(), request.getSize(), hash);
                     checkNotNull(data, "data not found for hash = %s", hash);
                     final Future future = connectionHandler.sendMessage(Response.newBuilder()
-                        .setCode(BlockExchageProtos.ErrorCode.NO_ERROR)
+                        .setCode(BlockExchangeProtos.ErrorCode.NO_ERROR)
                         .setData(ByteString.copyFrom(data))
                         .setId(request.getId())
                         .build());
@@ -173,10 +173,10 @@ public final class BlockPusher {
         if (indexHandler != null) {
             indexHandler.getEventBus().register(indexListener);
         }
-        final IndexUpdate indexUpdate = sendIndexUpdate(folder, BlockExchageProtos.FileInfo.newBuilder()
+        final IndexUpdate indexUpdate = sendIndexUpdate(folder, BlockExchangeProtos.FileInfo.newBuilder()
             .setName(path)
             .setSize(fileSize)
-            .setType(BlockExchageProtos.FileInfoType.FILE)
+            .setType(BlockExchangeProtos.FileInfoType.FILE)
             .addAllBlocks(dataSource.getBlocks()), fileInfo == null ? null : fileInfo.getVersionList()).getRight();
         return new FileUploadObserver() {
             @Override
@@ -231,7 +231,7 @@ public final class BlockPusher {
         };
     }
 
-    private Pair<Future, IndexUpdate> sendIndexUpdate(String folder, BlockExchageProtos.FileInfo.Builder fileInfoBuilder, @Nullable Iterable<Version> oldVersions) {
+    private Pair<Future, IndexUpdate> sendIndexUpdate(String folder, BlockExchangeProtos.FileInfo.Builder fileInfoBuilder, @Nullable Iterable<Version> oldVersions) {
         {
             long nextSequence = indexHandler.getSequencer().nextSequence();
             final List<Version> list = Lists.newArrayList(firstNonNull(oldVersions, Collections.emptyList()));
@@ -247,7 +247,7 @@ public final class BlockPusher {
                 .setVersion(Vector.newBuilder().addAllCounters(Iterables.transform(list, record -> Counter.newBuilder().setId(record.getId()).setValue(record.getValue()).build())).addCounters(version));
         }
         Date lastModified = new Date();
-        BlockExchageProtos.FileInfo fileInfo = fileInfoBuilder
+        BlockExchangeProtos.FileInfo fileInfo = fileInfoBuilder
             .setModifiedS(lastModified.getTime() / 1000)
             .setModifiedNs((int) ((lastModified.getTime() % 1000) * 1000000))
             .setNoPermissions(true)

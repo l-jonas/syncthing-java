@@ -11,14 +11,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package it.anyplace.sync.httprelay.server;
+package it.anyplace.sync.httprelay;
 
 import com.google.common.eventbus.EventBus;
 import com.google.protobuf.ByteString;
 import it.anyplace.sync.core.interfaces.RelayConnection;
-import it.anyplace.sync.httprelay.protos.HttpRelayProtos;
-import it.anyplace.sync.httprelay.protos.HttpRelayProtos.HttpRelayPeerMessage;
-import it.anyplace.sync.httprelay.protos.HttpRelayProtos.HttpRelayServerMessage;
+import it.anyplace.sync.httprelay.HttpRelayProtos.HttpRelayPeerMessage;
+import it.anyplace.sync.httprelay.HttpRelayProtos.HttpRelayServerMessage;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
