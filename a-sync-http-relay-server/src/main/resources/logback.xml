@@ -9,7 +9,7 @@
     </appender>
 
     <logger name="org.eclipse.jetty" level="INFO"/>
-    <logger name="it.anyplace.sync" level="DEBUG"/>
+    <logger name="net.syncthing.java" level="DEBUG"/>
     
     <root level="DEBUG" >
         <appender-ref ref="STDOUT" />

@@ -1,4 +1,4 @@
-package it.anyplace.sync.httprelay;
+package net.syncthing.java.httprelay;
 
 message HttpRelayPeerMessage{
     optional HttpRelayPeerMessageType message_type = 1;

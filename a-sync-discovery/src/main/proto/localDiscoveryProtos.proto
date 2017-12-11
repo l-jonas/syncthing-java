@@ -1,4 +1,4 @@
-package it.anyplace.sync.discovery.protocol;
+package net.syncthing.java.discovery.protocol;
 
 message Announce {
     optional bytes           id          = 1;

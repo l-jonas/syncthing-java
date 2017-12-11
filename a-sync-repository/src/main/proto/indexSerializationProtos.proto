@@ -1,4 +1,4 @@
-package it.anyplace.sync.repository.repo;
+package net.syncthing.java.repository.repo;
 
 message Index {
    optional int64 version = 1;

@@ -9,7 +9,7 @@ buildscript {
 
 allprojects  {
     apply plugin: 'maven'
-    group = 'it.anyplace.sync'
+    group = 'net.syncthing.java'
     version = '1.3'
 }
 
