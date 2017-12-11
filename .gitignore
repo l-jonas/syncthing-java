@@ -15,6 +15,7 @@
 /a-sync-http-relay-server/build/
 /a-sync-http-relay-server/out/
 a-sync-parent/
+build/
 .idea/
 .gradle/
 *.iml
