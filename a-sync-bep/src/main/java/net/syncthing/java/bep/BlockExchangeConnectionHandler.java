@@ -78,20 +78,17 @@ public final class BlockExchangeConnectionHandler implements Closeable {
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
-    private final DeviceAddress address;
+    private String deviceId;
     private long lastActive = Long.MIN_VALUE;
     private ClusterConfigInfo clusterConfigInfo;
     private IndexHandler indexHandler;
     private boolean isClosed = false, isConnected = false;
+    private final KeystoreHandler keystoreHandler;
 
-    public BlockExchangeConnectionHandler(ConfigurationService configuration, DeviceAddress deviceAddress) {
+    public BlockExchangeConnectionHandler(ConfigurationService configuration) {
         checkNotNull(configuration);
         this.configuration = configuration;
-        this.address = deviceAddress;
-    }
-
-    public DeviceAddress getAddress() {
-        return address;
+        keystoreHandler = KeystoreHandler.newLoader().loadAndStore(configuration);
     }
 
     public ClusterConfigInfo getClusterConfigInfo() {
@@ -115,12 +112,28 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         return isConnected;
     }
 
-    public BlockExchangeConnectionHandler connect() throws IOException, KeystoreHandler.CryptoException {
+    public void accept(Socket rawSocket) throws IOException, KeystoreHandler.CryptoException {
+        checkNotClosed();
+        checkArgument(socket == null && !isConnected, "already connected!");
+        logger.debug("accepting incoming connection");
+        socket = keystoreHandler.wrapSocket(rawSocket, false, BEP);
+        exchangeHelloMessage();
+        try {
+            deviceId = keystoreHandler.checkSocketCertificate((SSLSocket) socket);
+            if (!configuration.getPeerIds().contains(deviceId)) {
+                throw new IOException("Unknown device");
+            }
+        } catch (CertificateException e) {
+            throw new IOException(e);
+        }
+        initConnection();
+    }
+
+    public void connect(DeviceAddress address) throws IOException, KeystoreHandler.CryptoException {
         checkNotClosed();
         checkArgument(socket == null && !isConnected, "already connected!");
         logger.info("connecting to {}", address.getAddress());
-
-        KeystoreHandler keystoreHandler = KeystoreHandler.newLoader().loadAndStore(configuration);
+        deviceId = address.getDeviceId();
 
         switch (address.getType()) {
             case TCP:
@@ -141,16 +154,24 @@ public final class BlockExchangeConnectionHandler implements Closeable {
             default:
                 throw new UnsupportedOperationException("unsupported address type = " + address.getType());
         }
+        exchangeHelloMessage();
+        try {
+            keystoreHandler.checkSocketCertificate((SSLSocket) socket, address.getDeviceId());
+        } catch (CertificateException e) {
+            throw new IOException(e);
+        }
+        initConnection();
+    }
+
+    private void exchangeHelloMessage() throws IOException {
         in = new DataInputStream(socket.getInputStream());
         out = new DataOutputStream(socket.getOutputStream());
-
         sendHelloMessage(BlockExchangeProtos.Hello.newBuilder()
-            .setClientName(configuration.getClientName())
-            .setClientVersion(configuration.getClientVersion())
-            .setDeviceName(configuration.getDeviceName())
-            .build().toByteArray());
+                .setClientName(configuration.getClientName())
+                .setClientVersion(configuration.getClientVersion())
+                .setDeviceName(configuration.getDeviceName())
+                .build().toByteArray());
         markActivityOnSocket();
-
         BlockExchangeProtos.Hello hello = receiveHelloMessage();
         logger.trace("received hello message = {}", hello);
         ConnectionInfo connectionInfo = new ConnectionInfo();
@@ -158,11 +179,9 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         connectionInfo.setClientVersion(hello.getClientVersion());
         connectionInfo.setDeviceName(hello.getDeviceName());
         logger.info("connected to device = {}", connectionInfo);
-        try {
-            keystoreHandler.checkSocketCerificate((SSLSocket) socket, address.getDeviceId());
-        } catch (CertificateException e) {
-            throw new IOException(e);
-        }
+    }
+
+    private void initConnection() throws IOException {
         {
             ClusterConfig.Builder clusterConfigBuilder = ClusterConfig.newBuilder();
             for (String folder : configuration.getFolderNames()) {
@@ -179,9 +198,9 @@ public final class BlockExchangeConnectionHandler implements Closeable {
                 {
                     //other device
                     Device.Builder deviceBuilder = folderBuilder.addDevicesBuilder()
-                        .setId(ByteString.copyFrom(deviceIdStringToHashData(address.getDeviceId())));
+                        .setId(ByteString.copyFrom(deviceIdStringToHashData(deviceId)));
                     if (indexHandler != null) {
-                        IndexInfo indexSequenceInfo = indexHandler.getIndexRepository().findIndexInfoByDeviceAndFolder(address.getDeviceId(), folder);
+                        IndexInfo indexSequenceInfo = indexHandler.getIndexRepository().findIndexInfoByDeviceAndFolder(deviceId, folder);
                         if (indexSequenceInfo != null) {
                             deviceBuilder
                                 .setIndexId(indexSequenceInfo.getIndexId())
@@ -234,7 +253,6 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         }
         periodicExecutorService.scheduleWithFixedDelay(this::sendPing, 90, 90, TimeUnit.SECONDS);
         isConnected = true;
-        return this;
     }
 
     private void sendIndexMessage(String folder) {
@@ -395,7 +413,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
                 IOUtils.closeQuietly(socket);
                 socket = null;
             }
-            logger.info("closed connection {}", address);
+            logger.info("closed connection {}", deviceId);
             eventBus.post(ConnectionClosedEvent.INSTANCE);
             try {
                 periodicExecutorService.awaitTermination(2, TimeUnit.SECONDS);
@@ -480,7 +498,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
                                         .setLabel(folder.getLabel());
                                     Map<String, Device> devicesById = Maps.uniqueIndex(firstNonNull(folder.getDevicesList(), Collections.emptyList()),
                                             input -> hashDataToDeviceIdString(input.getId().toByteArray()));
-                                    Device otherDevice = devicesById.get(address.getDeviceId()),
+                                    Device otherDevice = devicesById.get(deviceId),
                                         ourDevice = devicesById.get(configuration.getDeviceId());
                                     if (otherDevice != null) {
                                         builder.setAnnounced(true);
@@ -488,7 +506,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
                                     final ClusterConfigFolderInfo folderInfo;
                                     if (ourDevice != null) {
                                         folderInfo = builder.setShared(true).build();
-                                        logger.info("folder shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
+                                        logger.info("folder shared from device = {} folder = {}", deviceId, folderInfo);
                                         if (!configuration.getFolderNames().contains(folderInfo.getFolder())) {
                                             configuration.edit().addFolders(new FolderInfo(folderInfo.getFolder(), folderInfo.getLabel()));
                                             logger.info("new folder shared = {}", folderInfo);
@@ -502,7 +520,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
                                         }
                                     } else {
                                         folderInfo = builder.build();
-                                        logger.info("folder not shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
+                                        logger.info("folder not shared from device = {} folder = {}", deviceId, folderInfo);
                                     }
                                     clusterConfigInfo.putFolderInfo(folderInfo);
                                     configuration.edit().addPeers(Iterables.filter(Iterables.transform(firstNonNull(folder.getDevicesList(), Collections.emptyList()), device -> {
@@ -529,7 +547,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
     }
 
     public String getDeviceId() {
-        return getAddress().getDeviceId();
+        return deviceId;
     }
 
     public abstract class MessageReceivedEvent<E> implements DeviceAddressActiveEvent {
@@ -550,8 +568,8 @@ public final class BlockExchangeConnectionHandler implements Closeable {
         }
 
         @Override
-        public DeviceAddress getDeviceAddress() {
-            return getConnectionHandler().getAddress();
+        public String getDeviceId() {
+            return getConnectionHandler().deviceId;
         }
 
     }
@@ -633,7 +651,7 @@ public final class BlockExchangeConnectionHandler implements Closeable {
 
     @Override
     public String toString() {
-        return "BlockExchangeConnectionHandler{" + "address=" + address + ", lastActive=" + (getLastActive() / 1000d) + "secs ago}";
+        return "BlockExchangeConnectionHandler{" + "address=" + deviceId + ", lastActive=" + (getLastActive() / 1000d) + "secs ago}";
     }
 
     private static final class ConnectionInfo {

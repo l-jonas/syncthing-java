@@ -23,17 +23,11 @@ import net.syncthing.java.core.cache.BlockCache
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.devices.DevicesHandler
-import net.syncthing.java.discovery.DeviceAddressSupplier
 import net.syncthing.java.discovery.DiscoveryHandler
 import net.syncthing.java.repository.repo.SqlRepository
-import net.syncthing.java.bep.BlockExchangeConnectionHandler
-import net.syncthing.java.bep.BlockPuller
 import net.syncthing.java.bep.BlockPuller.FileDownloadObserver
-import net.syncthing.java.bep.BlockPusher
 import net.syncthing.java.bep.BlockPusher.FileUploadObserver
-import net.syncthing.java.bep.IndexHandler
 import org.apache.commons.lang3.tuple.Pair
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import java.io.Closeable
@@ -43,6 +37,7 @@ import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 
 import com.google.common.base.Preconditions.checkNotNull
+import net.syncthing.java.bep.*
 import net.syncthing.java.core.beans.FolderInfo
 
 class SyncthingClient(private val configuration: ConfigurationService) : Closeable {
@@ -53,10 +48,13 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
     val indexHandler: IndexHandler
     private val connections = Collections.synchronizedList(Lists.newArrayList<BlockExchangeConnectionHandler>())
     val devicesHandler: DevicesHandler
+    // TODO: probably need to handle some event stuff on connection (like [[openConnection]]
+    private val connectionListener = ConnectionListener(configuration, { c -> connections.add(c) })
 
     init {
         indexHandler = IndexHandler(configuration, sqlRepository, sqlRepository)
-        discoveryHandler = DiscoveryHandler(configuration, sqlRepository)
+        connectionListener.open()
+        discoveryHandler = DiscoveryHandler(configuration, sqlRepository, connectionListener.getListeningPort())
         devicesHandler = DevicesHandler(configuration)
         discoveryHandler.eventBus.register(devicesHandler)
     }
@@ -70,7 +68,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
     private fun openConnection(deviceAddress: DeviceAddress): BlockExchangeConnectionHandler {
-        val connectionHandler = BlockExchangeConnectionHandler(configuration, deviceAddress)
+        val connectionHandler = BlockExchangeConnectionHandler(configuration)
         connectionHandler.indexHandler = indexHandler
         connectionHandler.eventBus.register(indexHandler)
         connectionHandler.eventBus.register(devicesHandler)
@@ -86,7 +84,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
                 shouldRestartForNewFolder.set(true)
             }
         })
-        connectionHandler.connect()
+        connectionHandler.connect(deviceAddress)
         connections.add(connectionHandler)
         if (shouldRestartForNewFolder.get()) {
             logger.info("restart connection for new folder shared")
@@ -100,7 +98,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
     private fun getDeviceConnection(address: DeviceAddress): BlockExchangeConnectionHandler {
         for (c in connections) {
-            if (c.address == address) {
+            if (c.deviceId == address.deviceId) {
                 return c
             }
         }
@@ -235,6 +233,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
         }
         indexHandler.close()
         sqlRepository.close()
+        connectionListener.close()
     }
 
 }

@@ -112,7 +112,7 @@ object Main {
         if (cmd.hasOption("d")) {
             val deviceId = cmd.getOptionValue("d")
             logger.info("discovery device id = {}", deviceId)
-            val deviceAddresses = LocalDiscoveryHandler(configuration).queryAndClose(deviceId)
+            val deviceAddresses = LocalDiscoveryHandler(configuration, 22000).queryAndClose(deviceId)
             logger.info("local response = {}", deviceAddresses)
         }
 

@@ -70,7 +70,7 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
 
     @Subscribe
     fun handleDeviceAddressActiveEvent(event: DeviceAddressActiveEvent) {
-        pushDeviceStats(getDeviceStats(event.deviceAddress.deviceId)
+        pushDeviceStats(getDeviceStats(event.deviceId)
                 .copyBuilder()
                 .setLastActive(Date())
                 .setStatus(DeviceStats.DeviceStatus.ONLINE_ACTIVE)

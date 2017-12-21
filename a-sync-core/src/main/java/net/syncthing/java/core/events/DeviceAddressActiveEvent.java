@@ -13,9 +13,7 @@
  */
 package net.syncthing.java.core.events;
 
-import net.syncthing.java.core.beans.DeviceAddress;
-
 public interface DeviceAddressActiveEvent {
 
-    DeviceAddress getDeviceAddress();
+    String getDeviceId();
 }

@@ -25,8 +25,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import net.syncthing.java.core.beans.DeviceAddress;
 import net.syncthing.java.core.configuration.ConfigurationService;
 import net.syncthing.java.core.events.DeviceAddressReceivedEvent;
-import net.syncthing.java.discovery.protocol.LocalDiscoveryProtos.Announce;
 import net.syncthing.java.core.security.KeystoreHandler;
+import net.syncthing.java.discovery.protocol.LocalDiscoveryProtos.Announce;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,11 +62,13 @@ public final class LocalDiscoveryHandler implements Closeable {
     private final EventBus mEventBus = new AsyncEventBus(mProcessingExecutor);
     private final Multimap<String, DeviceAddress> mLocalDiscoveryRecords = HashMultimap.create();
     private final ConfigurationService mConfiguration;
+    private final int mListenPort;
 
     private DatagramSocket mDatagramSocket;
 
-    public LocalDiscoveryHandler(ConfigurationService configuration) {
+    public LocalDiscoveryHandler(ConfigurationService configuration, int listenPort) {
         mConfiguration = configuration;
+        mListenPort = listenPort;
     }
 
     public Collection<DeviceAddress> queryAndClose(String deviceId) {
@@ -101,8 +103,10 @@ public final class LocalDiscoveryHandler implements Closeable {
             try {
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
                 new DataOutputStream(out).writeInt(MAGIC);
+                mLogger.info("sending out discovery message with port {}", mListenPort);
                 Announce.newBuilder()
                         .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(mConfiguration.getDeviceId())))
+                        .addAddresses("tcp://:" + mListenPort)
                         .setInstanceId(mConfiguration.getInstanceId())
                         .build().writeTo(out);
                 byte[] data = out.toByteArray();

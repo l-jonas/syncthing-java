@@ -55,11 +55,11 @@ public final class DiscoveryHandler implements Closeable {
     private final Map<Pair<String, String>, DeviceAddress> deviceAddressMap = Collections.synchronizedMap(Maps.<Pair<String, String>, DeviceAddress>newHashMap());
     private boolean isClosed = false;
 
-    public DiscoveryHandler(ConfigurationService configuration, DeviceAddressRepository deviceAddressRepository) {
+    public DiscoveryHandler(ConfigurationService configuration, DeviceAddressRepository deviceAddressRepository, int listenPort) {
         logger.info("init");
         this.configuration = configuration;
         this.deviceAddressRepository = deviceAddressRepository;
-        localDiscoveryHandler = new LocalDiscoveryHandler(configuration);
+        localDiscoveryHandler = new LocalDiscoveryHandler(configuration, listenPort);
         globalDiscoveryHandler = new GlobalDiscoveryHandler(configuration);
         localDiscoveryHandler.getEventBus().register(new Object() {
             @Subscribe

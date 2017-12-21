@@ -227,7 +227,7 @@ public final class KeystoreHandler {
         }
     }
 
-    public void checkSocketCerificate(SSLSocket socket, String deviceId) throws SSLPeerUnverifiedException, CertificateException {
+    public String checkSocketCertificate(SSLSocket socket) throws SSLPeerUnverifiedException, CertificateException {
         SSLSession session = socket.getSession();
         List<Certificate> certs = Arrays.asList(session.getPeerCertificates());
         CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
@@ -237,6 +237,11 @@ public final class KeystoreHandler {
         byte[] derData = certificate.getEncoded();
         String deviceIdFromCertificate = derDataToDeviceIdString(derData);
         logger.trace("remote pem certificate =\n{}", derToPem(derData));
+        return deviceIdFromCertificate;
+    }
+
+    public void checkSocketCertificate(SSLSocket socket, String deviceId) throws SSLPeerUnverifiedException, CertificateException {
+        String deviceIdFromCertificate = checkSocketCertificate(socket);
         checkArgument(equal(deviceIdFromCertificate, deviceId), "device id mismatch! expected = %s, got = %s", deviceId, deviceIdFromCertificate);
         logger.debug("remote ssl certificate match deviceId = {}", deviceId);
     }
