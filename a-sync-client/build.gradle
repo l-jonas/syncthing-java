@@ -1,8 +1,7 @@
-
-description = ''
 dependencies {
-  compile project(':a-sync-parent:a-sync-core')
-  compile project(':a-sync-parent:a-sync-bep')
-  compile project(':a-sync-parent:a-sync-repository')
-  compile project(':a-sync-parent:a-sync-discovery')
+  compile project(':a-sync-core')
+  compile project(':a-sync-bep')
+  compile project(':a-sync-repository')
+  compile project(':a-sync-discovery')
+  compile "commons-cli:commons-cli:1.4"
 }
