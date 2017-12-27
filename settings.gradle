@@ -4,7 +4,6 @@ include ':a-sync-parent:a-sync-relay'
 include ':a-sync-parent:a-sync-http-relay'
 include ':a-sync-parent:a-sync-bep'
 include ':a-sync-parent:a-sync-client'
-include ':a-sync-parent:a-sync-http-relay-server'
 include ':a-sync-parent:a-sync-repository'
 include ':a-sync-parent:a-sync-discovery'
 
@@ -13,6 +12,5 @@ project(':a-sync-parent:a-sync-relay').projectDir = "$rootDir/a-sync-relay" as F
 project(':a-sync-parent:a-sync-http-relay').projectDir = "$rootDir/a-sync-http-relay" as File
 project(':a-sync-parent:a-sync-bep').projectDir = "$rootDir/a-sync-bep" as File
 project(':a-sync-parent:a-sync-client').projectDir = "$rootDir/a-sync-client" as File
-project(':a-sync-parent:a-sync-http-relay-server').projectDir = "$rootDir/a-sync-http-relay-server" as File
 project(':a-sync-parent:a-sync-repository').projectDir = "$rootDir/a-sync-repository" as File
 project(':a-sync-parent:a-sync-discovery').projectDir = "$rootDir/a-sync-discovery" as File
