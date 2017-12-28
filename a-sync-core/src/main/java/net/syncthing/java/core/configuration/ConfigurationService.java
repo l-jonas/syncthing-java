@@ -347,10 +347,12 @@ public final class ConfigurationService implements Closeable {
         }
 
         public boolean addPeers(DeviceInfo... peers) {
+            logger.warn("add peers 1 {}", peers);
             return addPeers(Arrays.asList(peers));
         }
 
         public boolean addPeers(Iterable<DeviceInfo> peers) {
+            logger.warn("add peers 2 {}", peers);
             boolean added = false;
             if (peers != null) {
                 for (DeviceInfo deviceInfo : peers) {
@@ -364,6 +366,7 @@ public final class ConfigurationService implements Closeable {
         }
 
         public Editor setPeers(Iterable<DeviceInfo> peers) {
+            logger.warn("add peers 3 {}", peers);
             ConfigurationService.this.peers.clear();
             addPeers(peers);
             return this;

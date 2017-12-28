@@ -88,13 +88,13 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
         })
         connectionHandler.connect()
         connections.add(connectionHandler)
-        if (shouldRestartForNewFolder.get()) {
-            logger.info("restart connection for new folder shared")
-            connectionHandler.close()
-            return openConnection(deviceAddress)
-        } else {
-            return connectionHandler
-        }
+        return if (shouldRestartForNewFolder.get()) {
+                logger.info("restart connection for new folder shared")
+                connectionHandler.close()
+                openConnection(deviceAddress)
+            } else {
+                connectionHandler
+            }
     }
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
@@ -129,24 +129,20 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
         Thread {
             val addressesSupplier = discoveryHandler.newDeviceAddressSupplier()
             val connectedDevices = Sets.newHashSet<String>()
-            for (deviceAddress in addressesSupplier) {
-                if (deviceAddress == null)
-                    break
-
-                if (connectedDevices.contains(deviceAddress.deviceId)) {
-                    continue
-                }
-                try {
-                    val connection = getDeviceConnection(deviceAddress)
-                    connectedDevices.add(deviceAddress.deviceId)
-                    listener(connection)
-                } catch (e: IOException) {
-                    logger.warn("error connecting to device = {}", deviceAddress, e)
-                } catch (e: KeystoreHandler.CryptoException) {
-                    logger.warn("error connecting to device = {}", deviceAddress, e)
-                }
-
-            }
+            addressesSupplier
+                    .takeWhile { it != null }
+                    .filterNot { connectedDevices.contains(it.deviceId) }
+                    .forEach {
+                        try {
+                            val connection = getDeviceConnection(it)
+                            connectedDevices.add(it.deviceId)
+                            listener(connection)
+                        } catch (e: IOException) {
+                            logger.warn("error connecting to device = {}", it, e)
+                        } catch (e: KeystoreHandler.CryptoException) {
+                            logger.warn("error connecting to device = {}", it, e)
+                        }
+                    }
             completeListener()
             addressesSupplier.close()
         }.start()
@@ -160,7 +156,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
         getPeerConnections({ connection ->
             try {
                 indexHandler.waitForRemoteIndexAquired(connection)
-                indexUpdateComplete.add(connection.getDeviceId())
+                indexUpdateComplete.add(connection.deviceId)
             } catch (ex: InterruptedException) {
                 logger.warn("exception while waiting for index", ex)
             }
@@ -230,9 +226,8 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
     override fun close() {
         devicesHandler.close()
         discoveryHandler.close()
-        for (connectionHandler in connections) {
-            connectionHandler.close()
-        }
+        // Create copy of list, because it will be modified by handleConnectionClosedEvent(), causing ConcurrentModificationException.
+        ArrayList(connections).forEach{it.close()}
         indexHandler.close()
         sqlRepository.close()
     }

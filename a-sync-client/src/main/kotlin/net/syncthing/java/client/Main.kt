@@ -40,236 +40,245 @@ import java.util.concurrent.CountDownLatch
 
 import com.google.common.base.Preconditions.checkArgument
 
-object Main {
+class Main(private val commandLine: CommandLine) {
+
+    companion object {
+        @JvmStatic
+        fun main(args: Array<String>) {
+            val options = generateOptions()
+            val parser = DefaultParser()
+            val cmd = parser.parse(options, args)
+            if (cmd.hasOption("h")) {
+                val formatter = HelpFormatter()
+                formatter.printHelp("s-client", options)
+                return
+            }
+            val configFile = if (cmd.hasOption("C")) File(cmd.getOptionValue("C"))
+            else                                     File(System.getProperty("user.home"), ".s-client.properties")
+
+            ConfigurationService.newLoader().loadFrom(configFile).use { configuration ->
+                SyncthingClient(configuration).use { syncthingClient ->
+                    System.out.println("using config file = $configFile")
+                    FileUtils.cleanDirectory(configuration.temp)
+                    KeystoreHandler.newLoader().loadAndStore(configuration)
+                    System.out.println("configuration =\n${configuration.newWriter().dumpToString()}")
+                    System.out.println(configuration.storageInfo.dumpAvailableSpace())
+                    val main = Main(cmd)
+                    cmd.options.forEach { main.handleOption(it, configuration, syncthingClient) }
+                }
+            }
+        }
+
+        private fun generateOptions(): Options {
+            val options = Options()
+            options.addOption("C", "set-config", true, "set config file for s-client")
+            options.addOption("c", "config", false, "dump config")
+            options.addOption("S", "set-peers", true, "set peer, or comma-separated list of peers")
+            options.addOption("q", "query", true, "query directory server for device id")
+            options.addOption("d", "discovery", true, "discovery local network for device id")
+            options.addOption("p", "pull", true, "pull file from network")
+            options.addOption("P", "push", true, "push file to network")
+            options.addOption("o", "output", true, "set output file/directory")
+            options.addOption("i", "input", true, "set input file/directory")
+            options.addOption("a", "list-peers", false, "list peer addresses")
+            options.addOption("a", "address", true, "use this peer addresses")
+            options.addOption("L", "list-remote", false, "list folder (root) content from network")
+            options.addOption("I", "list-info", false, "dump folder info from network")
+            options.addOption("l", "list-info", false, "list folder info from local db")
+            options.addOption("s", "search", true, "search local index for <term>")
+            options.addOption("D", "delete", true, "push delete to network")
+            options.addOption("M", "mkdir", true, "push directory create to network")
+            options.addOption("h", "help", false, "print help")
+            return options
+        }
+    }
 
     private val logger = LoggerFactory.getLogger(Main::class.java)
 
-    @Throws(Exception::class)
-    @JvmStatic
-    fun main(args: Array<String>) {
-        val options = Options()
-        options.addOption("C", "set-config", true, "set config file for s-client")
-        options.addOption("c", "config", false, "dump config")
-        options.addOption("sp", "set-peers", true, "set peer, or comma-separated list of peers")
-        options.addOption("q", "query", true, "query directory server for device id")
-        options.addOption("d", "discovery", true, "discovery local network for device id")
-        options.addOption("p", "pull", true, "pull file from network")
-        options.addOption("P", "push", true, "push file to network")
-        options.addOption("o", "output", true, "set output file/directory")
-        options.addOption("i", "input", true, "set input file/directory")
-        options.addOption("lp", "list-peers", false, "list peer addresses")
-        options.addOption("a", "address", true, "use this peer addresses")
-        options.addOption("L", "list-remote", false, "list folder (root) content from network")
-        options.addOption("I", "list-info", false, "dump folder info from network")
-        options.addOption("li", "list-info", false, "list folder info from local db")
-        options.addOption("s", "search", true, "search local index for <term>")
-        options.addOption("D", "delete", true, "push delete to network")
-        options.addOption("M", "mkdir", true, "push directory create to network")
-        options.addOption("h", "help", false, "print help")
-        val parser = DefaultParser()
-        val cmd = parser.parse(options, args)
-
-        if (cmd.hasOption("h")) {
-            val formatter = HelpFormatter()
-            formatter.printHelp("s-client", options)
-            return
-        }
-
-        val configFile = if (cmd.hasOption("C")) File(cmd.getOptionValue("C")) else File(System.getProperty("user.home"), ".s-client.properties")
-        logger.info("using config file = {}", configFile)
-        val configuration = ConfigurationService.newLoader().loadFrom(configFile)
-        FileUtils.cleanDirectory(configuration.temp)
-        KeystoreHandler.newLoader().loadAndStore(configuration)
-        val syncthingClient = SyncthingClient(configuration)
-        if (cmd.hasOption("c")) {
-            logger.info("configuration =\n{}", configuration.newWriter().dumpToString())
-        } else {
-            logger.trace("configuration =\n{}", configuration.newWriter().dumpToString())
-        }
-        logger.debug("{}", configuration.storageInfo.dumpAvailableSpace())
-
-        if (cmd.hasOption("sp")) {
-            val peers = cmd.getOptionValue("sp")
-                    .split(",")
-                    .map { it.trim() }
-                    .filterNot { it.isEmpty() }
-                    .toList()
-            logger.info("set peers = {}", peers)
-            configuration.edit().setPeers(emptyList<DeviceInfo>())
-            for (peer in peers) {
-                KeystoreHandler.validateDeviceId(peer)
-                configuration.edit().addPeers(DeviceInfo(peer, null))
-            }
-            configuration.edit().persistNow()
-        }
-
-        if (cmd.hasOption("q")) {
-            val deviceId = cmd.getOptionValue("q")
-            logger.info("query device id = {}", deviceId)
-            val deviceAddresses = GlobalDiscoveryHandler(configuration).query(deviceId)
-            logger.info("server response = {}", deviceAddresses)
-        }
-        if (cmd.hasOption("d")) {
-            val deviceId = cmd.getOptionValue("d")
-            logger.info("discovery device id = {}", deviceId)
-            val deviceAddresses = LocalDiscoveryHandler(configuration).queryAndClose(deviceId)
-            logger.info("local response = {}", deviceAddresses)
-        }
-
-        if (cmd.hasOption("p")) {
-            val folderAndPath = cmd.getOptionValue("p")
-            logger.info("file path = {}", folderAndPath)
-            val folder = folderAndPath.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
-            val path = folderAndPath.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
-            val latch = CountDownLatch(1)
-            syncthingClient.pullFile(folder, path, { observer ->
-                try {
-                    val inputStream = observer.waitForComplete().inputStream
-                    val fileName = syncthingClient.indexHandler.getFileInfoByPath(folder, path)!!.fileName
-                    val file: File
-                    if (cmd.hasOption("o")) {
-                        val param = File(cmd.getOptionValue("o"))
-                        file = if (param.isDirectory) File(param, fileName) else param
-                    } else {
-                        file = File(fileName)
-                    }
-                    FileUtils.copyInputStreamToFile(inputStream, file)
-                    logger.info("saved file to = {}", file.absolutePath)
-                } catch (e: InterruptedException) {
-                    logger.warn("", e)
-                } catch (e: IOException) {
-                    logger.warn("", e)
+    private fun handleOption(option: Option, configuration: ConfigurationService, syncthingClient: SyncthingClient) {
+        when (option.opt) {
+            "S" -> {
+                val peers = option.value
+                        .split(",")
+                        .map { it.trim() }
+                        .filterNot { it.isEmpty() }
+                        .toList()
+                System.out.println("set peers = $peers")
+                configuration.edit().setPeers(emptyList<DeviceInfo>())
+                for (peer in peers) {
+                    KeystoreHandler.validateDeviceId(peer)
+                    configuration.edit().addPeers(DeviceInfo(peer, null))
                 }
-            }) { logger.warn("Failed to pull file") }
-            latch.await()
-        }
-        if (cmd.hasOption("P")) {
-            var path = cmd.getOptionValue("P")
-            val file = File(cmd.getOptionValue("i"))
-            checkArgument(!path.startsWith("/")) //TODO check path syntax
-            logger.info("file path = {}", path)
-            val folder = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
-            path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
-            val latch = CountDownLatch(1)
-            syncthingClient.pushFile(FileInputStream(file), folder, path, { fileUploadObserver ->
-                while (!fileUploadObserver.isCompleted) {
+                configuration.edit().persistNow()
+            }
+            "q" -> {
+                val deviceId = option.value
+                System.out.println("query device id = $deviceId")
+                val deviceAddresses = GlobalDiscoveryHandler(configuration).query(deviceId)
+                System.out.println("server response = $deviceAddresses")
+            }
+            "d" -> {
+                val deviceId = option.value
+                System.out.println("discovery device id = $deviceId")
+                val deviceAddresses = LocalDiscoveryHandler(configuration).queryAndClose(deviceId)
+                System.out.println("local response = $deviceAddresses")
+            }
+
+            "p" -> {
+                val folderAndPath = option.value
+                System.out.println("file path = $folderAndPath")
+                val folder = folderAndPath.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
+                val path = folderAndPath.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
+                val latch = CountDownLatch(1)
+                syncthingClient.pullFile(folder, path, { observer ->
                     try {
-                        fileUploadObserver.waitForProgressUpdate()
+                        val inputStream = observer.waitForComplete().inputStream
+                        val fileName = syncthingClient.indexHandler.getFileInfoByPath(folder, path)!!.fileName
+                        val file  =
+                            if (commandLine.hasOption("o")) {
+                                val param = File(commandLine.getOptionValue("o"))
+                                if (param.isDirectory) File(param, fileName) else param
+                            } else {
+                                File(fileName)
+                            }
+                        FileUtils.copyInputStreamToFile(inputStream, file)
+                        System.out.println("saved file to = $file.absolutePath")
+                    } catch (e: InterruptedException) {
+                        logger.warn("", e)
+                    } catch (e: IOException) {
+                        logger.warn("", e)
+                    }
+                }) { logger.warn("Failed to pull file") }
+                latch.await()
+            }
+            "P" -> {
+                var path = option.value
+                val file = File(commandLine.getOptionValue("i"))
+                checkArgument(!path.startsWith("/")) //TODO check path syntax
+                System.out.println("file path = $path")
+                val folder = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
+                path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
+                val latch = CountDownLatch(1)
+                syncthingClient.pushFile(FileInputStream(file), folder, path, { fileUploadObserver ->
+                    while (!fileUploadObserver.isCompleted) {
+                        try {
+                            fileUploadObserver.waitForProgressUpdate()
+                        } catch (e: InterruptedException) {
+                            logger.warn("", e)
+                        }
+
+                        System.out.println("upload progress ${fileUploadObserver.progressMessage}")
+                    }
+                    latch.countDown()
+                }) { logger.warn("Failed to upload file") }
+                latch.await()
+                System.out.println("uploaded file to network")
+            }
+            "D" -> {
+                var path = option.value
+                val folder = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
+                path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
+                System.out.println("delete path = $path")
+                val latch = CountDownLatch(1)
+                syncthingClient.pushDelete(folder, path, { observer ->
+                    try {
+                        observer.waitForComplete()
                     } catch (e: InterruptedException) {
                         logger.warn("", e)
                     }
 
-                    logger.debug("upload progress {}", fileUploadObserver.progressMessage)
-                }
-                latch.countDown()
-            }) { logger.warn("Failed to upload file") }
-            latch.await()
-            logger.info("uploaded file to network")
-        }
-        if (cmd.hasOption("D")) {
-            var path = cmd.getOptionValue("D")
-            val folder = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
-            path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
-            logger.info("delete path = {}", path)
-            val latch = CountDownLatch(1)
-            syncthingClient.pushDelete(folder, path, { observer ->
-                try {
-                    observer.waitForComplete()
-                } catch (e: InterruptedException) {
-                    logger.warn("", e)
-                }
-
-                latch.countDown()
-            }) { logger.warn("Failed to delete path") }
-            latch.await()
-            logger.info("deleted path")
-        }
-        if (cmd.hasOption("M")) {
-            var path = cmd.getOptionValue("M")
-            val folder = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
-            path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
-            logger.info("dir path = {}", path)
-            val latch = CountDownLatch(1)
-            syncthingClient.pushDir(folder, path, { observer ->
-                try {
-                    observer.waitForComplete()
-                } catch (e: InterruptedException) {
-                    logger.warn("", e)
-                }
-
-                latch.countDown()
-            }) { logger.warn("Failed to push directory") }
-            latch.await()
-            logger.info("uploaded dir to network")
-        }
-        if (cmd.hasOption("L")) {
-            updateIndex(syncthingClient)
-            for (folder in syncthingClient.indexHandler.folderList) {
-                syncthingClient.indexHandler.newIndexBrowserBuilder().setFolder(folder).build().use { indexBrowser ->
-                    logger.info("list folder = {}", indexBrowser.getFolder())
-                    for (fileInfo in indexBrowser.listFiles()) {
-                        logger.info("\t\t{} {} {}", fileInfo.getType().name.substring(0, 1), fileInfo.getPath(), fileInfo.describeSize())
+                    latch.countDown()
+                }) { System.out.println("Failed to delete path") }
+                latch.await()
+                System.out.println("deleted path")
+            }
+            "M" -> {
+                var path = option.value
+                val folder = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
+                path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
+                System.out.println("dir path = $path")
+                val latch = CountDownLatch(1)
+                syncthingClient.pushDir(folder, path, { observer ->
+                    try {
+                        observer.waitForComplete()
+                    } catch (e: InterruptedException) {
+                        logger.warn("", e)
                     }
-                }
+
+                    latch.countDown()
+                }) { System.out.println("Failed to push directory") }
+                latch.await()
+                System.out.println("uploaded dir to network")
             }
-        }
-        if (cmd.hasOption("I")) {
-            updateIndex(syncthingClient)
-            val folderInfo = StringBuilder()
-            for (folder in syncthingClient.indexHandler.folderList) {
-                folderInfo.append("\n\t\tfolder info : ")
-                        .append(syncthingClient.indexHandler.getFolderInfo(folder))
-                folderInfo.append("\n\t\tfolder stats : ")
-                        .append(syncthingClient.indexHandler.newFolderBrowser().getFolderStats(folder).dumpInfo())
-                        .append("\n")
-            }
-            logger.info("folders:\n{}\n", folderInfo.toString())
-        }
-        if (cmd.hasOption("li")) {
-            var folderInfo = ""
-            for (folder in syncthingClient.indexHandler.folderList) {
-                folderInfo += "\n\t\tfolder info : " + syncthingClient.indexHandler.getFolderInfo(folder)
-                folderInfo += "\n\t\tfolder stats : " + syncthingClient.indexHandler.newFolderBrowser().getFolderStats(folder).dumpInfo() + "\n"
-            }
-            logger.info("folders:\n{}\n", folderInfo)
-        }
-        if (cmd.hasOption("lp")) {
-            syncthingClient.discoveryHandler.newDeviceAddressSupplier().use { deviceAddressSupplier ->
-                var deviceAddressesStr = ""
-                for (deviceAddress in Lists.newArrayList<DeviceAddress>(deviceAddressSupplier)) {
-                    deviceAddressesStr += "\n\t\t" + deviceAddress.getDeviceId() + " : " + deviceAddress.getAddress()
-                }
-                logger.info("device addresses:\n{}\n", deviceAddressesStr)
-            }
-        }
-        if (cmd.hasOption("s")) {
-            val term = cmd.getOptionValue("s")
-            syncthingClient.indexHandler.newIndexFinderBuilder().build().use { indexFinder ->
+            "L" -> {
                 updateIndex(syncthingClient)
-                logger.info("search term = '{}'", term)
-                val event = indexFinder.doSearch(term)
-                if (event.hasGoodResults()) {
-                    logger.info("search results for term = '{}' :", term)
-                    for (fileInfo in event.getResultList()) {
-                        logger.info("\t\t{} {} {}", fileInfo.getType().name.substring(0, 1), fileInfo.getPath(), fileInfo.describeSize())
+                for (folder in syncthingClient.indexHandler.folderList) {
+                    syncthingClient.indexHandler.newIndexBrowserBuilder().setFolder(folder).build().use { indexBrowser ->
+                        System.out.println("list folder = ${indexBrowser.folder}")
+                        for (fileInfo in indexBrowser.listFiles()) {
+                            System.out.println("${fileInfo.type.name.substring(0, 1)}\t${fileInfo.describeSize()}\t${fileInfo.path}")
+                        }
                     }
-                } else if (event.hasTooManyResults()) {
-                    logger.info("too many results found for term = '{}'", term)
-                } else {
-                    logger.info("no result found for term = '{}'", term)
+                }
+            }
+            "I" -> {
+                updateIndex(syncthingClient)
+                val folderInfo = StringBuilder()
+                for (folder in syncthingClient.indexHandler.folderList) {
+                    folderInfo.append("\nfolder info: ")
+                            .append(syncthingClient.indexHandler.getFolderInfo(folder))
+                    folderInfo.append("\nfolder stats: ")
+                            .append(syncthingClient.indexHandler.newFolderBrowser().getFolderStats(folder).dumpInfo())
+                            .append("\n")
+                }
+                System.out.println("folders:\n$folderInfo\n")
+            }
+            "l" -> {
+                var folderInfo = ""
+                for (folder in syncthingClient.indexHandler.folderList) {
+                    folderInfo += "\nfolder info: " + syncthingClient.indexHandler.getFolderInfo(folder)
+                    folderInfo += "\nfolder stats: " + syncthingClient.indexHandler.newFolderBrowser().getFolderStats(folder).dumpInfo() + "\n"
+                }
+                System.out.println("folders:\n$folderInfo\n")
+            }
+            "a" -> {
+                syncthingClient.discoveryHandler.newDeviceAddressSupplier().use { deviceAddressSupplier ->
+                    var deviceAddressesStr = ""
+                    for (deviceAddress in Lists.newArrayList<DeviceAddress>(deviceAddressSupplier)) {
+                        deviceAddressesStr += "\n" + deviceAddress.deviceId + " : " + deviceAddress.address
+                    }
+                    System.out.println("device addresses:\n$deviceAddressesStr\n")
+                }
+            }
+            "s" -> {
+                val term = option.value
+                syncthingClient.indexHandler.newIndexFinderBuilder().build().use { indexFinder ->
+                    updateIndex(syncthingClient)
+                    val event = indexFinder.doSearch(term)
+                    when {
+                        event.hasGoodResults() -> {
+                            System.out.println("search results for '$term' :")
+                            for (fileInfo in event.resultList) {
+                                System.out.println("${fileInfo.type.name.substring(0, 1)}\t${fileInfo.describeSize()}\t${fileInfo.path}")
+                            }
+                        }
+                        event.hasTooManyResults() -> System.out.println("too many results found for = '$term'")
+                        else -> System.out.println("no result found for = '$term'")
+                    }
                 }
             }
         }
-        IOUtils.closeQuietly(configuration)
-        syncthingClient.close()
     }
 
     @Throws(InterruptedException::class)
     private fun updateIndex(client: SyncthingClient) {
         val latch = CountDownLatch(1)
-        client.updateIndexFromPeers { successes, failures ->
-            logger.info("Index update successful: {}", successes)
-            logger.info("Index update failed: {}", failures)
+        client.updateIndexFromPeers { _, failures ->
+            if (failures.isEmpty()) {
+                System.out.println("Index update successful for all peers")
+            } else {
+                System.out.println("Index update failed for devices: $failures")
+            }
             latch.countDown()
         }
         latch.await()

@@ -78,6 +78,7 @@ public final class AddressRanker implements Closeable {
         logger.trace("testing and ranking peer addresses");
         List<Future<DeviceAddress>> futures = Lists.newArrayList();
         for (final DeviceAddress deviceAddress : preprocessDeviceAddresses(sourceAddresses)) {
+            logger.debug("testAndRank({})", deviceAddress);
             futures.add(executorService.submit(() -> testAndRank(deviceAddress)));
         }
         for (Future<DeviceAddress> future : futures) {
@@ -96,7 +97,7 @@ public final class AddressRanker implements Closeable {
     }
 
     public static String dumpAddressRanking(List<DeviceAddress> list) {
-        return Joiner.on("\n").join(Lists.transform(list, a -> "\t" + a.getDeviceId() + "\t" + a.getAddress()));
+        return Joiner.on("\n").join(Lists.transform(list, a -> a.getDeviceId() + "\t" + a.getAddress()));
     }
 
     public String dumpAddressRanking() {

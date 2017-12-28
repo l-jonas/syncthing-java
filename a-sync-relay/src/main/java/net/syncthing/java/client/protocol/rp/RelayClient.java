@@ -45,8 +45,10 @@ public final class RelayClient {
         JOIN_SESSION_REQUEST = 3,
         RESPONSE = 4,
         CONNECT_REQUEST = 5,
-        SESSION_INVITATION = 6,
-        RESPONSE_SUCCESS_CODE = 0;
+        SESSION_INVITATION = 6;
+    private final static int ResponseSuccess = 0;
+    private final static int ResponseNotFound = 1;
+    private final static int ResponseAlreadyConnected = 2;
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final KeystoreHandler keystoreHandler;
 
@@ -80,7 +82,7 @@ public final class RelayClient {
             checkArgument(messageReader.getType() == RESPONSE);
             Response response = messageReader.readResponse();
             logger.debug("response = {}", response);
-            checkArgument(response.getCode() == RESPONSE_SUCCESS_CODE, "response code = %s (%s) expected %s", response.getCode(), response.getMessage(), RESPONSE_SUCCESS_CODE);
+            checkArgument(response.getCode() == ResponseSuccess, "response code = %s (%s) expected %s", response.getCode(), response.getMessage(), ResponseSuccess);
             logger.debug("relay connection ready");
         }
         return new RelayConnection() {
@@ -116,6 +118,10 @@ public final class RelayClient {
                 logger.debug("receiving session invitation");
                 MessageReader messageReader = in.readMessage();
                 logger.debug("received message = {}", messageReader.dumpMessageForDebug());
+                if (messageReader.getType() == RESPONSE) {
+                    Response response = messageReader.readResponse();
+                    throw new IOException(response.message);
+                }
                 checkArgument(messageReader.getType() == SESSION_INVITATION, "message type mismatch, expected %s, got %s", SESSION_INVITATION, messageReader.getType());
                 SessionInvitation.Builder builder = SessionInvitation.newBuilder();
                 builder.setFrom(hashDataToDeviceIdString(messageReader.readLengthAndData()));

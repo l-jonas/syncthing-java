@@ -505,11 +505,6 @@ public final class BlockExchangeConnectionHandler implements Closeable {
                                         logger.info("folder not shared from device = {} folder = {}", address.getDeviceId(), folderInfo);
                                     }
                                     clusterConfigInfo.putFolderInfo(folderInfo);
-                                    configuration.edit().addPeers(Iterables.filter(Iterables.transform(firstNonNull(folder.getDevicesList(), Collections.emptyList()), device -> {
-                                        String deviceId = hashDataToDeviceIdString(device.getId().toByteArray()),
-                                            name = device.hasName() ? device.getName() : null;
-                                        return new DeviceInfo(deviceId, name);
-                                    }), s -> !equal(s.getDeviceId(), configuration.getDeviceId())));
                                 }
                                 configuration.edit().persistLater();
                                 eventBus.post(new ClusterConfigMessageProcessedEvent(clusterConfig));

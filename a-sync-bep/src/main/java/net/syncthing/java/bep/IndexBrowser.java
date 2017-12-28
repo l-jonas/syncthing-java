@@ -267,8 +267,6 @@ public final class IndexBrowser implements Closeable {
         if (includeParentInList && (!PathUtils.isRoot(path) || allowParentInRoot)) {
             list.add(0, PARENT_FILE_INFO);
         }
-        logger.debug("doListFiles for path = '{}' : loaded list = {}", list);
-        logger.debug("doListFiles for path = '{}' END", path);
         return Collections.unmodifiableList(list);
     }
 

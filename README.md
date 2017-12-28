@@ -28,6 +28,10 @@ access a syncthing share).
 The project uses a standard gradle build. After installing gradle, simply run `gradle assemble` to compile, or
 `gradle install` to add it to your local maven repository.
 
+## Running
+
+To use the command line client, run `gradle run -Pargs="-h"`. 
+
 ## License
 
 All code is licensed under the [MPLv2 License][3].
