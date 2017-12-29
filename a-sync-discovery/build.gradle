@@ -1,4 +1,0 @@
-dependencies {
-  compile project(':a-sync-core')
-  compile project(':a-sync-repository')
-}

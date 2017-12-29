@@ -15,9 +15,10 @@ buildscript {
 allprojects {
     apply plugin: 'maven'
     apply plugin: 'com.github.ben-manes.versions'
-    group = 'net.syncthing.java'
+    group = 'com.github.Nutomic'
     version = '0.1'
 }
+
 
 subprojects {
     apply plugin: 'kotlin'
@@ -44,7 +45,6 @@ subprojects {
     }
 
     dependencies {
-        compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
         compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
     }
 }

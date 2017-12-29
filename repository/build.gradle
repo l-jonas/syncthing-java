@@ -1,0 +1,6 @@
+dependencies {
+  compile project(':core')
+    compile 'com.h2database:h2:1.4.193'
+    compile 'com.zaxxer:HikariCP-java7:2.4.9'
+    compile "com.google.protobuf:protobuf-java:$protobuf_version"
+}

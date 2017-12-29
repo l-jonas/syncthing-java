@@ -1,16 +1,11 @@
-rootProject.name = 'a-sync'
-include ':a-sync-core'
-include ':a-sync-relay'
-include ':a-sync-http-relay'
-include ':a-sync-bep'
-include ':a-sync-client'
-include ':a-sync-repository'
-include ':a-sync-discovery'
+rootProject.name = 'syncthing-java'
+include ':core'
+include ':relay'
+include ':http-relay'
+include ':bep'
+include ':client'
+include ':repository'
+include ':discovery'
 
-project(':a-sync-core').projectDir = "$rootDir/a-sync-core" as File
-project(':a-sync-relay').projectDir = "$rootDir/a-sync-relay" as File
-project(':a-sync-http-relay').projectDir = "$rootDir/a-sync-http-relay" as File
-project(':a-sync-bep').projectDir = "$rootDir/a-sync-bep" as File
-project(':a-sync-client').projectDir = "$rootDir/a-sync-client" as File
-project(':a-sync-repository').projectDir = "$rootDir/a-sync-repository" as File
-project(':a-sync-discovery').projectDir = "$rootDir/a-sync-discovery" as File
+// Also call this syncthing-java so it can be easily used from syncthing-lite.
+project(':client').name = 'syncthing-java'

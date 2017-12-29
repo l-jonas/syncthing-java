@@ -1,5 +1,0 @@
-dependencies {
-  compile project(':a-sync-relay')
-  compile 'org.eclipse.jetty:jetty-server:8.2.0.v20160908'
-  compile "com.google.protobuf:protobuf-java:$protobuf_version"
-}
