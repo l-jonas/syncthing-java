@@ -48,6 +48,10 @@ import static net.syncthing.java.core.utils.PathUtils.*;
  */
 public final class IndexBrowser implements Closeable {
 
+    public interface OnPathChangedListener {
+        public void onPathChanged();
+    }
+
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final LoadingCache<String, List<FileInfo>> listFolderCache = CacheBuilder.newBuilder()
         .expireAfterWrite(10, TimeUnit.MINUTES)
@@ -100,6 +104,7 @@ public final class IndexBrowser implements Closeable {
     };
     private final Set<String> preloadJobs = Sets.newLinkedHashSet();
     private final Object preloadJobsLock = new Object();
+    private OnPathChangedListener mOnPathChangedListener;
 
     private IndexBrowser(IndexRepository indexRepository, IndexHandler indexHandler, String folder, boolean includeParentInList, boolean allowParentInRoot, Comparator<FileInfo> ordering) {
         checkNotNull(indexRepository);
@@ -128,6 +133,10 @@ public final class IndexBrowser implements Closeable {
             listFolderCache.cleanUp();
             fileInfoCache.cleanUp();
         }, 1, 1, TimeUnit.MINUTES);
+    }
+
+    public void setOnFolderChangedListener(OnPathChangedListener onPathChangedListener) {
+        mOnPathChangedListener = onPathChangedListener;
     }
 
     private void invalidateCache() {
@@ -172,7 +181,9 @@ public final class IndexBrowser implements Closeable {
                             preloadJobs.remove(preloadPath);
                             if (isCacheReady()) {
                                 logger.info("cache ready, notify listeners");
-                                preloadJobsLock.notifyAll();
+                                if (mOnPathChangedListener != null) {
+                                    mOnPathChangedListener.onPathChanged();
+                                }
                             } else {
                                 logger.info("still {} job[s] left in cache loader", preloadJobs.size());
                                 executorService.submit(this);
@@ -186,36 +197,9 @@ public final class IndexBrowser implements Closeable {
         }
     }
 
-    public boolean isCacheReady() {
+    private boolean isCacheReady() {
         synchronized (preloadJobsLock) {
             return preloadJobs.isEmpty();
-        }
-    }
-
-    public boolean isCacheReadyAfterALittleWait() {
-        synchronized (preloadJobsLock) {
-            if (!isCacheReady()) {
-                try {
-                    preloadJobsLock.wait(100);
-                } catch (InterruptedException ex) {
-                    logger.warn("", ex);
-                }
-            }
-            return isCacheReady();
-        }
-    }
-
-    public void waitForCacheReady() {
-        // TODO: this should be a callback
-        logger.debug("waiting for cache to be ready");
-        synchronized (preloadJobsLock) {
-            while (!isCacheReady()) {
-                try {
-                    preloadJobsLock.wait();
-                } catch (InterruptedException ex) {
-                    logger.warn("", ex);
-                }
-            }
         }
     }
 
@@ -274,14 +258,6 @@ public final class IndexBrowser implements Closeable {
         return PathUtils.isRoot(currentPath);
     }
 
-    public List<String> listNames() {
-        return Collections.unmodifiableList(Lists.transform(listFiles(), FileInfo::getFileName));
-    }
-
-    public FileInfo getFileInfoByRelativePath(String relativePath) {
-        return getFileInfoByAbsolutePath(getAbsolutePath(relativePath));
-    }
-
     public FileInfo getFileInfoByAbsolutePath(String path) {
         return PathUtils.isRoot(path) ? ROOT_FILE_INFO : fileInfoCache.getUnchecked(path);
     }
@@ -302,18 +278,16 @@ public final class IndexBrowser implements Closeable {
         }
     }
 
-    public IndexBrowser navigateToRelativePath(String newPath) {
-        return navigateToAbsolutePath(getAbsolutePath(newPath));
-    }
-
     public IndexBrowser navigateTo(FileInfo fileInfo) {
         checkArgument(fileInfo.isDirectory());
         checkArgument(equal(fileInfo.getFolder(), folder));
-        return equal(fileInfo.getPath(), PARENT_FILE_INFO.getPath()) ? navigateToParentPath() : navigateToAbsolutePath(fileInfo.getPath());
+        return equal(fileInfo.getPath(), PARENT_FILE_INFO.getPath())
+                ? navigateToAbsolutePath(getParentPath(currentPath))
+                : navigateToAbsolutePath(fileInfo.getPath());
     }
 
     public IndexBrowser navigateToNearestPath(@Nullable String oldPath) {
-        while (!StringUtils.isBlank(oldPath)) {
+        if (!StringUtils.isBlank(oldPath)) {
             return navigateToAbsolutePath(oldPath);
         }
         return this;
@@ -331,10 +305,6 @@ public final class IndexBrowser implements Closeable {
         logger.info("navigate to path = '{}'", currentPath);
         preloadFileInfoForCurrentPath();
         return this;
-    }
-
-    public IndexBrowser navigateToParentPath() {
-        return navigateToAbsolutePath(getParentPath(currentPath));
     }
 
     @Override
