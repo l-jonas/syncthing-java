@@ -100,7 +100,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
     private fun getDeviceConnection(address: DeviceAddress): BlockExchangeConnectionHandler {
         for (c in connections) {
-            if (c.address == address) {
+            if (c.address.deviceId == address.deviceId) {
                 return c
             }
         }
