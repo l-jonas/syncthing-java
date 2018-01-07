@@ -25,6 +25,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import net.syncthing.java.bep.BlockExchangeProtos;
+import net.syncthing.java.bep.BlockExchangeExtraProtos;
 import net.syncthing.java.core.beans.*;
 import net.syncthing.java.core.beans.FileInfo.FileType;
 import net.syncthing.java.core.beans.FileInfo.Version;
@@ -33,7 +35,6 @@ import net.syncthing.java.core.interfaces.DeviceAddressRepository;
 import net.syncthing.java.core.interfaces.IndexRepository;
 import net.syncthing.java.core.interfaces.Sequencer;
 import net.syncthing.java.core.interfaces.TempRepository;
-import net.syncthing.java.repository.repo.IndexSerializationProtos;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -392,7 +393,7 @@ public final class SqlRepository implements Closeable, IndexRepository, DeviceAd
     }
 
     private FileBlocks readFileBlocks(ResultSet resultSet) throws SQLException, InvalidProtocolBufferException {
-        IndexSerializationProtos.Blocks blocks = IndexSerializationProtos.Blocks.parseFrom(resultSet.getBytes("blocks"));
+        BlockExchangeExtraProtos.Blocks blocks = BlockExchangeExtraProtos.Blocks.parseFrom(resultSet.getBytes("blocks"));
         List<BlockInfo> blockList = Lists.transform(blocks.getBlocksList(), record -> new BlockInfo(record.getOffset(), record.getSize(), BaseEncoding.base16().encode(record.getHash().toByteArray())));
         return new FileBlocks(resultSet.getString("folder"), resultSet.getString("path"), blockList);
     }
@@ -412,8 +413,8 @@ public final class SqlRepository implements Closeable, IndexRepository, DeviceAd
                     prepareStatement.setString(2, newFileBlocks.getPath());
                     prepareStatement.setString(3, newFileBlocks.getHash());
                     prepareStatement.setLong(4, newFileBlocks.getSize());
-                    prepareStatement.setBytes(5, IndexSerializationProtos.Blocks.newBuilder()
-                        .addAllBlocks(Iterables.transform(newFileBlocks.getBlocks(), input -> IndexSerializationProtos.BlockInfo.newBuilder()
+                    prepareStatement.setBytes(5, BlockExchangeExtraProtos.Blocks.newBuilder()
+                        .addAllBlocks(Iterables.transform(newFileBlocks.getBlocks(), input -> BlockExchangeProtos.BlockInfo.newBuilder()
                             .setOffset(input.getOffset())
                             .setSize(input.getSize())
                             .setHash(ByteString.copyFrom(BaseEncoding.base16().decode(input.getHash())))
