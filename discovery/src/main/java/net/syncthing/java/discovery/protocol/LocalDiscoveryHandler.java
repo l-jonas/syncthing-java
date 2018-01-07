@@ -152,6 +152,10 @@ public final class LocalDiscoveryHandler implements Closeable {
                     mProcessingExecutor.submit(() -> handleReceivedDatagram(datagramPacket));
                     mListeningExecutor.submit(this);
                 } catch (IOException e) {
+                    if (e.getMessage().equals("Socket closed")) {
+                        // Ignore exception on socket close.
+                        return;
+                    }
                     mLogger.warn("Error receiving datagram", e);
                     close();
                 }
