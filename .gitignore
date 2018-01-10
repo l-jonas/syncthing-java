@@ -1,18 +1,15 @@
-/core/build/
-/core/out/
-/relay/build/
-/relay/out/
-/http-relay/build/
-/http-relay/out/
-/bep/build/
-/bep/out/
-/repository/build/
-/repository/out/
-/discovery/build/
-/discovery/out/
-/client/build/
-/client/out/
-build/
-.idea/
+# Gradle
 .gradle/
+build/
+*/build/
+*/out/
+
+# Intellij
+.idea/
 *.iml
+
+# Visual Studio Code
+*.classpath
+*.project
+*.settings
+*/bin/
