@@ -13,32 +13,20 @@
  */
 package net.syncthing.java.client
 
+import com.google.common.base.Preconditions.checkArgument
 import com.google.common.collect.Lists
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.security.KeystoreHandler
-import net.syncthing.java.discovery.DeviceAddressSupplier
-import net.syncthing.java.discovery.protocol.GlobalDiscoveryHandler
-import net.syncthing.java.discovery.protocol.LocalDiscoveryHandler
-import net.syncthing.java.bep.IndexBrowser
-import net.syncthing.java.bep.IndexFinder
 import org.apache.commons.cli.*
 import org.apache.commons.io.FileUtils
-import org.apache.commons.io.IOUtils
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
-import java.io.InputStream
-import java.util.Arrays
-import java.util.Collections
 import java.util.concurrent.CountDownLatch
-
-import com.google.common.base.Preconditions.checkArgument
 
 class Main(private val commandLine: CommandLine) {
 
@@ -74,8 +62,6 @@ class Main(private val commandLine: CommandLine) {
             options.addOption("C", "set-config", true, "set config file for s-client")
             options.addOption("c", "config", false, "dump config")
             options.addOption("S", "set-peers", true, "set peer, or comma-separated list of peers")
-            options.addOption("q", "query", true, "query directory server for device id")
-            options.addOption("d", "discovery", true, "discovery local network for device id")
             options.addOption("p", "pull", true, "pull file from network")
             options.addOption("P", "push", true, "push file to network")
             options.addOption("o", "output", true, "set output file/directory")
@@ -111,19 +97,6 @@ class Main(private val commandLine: CommandLine) {
                 }
                 configuration.edit().persistNow()
             }
-            "q" -> {
-                val deviceId = option.value
-                System.out.println("query device id = $deviceId")
-                val deviceAddresses = GlobalDiscoveryHandler(configuration).query(deviceId)
-                System.out.println("server response = $deviceAddresses")
-            }
-            "d" -> {
-                val deviceId = option.value
-                System.out.println("discovery device id = $deviceId")
-                val deviceAddresses = LocalDiscoveryHandler(configuration).queryAndClose(deviceId)
-                System.out.println("local response = $deviceAddresses")
-            }
-
             "p" -> {
                 val folderAndPath = option.value
                 System.out.println("file path = $folderAndPath")

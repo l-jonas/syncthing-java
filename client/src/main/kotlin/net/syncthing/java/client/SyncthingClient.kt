@@ -131,6 +131,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
             val connectedDevices = Sets.newHashSet<String>()
             addressesSupplier
                     .takeWhile { it != null }
+                    .filterNotNull()
                     .filterNot { connectedDevices.contains(it.deviceId) }
                     .forEach {
                         try {
