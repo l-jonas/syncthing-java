@@ -290,10 +290,9 @@ public final class KeystoreHandler {
                         keyStore = generateKeystore(configuration);
                         isNew = true;
                     } catch (CryptoException | IOException ex) {
-                        logger.error("error generating keystore", ex);
+                        throw new RuntimeException("error generating keystore", ex);
                     }
                 }
-                checkNotNull(keyStore, "unable to aquire keystore");
                 KeystoreHandler keystoreHandler = new KeystoreHandler(keyStore.getLeft());
                 if (isNew) {
                     configuration.edit()

@@ -70,8 +70,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
     private fun openConnection(deviceAddress: DeviceAddress): BlockExchangeConnectionHandler {
-        val connectionHandler = BlockExchangeConnectionHandler(configuration, deviceAddress)
-        connectionHandler.indexHandler = indexHandler
+        val connectionHandler = BlockExchangeConnectionHandler(configuration, deviceAddress, indexHandler)
         connectionHandler.eventBus.register(indexHandler)
         connectionHandler.eventBus.register(devicesHandler)
         val shouldRestartForNewFolder = AtomicBoolean(false)
@@ -157,7 +156,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
         getPeerConnections({ connection ->
             try {
                 indexHandler.waitForRemoteIndexAquired(connection)
-                indexUpdateComplete.add(connection.deviceId)
+                indexUpdateComplete.add(connection.deviceId())
             } catch (ex: InterruptedException) {
                 logger.warn("exception while waiting for index", ex)
             }
@@ -173,7 +172,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
             try {
                 val fileInfoAndBlocks = indexHandler.waitForRemoteIndexAquired(connection).getFileInfoAndBlocksByPath(fileInfo.folder, fileInfo.path)
                 checkNotNull(fileInfoAndBlocks, "file not found in local index for folder = %s path = %s", fileInfo.folder, fileInfo.path)
-                val observer = BlockPuller(configuration, connection, false).pullBlocks(fileInfoAndBlocks!!.value)
+                val observer = connection.getBlockPuller().pullBlocks(fileInfoAndBlocks!!.value)
                 listener(observer)
             } catch (e: InterruptedException) {
                 logger.warn("Failed to pull file", e)
@@ -186,8 +185,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
                  errorListener: () -> Unit) {
         getConnectionForFolder(folder, { connection ->
             try {
-                val pusher = BlockPusher(configuration, connection, false)
-                pusher.withIndexHandler(indexHandler)
+                val pusher = connection.getBlockPusher()
                 val fileInfo = indexHandler.waitForRemoteIndexAquired(connection).getFileInfoByPath(folder, path)
                 val observer = pusher.pushFile(data, fileInfo, folder, path)
                 listener(observer)
@@ -201,8 +199,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
     fun pushDir(folder: String, path: String, listener: (indexEditObserver: BlockPusher.IndexEditObserver) -> Unit,
                 errorListener: () -> Unit) {
         getConnectionForFolder(folder, { connection ->
-            val pusher = BlockPusher(configuration, connection, false)
-            pusher.withIndexHandler(indexHandler)
+            val pusher = connection.getBlockPusher()
             val observer = pusher.pushDir(folder, path)
             listener(observer)
         }, errorListener)
@@ -212,8 +209,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
                    errorListener: () -> Unit) {
         getConnectionForFolder(folder, { connection ->
             try {
-                val pusher = BlockPusher(configuration, connection, false)
-                pusher.withIndexHandler(indexHandler)
+                val pusher = connection.getBlockPusher()
                 val fileInfo = indexHandler.waitForRemoteIndexAquired(connection).getFileInfoByPath(folder, path)
                 val observer = pusher.pushDelete(fileInfo!!, folder, path)
                 listener(observer)

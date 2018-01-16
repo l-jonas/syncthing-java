@@ -15,6 +15,7 @@ package net.syncthing.java.client
 
 import com.google.common.base.Preconditions.checkArgument
 import com.google.common.collect.Lists
+import net.syncthing.java.bep.IndexBrowser
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FileInfo
@@ -71,7 +72,6 @@ class Main(private val commandLine: CommandLine) {
             options.addOption("L", "list-remote", false, "list folder (root) content from network")
             options.addOption("I", "list-info", false, "dump folder info from network")
             options.addOption("l", "list-info", false, "list folder info from local db")
-            options.addOption("s", "search", true, "search local index for <term>")
             options.addOption("D", "delete", true, "push delete to network")
             options.addOption("M", "mkdir", true, "push directory create to network")
             options.addOption("h", "help", false, "print help")
@@ -109,7 +109,7 @@ class Main(private val commandLine: CommandLine) {
                         .build()
                 syncthingClient.pullFile(fileInfo, { observer ->
                     try {
-                        val inputStream = observer.waitForComplete().inputStream
+                        val inputStream = observer.waitForComplete().inputStream()
                         val fileName = syncthingClient.indexHandler.getFileInfoByPath(folder, path)!!.fileName
                         val file  =
                             if (commandLine.hasOption("o")) {
@@ -137,14 +137,14 @@ class Main(private val commandLine: CommandLine) {
                 path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
                 val latch = CountDownLatch(1)
                 syncthingClient.pushFile(FileInputStream(file), folder, path, { fileUploadObserver ->
-                    while (!fileUploadObserver.isCompleted) {
+                    while (!fileUploadObserver.isCompleted()) {
                         try {
                             fileUploadObserver.waitForProgressUpdate()
                         } catch (e: InterruptedException) {
                             logger.warn("", e)
                         }
 
-                        System.out.println("upload progress ${fileUploadObserver.progressMessage}")
+                        System.out.println("upload progress ${fileUploadObserver.progressMessage()}")
                     }
                     latch.countDown()
                 }) { logger.warn("Failed to upload file") }
@@ -189,8 +189,8 @@ class Main(private val commandLine: CommandLine) {
             }
             "L" -> {
                 updateIndex(syncthingClient)
-                for (folder in syncthingClient.indexHandler.folderList) {
-                    syncthingClient.indexHandler.newIndexBrowserBuilder().setFolder(folder).build().use { indexBrowser ->
+                for (folder in syncthingClient.indexHandler.folderList()) {
+                    syncthingClient.indexHandler.newIndexBrowser(folder).use { indexBrowser ->
                         System.out.println("list folder = ${indexBrowser.folder}")
                         for (fileInfo in indexBrowser.listFiles()) {
                             System.out.println("${fileInfo.type.name.substring(0, 1)}\t${fileInfo.describeSize()}\t${fileInfo.path}")
@@ -201,7 +201,7 @@ class Main(private val commandLine: CommandLine) {
             "I" -> {
                 updateIndex(syncthingClient)
                 val folderInfo = StringBuilder()
-                for (folder in syncthingClient.indexHandler.folderList) {
+                for (folder in syncthingClient.indexHandler.folderList()) {
                     folderInfo.append("\nfolder info: ")
                             .append(syncthingClient.indexHandler.getFolderInfo(folder))
                     folderInfo.append("\nfolder stats: ")
@@ -212,7 +212,7 @@ class Main(private val commandLine: CommandLine) {
             }
             "l" -> {
                 var folderInfo = ""
-                for (folder in syncthingClient.indexHandler.folderList) {
+                for (folder in syncthingClient.indexHandler.folderList()) {
                     folderInfo += "\nfolder info: " + syncthingClient.indexHandler.getFolderInfo(folder)
                     folderInfo += "\nfolder stats: " + syncthingClient.indexHandler.newFolderBrowser().getFolderStats(folder).dumpInfo() + "\n"
                 }
@@ -225,23 +225,6 @@ class Main(private val commandLine: CommandLine) {
                         deviceAddressesStr += "\n" + deviceAddress.deviceId + " : " + deviceAddress.address
                     }
                     System.out.println("device addresses:\n$deviceAddressesStr\n")
-                }
-            }
-            "s" -> {
-                val term = option.value
-                syncthingClient.indexHandler.newIndexFinderBuilder().build().use { indexFinder ->
-                    updateIndex(syncthingClient)
-                    val event = indexFinder.doSearch(term)
-                    when {
-                        event.hasGoodResults() -> {
-                            System.out.println("search results for '$term' :")
-                            for (fileInfo in event.resultList) {
-                                System.out.println("${fileInfo.type.name.substring(0, 1)}\t${fileInfo.describeSize()}\t${fileInfo.path}")
-                            }
-                        }
-                        event.hasTooManyResults() -> System.out.println("too many results found for = '$term'")
-                        else -> System.out.println("no result found for = '$term'")
-                    }
                 }
             }
         }
