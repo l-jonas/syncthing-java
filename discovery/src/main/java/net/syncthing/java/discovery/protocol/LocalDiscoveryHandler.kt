@@ -16,7 +16,6 @@ package net.syncthing.java.discovery.protocol
 import com.google.common.base.Preconditions.checkArgument
 import com.google.common.collect.HashMultimap
 import com.google.common.eventbus.AsyncEventBus
-import com.google.common.eventbus.EventBus
 import com.google.common.eventbus.Subscribe
 import com.google.protobuf.ByteString
 import com.google.protobuf.InvalidProtocolBufferException
@@ -39,7 +38,7 @@ import java.nio.ByteBuffer
 import java.util.*
 import java.util.concurrent.Executors
 
-internal class LocalDiscoveryHandler(private val mConfiguration: ConfigurationService) : Closeable {
+internal class LocalDiscoveryHandler(private val configuration: ConfigurationService) : Closeable {
 
     companion object {
         private val MAGIC = 0x2EA7D90B
@@ -48,13 +47,13 @@ internal class LocalDiscoveryHandler(private val mConfiguration: ConfigurationSe
         private val INCOMING_BUFFER_SIZE = 1024
     }
 
-    private val mLogger = LoggerFactory.getLogger(javaClass)
-    private val mListeningExecutor = Executors.newSingleThreadScheduledExecutor()
-    private val mProcessingExecutor = Executors.newCachedThreadPool()
-    val eventBus: EventBus = AsyncEventBus(mProcessingExecutor)
-    private val mLocalDiscoveryRecords = HashMultimap.create<String, DeviceAddress>()
+    private val logger = LoggerFactory.getLogger(javaClass)
+    private val listeningExecutor = Executors.newSingleThreadScheduledExecutor()
+    private val processingExecutor = Executors.newCachedThreadPool()
+    val eventBus = AsyncEventBus(processingExecutor)
+    private val localDiscoveryRecords = HashMultimap.create<String, DeviceAddress>()
 
-    private var mDatagramSocket: DatagramSocket? = null
+    private var datagramSocket: DatagramSocket? = null
 
     fun queryAndClose(deviceId: String): Collection<DeviceAddress> {
         val lock = Object()
@@ -62,7 +61,7 @@ internal class LocalDiscoveryHandler(private val mConfiguration: ConfigurationSe
             @Subscribe
             fun handleMessageReceivedEvent(event: MessageReceivedEvent) {
                 synchronized(lock) {
-                    if (deviceId == event.deviceId) {
+                    if (deviceId == event.deviceId()) {
                         lock.notify()
                     }
                 }
@@ -74,24 +73,24 @@ internal class LocalDiscoveryHandler(private val mConfiguration: ConfigurationSe
             try {
                 lock.wait(MAX_WAIT.toLong())
             } catch (ex: InterruptedException) {
-                mLogger.warn("", ex)
+                logger.warn("", ex)
             }
 
         }
         close()
-        synchronized(mLocalDiscoveryRecords) {
-            return mLocalDiscoveryRecords.get(deviceId)
+        synchronized(localDiscoveryRecords) {
+            return localDiscoveryRecords.get(deviceId)
         }
     }
 
     fun sendAnnounceMessage() {
-        mProcessingExecutor.submit {
+        processingExecutor.submit {
             try {
                 val out = ByteArrayOutputStream()
                 DataOutputStream(out).writeInt(MAGIC)
                 Announce.newBuilder()
-                        .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(mConfiguration.deviceId)))
-                        .setInstanceId(mConfiguration.instanceId)
+                        .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId)))
+                        .setInstanceId(configuration.instanceId)
                         .build().writeTo(out)
                 val data = out.toByteArray()
                 val networkInterfaces = NetworkInterface.getNetworkInterfaces()
@@ -99,9 +98,9 @@ internal class LocalDiscoveryHandler(private val mConfiguration: ConfigurationSe
                     val networkInterface = networkInterfaces.nextElement()
                     for (interfaceAddress in networkInterface.interfaceAddresses) {
                         val broadcastAddress = interfaceAddress.broadcast
-                        mLogger.trace("interface = {} address = {} broadcast = {}", networkInterface, interfaceAddress, broadcastAddress)
+                        logger.trace("interface = {} address = {} broadcast = {}", networkInterface, interfaceAddress, broadcastAddress)
                         if (broadcastAddress != null) {
-                            mLogger.debug("sending broadcast announce on {}", broadcastAddress)
+                            logger.debug("sending broadcast announce on {}", broadcastAddress)
                             DatagramSocket().use { broadcastSocket ->
                                 broadcastSocket.broadcast = true
                                 val datagramPacket = DatagramPacket(
@@ -112,38 +111,38 @@ internal class LocalDiscoveryHandler(private val mConfiguration: ConfigurationSe
                     }
                 }
             } catch (e: IOException) {
-                mLogger.warn("Failed to send local announce message", e)
+                logger.warn("Failed to send local announce message", e)
             }
         }
     }
 
     fun startListener() {
-        if (mDatagramSocket == null || mDatagramSocket!!.isClosed) {
+        if (datagramSocket == null || datagramSocket!!.isClosed) {
             try {
-                mDatagramSocket = DatagramSocket(LISTENING_PORT, InetAddress.getByName("0.0.0.0"))
-                mLogger.info("Opened udp socket {}", mDatagramSocket!!.localSocketAddress)
+                datagramSocket = DatagramSocket(LISTENING_PORT, InetAddress.getByName("0.0.0.0"))
+                logger.info("Opened udp socket {}", datagramSocket!!.localSocketAddress)
             } catch (e: IOException) {
-                mLogger.warn("Failed to open listening socket on port {}", LISTENING_PORT, e)
+                logger.warn("Failed to open listening socket on port {}", LISTENING_PORT, e)
                 return
             }
 
         }
 
-        mListeningExecutor.submit(object : Runnable {
+        listeningExecutor.submit(object : Runnable {
             override fun run() {
                 try {
                     val datagramPacket = DatagramPacket(ByteArray(INCOMING_BUFFER_SIZE), INCOMING_BUFFER_SIZE)
-                    mLogger.trace("waiting for message on socket addr = {}",
-                            mDatagramSocket!!.localSocketAddress)
-                    mDatagramSocket!!.receive(datagramPacket)
-                    mProcessingExecutor.submit { handleReceivedDatagram(datagramPacket) }
-                    mListeningExecutor.submit(this)
+                    logger.trace("waiting for message on socket addr = {}",
+                            datagramSocket!!.localSocketAddress)
+                    datagramSocket!!.receive(datagramPacket)
+                    processingExecutor.submit { handleReceivedDatagram(datagramPacket) }
+                    listeningExecutor.submit(this)
                 } catch (e: IOException) {
                     if (e.message == "Socket closed") {
                         // Ignore exception on socket close.
                         return
                     }
-                    mLogger.warn("Error receiving datagram", e)
+                    logger.warn("Error receiving datagram", e)
                     close()
                 }
 
@@ -162,10 +161,15 @@ internal class LocalDiscoveryHandler(private val mConfiguration: ConfigurationSe
             val deviceId = KeystoreHandler.hashDataToDeviceIdString(announce.id.toByteArray())
 
             // Ignore announcement received from ourselves.
-            if (deviceId == mConfiguration.deviceId)
+            if (deviceId == configuration.deviceId)
                 return
 
-            mLogger.debug("received local announce from device id = {}", deviceId)
+            if (!configuration.peerIds.contains(deviceId)) {
+                logger.trace("Received local announce from $deviceId which is not a peer, ignoring")
+                return
+            }
+
+            logger.debug("received local announce from device id = {}", deviceId)
             val addressesList = announce.addressesList ?: listOf<String>()
             val deviceAddresses = addressesList.map { address ->
                 // When interpreting addresses with an unspecified address, e.g.,
@@ -179,14 +183,13 @@ internal class LocalDiscoveryHandler(private val mConfiguration: ConfigurationSe
                         .build()
             }
             var isNew = false
-            synchronized(mLocalDiscoveryRecords) {
-                isNew = !mLocalDiscoveryRecords.removeAll(deviceId).isEmpty()
-                mLocalDiscoveryRecords.putAll(deviceId, deviceAddresses)
+            synchronized(localDiscoveryRecords) {
+                isNew = !localDiscoveryRecords.removeAll(deviceId).isEmpty()
+                localDiscoveryRecords.putAll(deviceId, deviceAddresses)
             }
             eventBus.post(object : MessageReceivedEvent() {
 
-                override val deviceId: String
-                    get() = deviceId
+                override fun deviceId() = deviceId
 
                 override fun getDeviceAddresses(): List<DeviceAddress> {
                     return Collections.unmodifiableList(deviceAddresses)
@@ -194,33 +197,32 @@ internal class LocalDiscoveryHandler(private val mConfiguration: ConfigurationSe
             })
             if (isNew) {
                 eventBus.post(object : NewLocalPeerEvent() {
-                    override val deviceId: String
-                        get() = deviceId
+                    override fun deviceId() = deviceId
                 })
             }
         } catch (ex: InvalidProtocolBufferException) {
-            mLogger.warn("error processing datagram", ex)
+            logger.warn("error processing datagram", ex)
         }
 
     }
 
     override fun close() {
-        mProcessingExecutor.shutdown()
-        mListeningExecutor.shutdown()
-        if (mDatagramSocket != null) {
-            IOUtils.closeQuietly(mDatagramSocket)
+        processingExecutor.shutdown()
+        listeningExecutor.shutdown()
+        if (datagramSocket != null) {
+            IOUtils.closeQuietly(datagramSocket)
         }
     }
 
     abstract inner class MessageReceivedEvent : DeviceAddressReceivedEvent {
 
-        abstract val deviceId: String
+        abstract fun deviceId(): String
 
         abstract override fun getDeviceAddresses(): List<DeviceAddress>
     }
 
     abstract inner class NewLocalPeerEvent {
 
-        abstract val deviceId: String
+        abstract fun deviceId(): String
     }
 }

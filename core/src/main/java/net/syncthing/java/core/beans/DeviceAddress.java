@@ -87,12 +87,8 @@ public final class DeviceAddress {
         return score;
     }
 
-    public InetAddress getInetAddress() {
-        try {
-            return InetAddress.getByName(address.replaceFirst("^[^:]+://", "").replaceFirst("(:[0-9]+)?(/.*)?$", ""));
-        } catch (UnknownHostException ex) {
-            throw new RuntimeException(ex);
-        }
+    public InetAddress getInetAddress() throws UnknownHostException {
+        return InetAddress.getByName(address.replaceFirst("^[^:]+://", "").replaceFirst("(:[0-9]+)?(/.*)?$", ""));
     }
 
     public int getPort() {
@@ -125,7 +121,7 @@ public final class DeviceAddress {
         }
     }
 
-    public InetSocketAddress getSocketAddress() {
+    public InetSocketAddress getSocketAddress() throws UnknownHostException {
         return new InetSocketAddress(getInetAddress(), getPort());
     }
 

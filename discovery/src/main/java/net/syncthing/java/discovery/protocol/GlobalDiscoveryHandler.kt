@@ -13,8 +13,6 @@
  */
 package net.syncthing.java.discovery.protocol
 
-import com.google.common.cache.CacheBuilder
-import com.google.common.cache.CacheLoader
 import com.google.gson.Gson
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.configuration.ConfigurationService
@@ -32,53 +30,37 @@ import java.io.IOException
 import java.security.KeyManagementException
 import java.security.KeyStoreException
 import java.security.NoSuchAlgorithmException
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.TimeUnit
 
 internal class GlobalDiscoveryHandler(private val configuration: ConfigurationService) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private val gson = Gson()
-    private val cache = CacheBuilder.newBuilder()
-            .expireAfterAccess(30, TimeUnit.MINUTES)
-            .refreshAfterWrite(10, TimeUnit.MINUTES)
-            .build(object : CacheLoader<String, List<DeviceAddress>>() {
-                @Throws(Exception::class)
-                override fun load(deviceId: String): List<DeviceAddress> {
-                    return doQuery(deviceId)
+
+    fun query(deviceId: String, callback: (List<DeviceAddress>) -> Unit) {
+        val addresses = pickAnnounceServers()
+                .map {
+                    try {
+                        queryAnnounceServer(it, deviceId)
+                    } catch (e: IOException) {
+                        logger.warn("Failed to query $it", e)
+                        listOf<DeviceAddress>()
+                    }
                 }
-            })
-    private var serverList: List<String>? = null
-
-    fun query(deviceId: String): List<DeviceAddress> {
-        try {
-            return cache.get(deviceId)
-        } catch (ex: ExecutionException) {
-            throw RuntimeException(ex)
-        }
-
+                .flatten()
+        logger.info("Discovered addresses for $deviceId: $addresses")
+        callback(addresses)
     }
 
-    private fun doQuery(deviceId: String): List<DeviceAddress> {
-        synchronized(this) {
-            if (serverList == null) {
-                logger.debug("ranking discovery server addresses")
-                val list = AddressRanker.testAndRank(configuration.discoveryServers.map { DeviceAddress(it, "tcp://$it:443") })
-                logger.info("discovery server addresses = \n\n{}\n", AddressRanker.dumpAddressRanking(list))
-                serverList = list.map { it.deviceId }
-            }
-        }
-        return serverList!!
-                .mapNotNull { doQuery(it, deviceId) }
-                .firstOrNull()
-                .orEmpty()
+    private fun pickAnnounceServers(): List<String> {
+        logger.debug("ranking discovery server addresses")
+        val list = AddressRanker
+                .pingAddresses(configuration.discoveryServers.map { DeviceAddress(it, "tcp://$it:443") })
+        logger.info("discovery server addresses = {}", list.map { it.address })
+        return list.mapNotNull { it.deviceId }
     }
 
-    /**
-     *
-     * @return null on error, empty list on 'not found', address list otherwise
-     */
-    private fun doQuery(server: String, deviceId: String): List<DeviceAddress>? {
+    @Throws(IOException::class)
+    private fun queryAnnounceServer(server: String, deviceId: String): List<DeviceAddress> {
         try {
             logger.trace("querying server {} for device id {}", server, deviceId)
             val httpClient = HttpClients.custom()
@@ -104,19 +86,15 @@ internal class GlobalDiscoveryHandler(private val configuration: ConfigurationSe
         } catch (e: Exception) {
             when (e) {
                 is IOException, is NoSuchAlgorithmException, is KeyStoreException, is KeyManagementException ->
-                    logger.warn("error in global discovery for device = $deviceId", e)
+                    throw IOException(e)
                 else -> throw e
             }
         }
-
-        return null
     }
 
     override fun close() {}
 
     class AnnouncementMessageBean {
-
         var addresses: List<String>? = null
-
     }
 }

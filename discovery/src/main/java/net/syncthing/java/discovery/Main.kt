@@ -23,6 +23,7 @@ import org.apache.commons.cli.Option
 import org.apache.commons.cli.Options
 import org.apache.commons.io.FileUtils
 import java.io.File
+import java.util.concurrent.CountDownLatch
 
 class Main {
 
@@ -66,8 +67,13 @@ class Main {
             "q" -> {
                 val deviceId = option.value
                 System.out.println("query device id = $deviceId")
-                val deviceAddresses = GlobalDiscoveryHandler(configuration).query(deviceId)
-                System.out.println("server response = $deviceAddresses")
+                val latch = CountDownLatch(1)
+                GlobalDiscoveryHandler(configuration).query(deviceId, { it ->
+                    val addresses = it.map { it.address }.fold("", { l, r -> "$l\n$r"})
+                    System.out.println("server response: $addresses")
+                    latch.countDown()
+                })
+                latch.await()
             }
             "d" -> {
                 val deviceId = option.value

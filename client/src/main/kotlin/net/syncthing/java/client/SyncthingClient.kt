@@ -138,9 +138,9 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
                             connectedDevices.add(it.deviceId)
                             listener(connection)
                         } catch (e: IOException) {
-                            logger.warn("error connecting to device = {}", it, e)
+                            logger.warn("error connecting to device = $it", e)
                         } catch (e: KeystoreHandler.CryptoException) {
-                            logger.warn("error connecting to device = {}", it, e)
+                            logger.warn("error connecting to device = $it", e)
                         }
                     }
             completeListener()

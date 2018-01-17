@@ -14,7 +14,6 @@
 package net.syncthing.java.discovery
 
 import com.google.common.base.Preconditions.checkArgument
-import com.google.common.base.Preconditions.checkNotNull
 import com.google.common.collect.Ordering
 import com.google.common.eventbus.Subscribe
 import net.syncthing.java.core.beans.DeviceAddress
@@ -49,7 +48,6 @@ class DeviceAddressSupplier(private val discoveryHandler: DiscoveryHandler) : Cl
         get() = getDeviceAddressOrWait(5000)
 
     init {
-        checkNotNull(discoveryHandler)
         synchronized(queueLock) {
             discoveryHandler.eventBus.register(discoveryHandlerListener)
             deviceAddressQueue.addAll(discoveryHandler.getAllWorkingDeviceAddresses())// note: slight risk of duplicate address loading

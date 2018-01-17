@@ -29,7 +29,8 @@ import java.io.Closeable
 import java.util.*
 import java.util.concurrent.Executors
 
-class DiscoveryHandler(private val configuration: ConfigurationService, private val deviceAddressRepository: DeviceAddressRepository) : Closeable {
+class DiscoveryHandler(private val configuration: ConfigurationService,
+                       private val deviceAddressRepository: DeviceAddressRepository) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private val globalDiscoveryHandler = GlobalDiscoveryHandler(configuration)
@@ -60,7 +61,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService, private 
         if (shouldLoadFromDb) {
             shouldLoadFromDb = false
             executorService.submit {
-                val list = this@DiscoveryHandler.deviceAddressRepository.findAllDeviceAddress()
+                val list = deviceAddressRepository.findAllDeviceAddress()
                 logger.info("received device address list from database")
                 processDeviceAddressBg(list)
             }
@@ -73,10 +74,8 @@ class DiscoveryHandler(private val configuration: ConfigurationService, private 
         if (shouldLoadFromGlobal) {
             shouldLoadFromGlobal = false //TODO timeout for reload
             executorService.submit {
-                for (deviceId in this@DiscoveryHandler.configuration.peerIds) {
-                    val list = globalDiscoveryHandler.query(deviceId)
-                    logger.info("received device address list from global discovery")
-                    processDeviceAddressBg(list)
+                for (deviceId in configuration.peerIds) {
+                    globalDiscoveryHandler.query(deviceId, this::processDeviceAddressBg)
                 }
             }
         }
@@ -94,7 +93,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService, private 
                 list.filter { deviceAddress ->
                     !peers.contains(deviceAddress.deviceId) || deviceAddressMap.containsKey(Pair.of(deviceAddress.deviceId, deviceAddress.address))
                 }
-                AddressRanker.testAndRank(list)
+                AddressRanker.pingAddresses(list)
                         .forEach { putDeviceAddress(it) }
             }
         }

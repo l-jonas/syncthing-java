@@ -13,7 +13,6 @@
  */
 package net.syncthing.java.bep
 
-import com.google.common.collect.Iterables
 import com.google.common.eventbus.Subscribe
 import net.syncthing.java.bep.BlockExchangeConnectionHandler.Companion.assertProtocol
 import com.google.common.hash.Hashing
@@ -158,7 +157,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
                 connectionHandler.eventBus.unregister(listener)
                 monitoringProcessExecutorService.shutdown()
                 indexHandler.eventBus.unregister(indexListener)
-                val fileInfo1 = indexHandler.pushRecord(indexUpdate.folder, Iterables.getOnlyElement(indexUpdate.filesList))
+                val fileInfo1 = indexHandler.pushRecord(indexUpdate.folder, indexUpdate.filesList.single())
                 logger.info("sent file info record = {}", fileInfo1)
             }
 
@@ -265,7 +264,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
 
         @Throws(IOException::class)
         override fun close() {
-            indexHandler.pushRecord(indexUpdate.folder, Iterables.getOnlyElement(indexUpdate.filesList))
+            indexHandler.pushRecord(indexUpdate.folder, indexUpdate.filesList.single())
         }
 
     }
