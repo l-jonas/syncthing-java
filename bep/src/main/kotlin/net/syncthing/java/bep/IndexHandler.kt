@@ -25,7 +25,7 @@ import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.interfaces.IndexRepository
 import net.syncthing.java.core.interfaces.Sequencer
 import net.syncthing.java.core.interfaces.TempRepository
-import net.syncthing.java.core.security.KeystoreHandler.hashDataToDeviceIdString
+import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.ExecutorUtils
 import org.apache.commons.lang3.tuple.Pair
 import org.apache.http.util.TextUtils
@@ -48,7 +48,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
 
     private fun lastActive(): Long = System.currentTimeMillis() - lastIndexActivity
 
-    fun sequencer(): Sequencer = indexRepository.sequencer
+    fun sequencer(): Sequencer = indexRepository.getSequencer()
 
     fun folderList(): List<String> = folderInfoByFolder.keys.toList()
 
@@ -64,7 +64,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
 
     private fun loadFolderInfoFromConfig() {
         synchronized(writeAccessLock) {
-            for (folderInfo in configuration.folders) {
+            for (folderInfo in configuration.getFolders()) {
                 folderInfoByFolder.put(folderInfo.folder, folderInfo) //TODO reference 'folder info' repository
             }
         }
@@ -113,7 +113,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
                 val folderInfo = updateFolderInfo(folder, folderRecord.label)
                 logger.debug("aquired folder info from cluster config = {}", folderInfo)
                 for (deviceRecord in folderRecord.devicesList) {
-                    val deviceId = hashDataToDeviceIdString(deviceRecord.id.toByteArray())
+                    val deviceId = KeystoreHandler.hashDataToDeviceIdString(deviceRecord.id.toByteArray())
                     if (deviceRecord.hasIndexId() && deviceRecord.hasMaxSequence()) {
                         val folderIndexInfo = updateIndexInfo(folder, deviceId, deviceRecord.indexId, deviceRecord.maxSequence, null)
                         logger.debug("aquired folder index info from cluster config = {}", folderIndexInfo)
@@ -138,12 +138,13 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
                 .setDeleted(bepFileInfo.deleted)
         when (bepFileInfo.type) {
             BlockExchangeProtos.FileInfoType.FILE -> {
-                fileBlocks = FileBlocks(folder, builder.path, ((bepFileInfo.blocksList ?: emptyList())).map { record ->
+                fileBlocks = FileBlocks(folder, builder.getPath()!!, ((bepFileInfo.blocksList ?: emptyList())).map { record ->
                     BlockInfo(record.offset, record.size, BaseEncoding.base16().encode(record.hash.toByteArray()))
                 })
                 builder
                         .setTypeFile()
-                        .setHash(fileBlocks.hash).size = bepFileInfo.size
+                        .setHash(fileBlocks.hash)
+                        .setSize(bepFileInfo.size)
             }
             BlockExchangeProtos.FileInfoType.DIRECTORY -> builder.setTypeDir()
             else -> {
@@ -171,17 +172,17 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
             } else {
                 builder = indexSequenceInfo.copyBuilder()
             }
-            if (indexId != null && indexId != builder.indexId) {
+            if (indexId != null && indexId != builder.getIndexId()) {
                 shouldUpdate = true
-                builder.indexId = indexId
+                builder.setIndexId(indexId)
             }
-            if (maxSequence != null && maxSequence > builder.maxSequence) {
+            if (maxSequence != null && maxSequence > builder.getMaxSequence()) {
                 shouldUpdate = true
-                builder.maxSequence = maxSequence
+                builder.setMaxSequence(maxSequence)
             }
-            if (localSequence != null && localSequence > builder.localSequence) {
+            if (localSequence != null && localSequence > builder.getLocalSequence()) {
                 shouldUpdate = true
-                builder.localSequence = localSequence
+                builder.setLocalSequence(localSequence)
             }
             if (shouldUpdate) {
                 indexSequenceInfo = builder.build()

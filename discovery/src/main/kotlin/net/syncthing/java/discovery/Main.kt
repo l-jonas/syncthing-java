@@ -44,7 +44,7 @@ class Main {
             ConfigurationService.newLoader().loadFrom(configFile).use { configuration ->
                 System.out.println("using config file = $configFile")
                 FileUtils.cleanDirectory(configuration.temp)
-                KeystoreHandler.newLoader().loadAndStore(configuration)
+                KeystoreHandler.Loader().loadAndStore(configuration)
                 System.out.println("configuration =\n${configuration.newWriter().dumpToString()}")
                 System.out.println(configuration.storageInfo.dumpAvailableSpace())
                 val main = Main()

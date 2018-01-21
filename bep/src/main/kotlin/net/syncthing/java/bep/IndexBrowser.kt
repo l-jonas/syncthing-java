@@ -21,7 +21,6 @@ import net.syncthing.java.core.interfaces.IndexRepository
 import net.syncthing.java.core.utils.ExecutorUtils
 import net.syncthing.java.core.utils.FileInfoOrdering.ALPHA_ASC_DIR_FIRST
 import net.syncthing.java.core.utils.PathUtils
-import net.syncthing.java.core.utils.PathUtils.*
 import org.apache.commons.lang3.StringUtils
 import org.slf4j.LoggerFactory
 import java.io.Closeable
@@ -66,7 +65,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
                     return doGetFileInfoByAbsolutePath(path)
                 }
             })
-    var currentPath: String = ROOT_PATH
+    var currentPath: String = PathUtils.ROOT_PATH
         private set
     private val PARENT_FILE_INFO: FileInfo
     private val ROOT_FILE_INFO: FileInfo
@@ -102,19 +101,19 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
         PARENT_FILE_INFO = FileInfo.Builder()
                 .setFolder(folder)
                 .setTypeDir()
-                .setPath(PARENT_PATH)
+                .setPath(PathUtils.PARENT_PATH)
                 .build()
         ROOT_FILE_INFO = FileInfo.Builder()
                 .setFolder(folder)
                 .setTypeDir()
-                .setPath(ROOT_PATH)
+                .setPath(PathUtils.ROOT_PATH)
                 .build()
         executorService.scheduleWithFixedDelay({
             logger.debug("folder cache cleanup")
             listFolderCache.cleanUp()
             fileInfoCache.cleanUp()
         }, 1, 1, TimeUnit.MINUTES)
-        navigateToAbsolutePath(ROOT_PATH)
+        navigateToAbsolutePath(PathUtils.ROOT_PATH)
     }
 
     fun setOnFolderChangedListener(onPathChangedListener: (() -> Unit)?) {
@@ -147,9 +146,9 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
                             }
 
                             logger.info("folder preload BEGIN for folder = '{}' path = '{}'", folder, preloadPath)
-                            getFileInfoByAbsolutePath(preloadPath)
-                            if (!PathUtils.isRoot(preloadPath)) {
-                                val parent = getParentPath(preloadPath)
+                            getFileInfoByAbsolutePath(preloadPath!!)
+                            if (!PathUtils.isRoot(preloadPath!!)) {
+                                val parent = PathUtils.getParentPath(preloadPath!!)
                                 getFileInfoByAbsolutePath(parent)
                                 listFiles(parent)
                             }
@@ -160,7 +159,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
                             }
                             logger.info("folder preload END for folder = '{}' path = '{}'", folder, preloadPath)
                             synchronized(preloadJobsLock) {
-                                preloadJobs.remove(preloadPath)
+                                preloadJobs.remove(preloadPath!!)
                                 if (isCacheReady()) {
                                     logger.info("cache ready, notify listeners")
                                     mOnPathChangedListener?.invoke()
@@ -195,8 +194,8 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
         return Collections.unmodifiableList(list)
     }
 
-    fun getFileInfoByAbsolutePath(path: String?): FileInfo {
-        return if (PathUtils.isRoot(path)) ROOT_FILE_INFO else fileInfoCache.getUnchecked(path!!)
+    fun getFileInfoByAbsolutePath(path: String): FileInfo {
+        return if (PathUtils.isRoot(path)) ROOT_FILE_INFO else fileInfoCache.getUnchecked(path)
     }
 
     private fun doGetFileInfoByAbsolutePath(path: String): FileInfo? {
@@ -210,7 +209,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
         assert(fileInfo.isDirectory)
         assert(fileInfo.folder == folder)
         return if (fileInfo.path == PARENT_FILE_INFO.path)
-            navigateToAbsolutePath(getParentPath(currentPath))
+            navigateToAbsolutePath(PathUtils.getParentPath(currentPath))
         else
             navigateToAbsolutePath(fileInfo.path)
     }
@@ -223,7 +222,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
 
     private fun navigateToAbsolutePath(newPath: String) {
         if (PathUtils.isRoot(newPath)) {
-            currentPath = ROOT_PATH
+            currentPath = PathUtils.ROOT_PATH
         } else {
             val fileInfo = getFileInfoByAbsolutePath(newPath)
             assert(fileInfo.isDirectory, {"cannot navigate to path ${fileInfo.path}: not a directory"})

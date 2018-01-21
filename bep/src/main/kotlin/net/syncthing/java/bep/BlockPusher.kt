@@ -23,7 +23,7 @@ import net.syncthing.java.bep.BlockExchangeProtos.Vector
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.beans.FileInfo.Version
 import net.syncthing.java.core.configuration.ConfigurationService
-import net.syncthing.java.core.security.KeystoreHandler.deviceIdStringToHashData
+import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.BlockUtils
 import net.syncthing.java.core.utils.FileUtils.createTempFile
 import org.apache.commons.io.FileUtils
@@ -180,7 +180,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
             val nextSequence = indexHandler.sequencer().nextSequence()
             val list = oldVersions ?: emptyList()
             logger.debug("version list = {}", list)
-            val id = ByteBuffer.wrap(deviceIdStringToHashData(configuration.deviceId)).long
+            val id = ByteBuffer.wrap(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId)).long
             val version = Counter.newBuilder()
                     .setId(id)
                     .setValue(nextSequence)

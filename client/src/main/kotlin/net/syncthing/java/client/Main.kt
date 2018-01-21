@@ -49,7 +49,7 @@ class Main(private val commandLine: CommandLine) {
                 SyncthingClient(configuration).use { syncthingClient ->
                     System.out.println("using config file = $configFile")
                     FileUtils.cleanDirectory(configuration.temp)
-                    KeystoreHandler.newLoader().loadAndStore(configuration)
+                    KeystoreHandler.Loader().loadAndStore(configuration)
                     System.out.println("configuration =\n${configuration.newWriter().dumpToString()}")
                     System.out.println(configuration.storageInfo.dumpAvailableSpace())
                     val main = Main(cmd)

@@ -176,7 +176,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
                 // tcp://0.0.0.0:22000 or tcp://:42424, the source address of the
                 // discovery announcement is to be used.
                 DeviceAddress.newBuilder()
-                        .setAddress(address?.replaceFirst("tcp://(0.0.0.0|):".toRegex(), "tcp://$sourceAddress:"))
+                        .setAddress(address.replaceFirst("tcp://(0.0.0.0|):".toRegex(), "tcp://$sourceAddress:"))
                         .setDeviceId(deviceId)
                         .setInstanceId(announce.instanceId)
                         .setProducer(DeviceAddress.AddressProducer.LOCAL_DISCOVERY)

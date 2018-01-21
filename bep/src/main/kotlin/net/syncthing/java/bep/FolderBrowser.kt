@@ -35,7 +35,7 @@ class FolderBrowser internal constructor(private val indexHandler: IndexHandler)
     private val indexRepositoryEventListener = object : Any() {
         @Subscribe
         fun handleFolderStatsUpdatedEvent(event: IndexRepository.FolderStatsUpdatedEvent) {
-            addFolderStats(event.folderStats)
+            addFolderStats(event.getFolderStats())
         }
     }
 
@@ -43,7 +43,7 @@ class FolderBrowser internal constructor(private val indexHandler: IndexHandler)
             (indexHandler.folderInfoList().map { folderInfo -> Pair.of(folderInfo, getFolderStats(folderInfo.folder)) }).toList()
 
     init {
-        indexHandler.indexRepository.eventBus.register(indexRepositoryEventListener)
+        indexHandler.indexRepository.getEventBus().register(indexRepositoryEventListener)
         addFolderStats(indexHandler.indexRepository.findAllFolderStats())
     }
 
@@ -62,6 +62,6 @@ class FolderBrowser internal constructor(private val indexHandler: IndexHandler)
     }
 
     override fun close() {
-        indexHandler.indexRepository.eventBus.unregister(indexRepositoryEventListener)
+        indexHandler.indexRepository.getEventBus().unregister(indexRepositoryEventListener)
     }
 }

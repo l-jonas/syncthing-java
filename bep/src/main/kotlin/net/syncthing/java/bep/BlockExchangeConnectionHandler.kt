@@ -76,20 +76,20 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
         assert(socket == null && !isConnected, {"already connected!"})
         logger.info("connecting to {}", address.address)
 
-        val keystoreHandler = KeystoreHandler.newLoader().loadAndStore(configuration)
+        val keystoreHandler = KeystoreHandler.Loader().loadAndStore(configuration)
 
         socket = when (address.type) {
             DeviceAddress.AddressType.TCP -> {
                 logger.debug("opening tcp ssl connection")
-                keystoreHandler.createSocket(address.socketAddress, BEP)
+                keystoreHandler.createSocket(address.socketAddress, KeystoreHandler.BEP)
             }
             DeviceAddress.AddressType.RELAY -> {
                 logger.debug("opening relay connection")
-                keystoreHandler.wrapSocket(RelayClient(configuration).openRelayConnection(address), BEP)
+                keystoreHandler.wrapSocket(RelayClient(configuration).openRelayConnection(address), KeystoreHandler.BEP)
             }
             DeviceAddress.AddressType.HTTP_RELAY, DeviceAddress.AddressType.HTTPS_RELAY -> {
                 logger.debug("opening http relay connection")
-                keystoreHandler.wrapSocket(HttpRelayClient().openRelayConnection(address), BEP)
+                keystoreHandler.wrapSocket(HttpRelayClient().openRelayConnection(address), KeystoreHandler.BEP)
             }
             else -> throw UnsupportedOperationException("unsupported address type = " + address.type)
         }
@@ -123,13 +123,13 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                 run {
                     //our device
                     val deviceBuilder = folderBuilder.addDevicesBuilder()
-                            .setId(ByteString.copyFrom(deviceIdStringToHashData(configuration.deviceId)))
+                            .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId)))
                     deviceBuilder.setIndexId(indexHandler.sequencer().indexId()).maxSequence = indexHandler.sequencer().currentSequence()
                 }
                 run {
                     //other device
                     val deviceBuilder = folderBuilder.addDevicesBuilder()
-                            .setId(ByteString.copyFrom(deviceIdStringToHashData(address.deviceId)))
+                            .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(address.deviceId)))
                     val indexSequenceInfo = indexHandler.indexRepository.findIndexInfoByDeviceAndFolder(address.deviceId, folder)
                     if (indexSequenceInfo != null) {
                         deviceBuilder
@@ -388,7 +388,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                                 for (folder in clusterConfig.foldersList ?: emptyList()) {
                                     val folderInfo = ClusterConfigFolderInfo(folder.id, folder.label)
                                     val devicesById = Maps.uniqueIndex(folder.devicesList ?: emptyList()) {
-                                        input -> hashDataToDeviceIdString(input?.id?.toByteArray())
+                                        input -> KeystoreHandler.hashDataToDeviceIdString(input!!.id!!.toByteArray())
                                     }
                                     val otherDevice = devicesById[address.deviceId]
                                     val ourDevice = devicesById[configuration.deviceId]

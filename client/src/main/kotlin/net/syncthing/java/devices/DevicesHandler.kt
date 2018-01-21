@@ -70,7 +70,7 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
 
     @Subscribe
     fun handleDeviceAddressActiveEvent(event: DeviceAddressActiveEvent) {
-        pushDeviceStats(getDeviceStats(event.deviceAddress.deviceId)
+        pushDeviceStats(getDeviceStats(event.getDeviceAddress().deviceId)
                 .copyBuilder()
                 .setLastActive(Date())
                 .setStatus(DeviceStats.DeviceStatus.ONLINE_ACTIVE)
@@ -79,7 +79,7 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
 
     @Subscribe
     fun handleDeviceAddressReceivedEvent(event: DeviceAddressReceivedEvent) {
-        for (deviceAddress in event.deviceAddresses) {
+        for (deviceAddress in event.getDeviceAddresses()) {
             if (deviceAddress.isWorking) {
                 val deviceStats = getDeviceStats(deviceAddress.deviceId)
                 val newStatus: DeviceStatus
@@ -97,7 +97,7 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
     }
 
     private fun loadDevicesFromConfiguration() {
-        for (deviceInfo in configuration.peers) {
+        for (deviceInfo in configuration.getPeers()) {
             if (!deviceStatsMap.containsKey(deviceInfo.deviceId)) {
                 pushDeviceStats(DeviceStats.newBuilder().setDeviceId(deviceInfo.deviceId).setName(deviceInfo.name).build())
             }

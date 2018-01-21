@@ -52,7 +52,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
             @Subscribe
             fun handleMessageReceivedEvent(event: LocalDiscoveryHandler.MessageReceivedEvent) {
                 logger.info("received device address list from local discovery")
-                processDeviceAddressBg(event.deviceAddresses)
+                processDeviceAddressBg(event.getDeviceAddresses())
             }
         })
     }
