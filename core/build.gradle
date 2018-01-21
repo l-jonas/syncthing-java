@@ -7,6 +7,6 @@ dependencies {
     compile "com.google.code.gson:gson:2.8.2"
     compile "com.google.guava:guava:23.5-android"
     compile "org.apache.httpcomponents:httpclient:4.5.4"
-    compile "org.bouncycastle:bcmail-jdk15on:1.58"
-    compile "org.mortbay.jetty.alpn:alpn-boot:8.1.11.v20170118"
+    compile "org.bouncycastle:bcmail-jdk15on:1.59"
+    compile "org.mortbay.jetty.alpn:alpn-boot:8.1.12.v20180117"
 }
