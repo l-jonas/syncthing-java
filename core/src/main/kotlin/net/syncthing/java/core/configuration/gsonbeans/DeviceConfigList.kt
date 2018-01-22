@@ -1,7 +1,7 @@
-/* 
- * Copyright (C) 2016 Davide Imbriaco
+/*
+ * Copyright 2016 Davide Imbriaco <davide.imbriaco@gmail.com>.
  *
- * This Java file is subject to the terms of the Mozilla Public
+ * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  *
@@ -13,10 +13,4 @@
  */
 package net.syncthing.java.core.configuration.gsonbeans
 
-import com.google.common.collect.Lists
-
-class FolderConfigList {
-
-    var folders: MutableList<FolderConfig> = Lists.newArrayList()
-
-}
+data class DeviceConfigList(val devices: MutableList<DeviceConfig> = mutableListOf())

@@ -19,12 +19,9 @@ import java.util.Date
 
 class FolderStats private constructor(val fileCount: Long, val dirCount: Long, val size: Long, val lastUpdate: Date, folder: String, label: String?) : FolderInfo(folder, label) {
 
-    val recordCount: Long
-        get() = dirCount + fileCount
+    fun getRecordCount(): Long = dirCount + fileCount
 
-    fun describeSize(): String {
-        return FileUtils.byteCountToDisplaySize(size)
-    }
+    fun describeSize(): String = FileUtils.byteCountToDisplaySize(size)
 
     fun dumpInfo(): String {
         return ("folder " + label + " (" + folder + ") file count = " + fileCount
@@ -35,9 +32,7 @@ class FolderStats private constructor(val fileCount: Long, val dirCount: Long, v
         return "FolderStats{folder=$folder, fileCount=$fileCount, dirCount=$dirCount, size=$size, lastUpdate=$lastUpdate}"
     }
 
-    fun copyBuilder(): Builder {
-        return Builder(fileCount, dirCount, size, folder, label)
-    }
+    fun copyBuilder(): Builder = Builder(fileCount, dirCount, size, folder, label)
 
     class Builder {
 
@@ -48,7 +43,7 @@ class FolderStats private constructor(val fileCount: Long, val dirCount: Long, v
         private var folder: String? = null
         private var label: String? = null
 
-        internal constructor() {}
+        constructor()
 
         constructor(fileCount: Long, dirCount: Long, size: Long, folder: String, label: String) {
             this.fileCount = fileCount
@@ -58,54 +53,42 @@ class FolderStats private constructor(val fileCount: Long, val dirCount: Long, v
             this.label = label
         }
 
-        fun getFileCount(): Long {
-            return fileCount
-        }
+        fun getFileCount(): Long = fileCount
 
         fun setFileCount(fileCount: Long): Builder {
             this.fileCount = fileCount
             return this
         }
 
-        fun getDirCount(): Long {
-            return dirCount
-        }
+        fun getDirCount(): Long = dirCount
 
         fun setDirCount(dirCount: Long): Builder {
             this.dirCount = dirCount
             return this
         }
 
-        fun getSize(): Long {
-            return size
-        }
+        fun getSize(): Long = size
 
         fun setSize(size: Long): Builder {
             this.size = size
             return this
         }
 
-        fun getLastUpdate(): Date {
-            return lastUpdate
-        }
+        fun getLastUpdate(): Date = lastUpdate
 
         fun setLastUpdate(lastUpdate: Date): Builder {
             this.lastUpdate = lastUpdate
             return this
         }
 
-        fun getFolder(): String? {
-            return folder
-        }
+        fun getFolder(): String? = folder
 
         fun setFolder(folder: String): Builder {
             this.folder = folder
             return this
         }
 
-        fun getLabel(): String? {
-            return label
-        }
+        fun getLabel(): String? = label
 
         fun setLabel(label: String): Builder {
             this.label = label
@@ -116,12 +99,5 @@ class FolderStats private constructor(val fileCount: Long, val dirCount: Long, v
             return FolderStats(fileCount, dirCount, size, lastUpdate, folder!!, label)
         }
 
-    }
-
-    companion object {
-
-        fun newBuilder(): Builder {
-            return Builder()
-        }
     }
 }

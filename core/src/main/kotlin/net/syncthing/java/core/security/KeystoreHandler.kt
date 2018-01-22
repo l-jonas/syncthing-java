@@ -13,30 +13,19 @@
  */
 package net.syncthing.java.core.security
 
-import com.google.common.base.Function
-import com.google.common.base.Joiner
-import com.google.common.base.Splitter
-import com.google.common.cache.Cache
 import com.google.common.cache.CacheBuilder
-import com.google.common.collect.Iterables
 import com.google.common.hash.Hashing
 import com.google.common.io.BaseEncoding
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.interfaces.RelayConnection
+import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.lang3.tuple.Pair
-import org.bouncycastle.cert.X509CertificateHolder
-import org.bouncycastle.cert.X509v1CertificateBuilder
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v1CertificateBuilder
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.operator.ContentSigner
 import org.bouncycastle.operator.OperatorCreationException
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-
-import javax.net.ssl.*
-import javax.security.auth.x500.X500Principal
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -44,15 +33,13 @@ import java.math.BigInteger
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.*
-import java.security.cert.*
 import java.security.cert.Certificate
-import java.util.Arrays
-import java.util.Date
-
-import com.google.common.base.Objects.equal
-import com.google.common.base.Preconditions.checkArgument
-import com.google.common.base.Preconditions.checkNotNull
-import org.apache.commons.lang3.StringUtils.isBlank
+import java.security.cert.CertificateException
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import java.util.*
+import javax.net.ssl.*
+import javax.security.auth.x500.X500Principal
 
 class KeystoreHandler private constructor(private val keyStore: KeyStore) {
 
@@ -183,11 +170,11 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         val certificateFactory = CertificateFactory.getInstance("X.509")
         val certPath = certificateFactory.generateCertPath(certs)
         val certificate = certPath.certificates[0]
-        checkArgument(certificate is X509Certificate)
+        NetworkUtils.assertProtocol(certificate is X509Certificate)
         val derData = certificate.encoded
         val deviceIdFromCertificate = derDataToDeviceIdString(derData)
         logger.trace("remote pem certificate =\n{}", derToPem(derData))
-        checkArgument(equal(deviceIdFromCertificate, deviceId), "device id mismatch! expected = %s, got = %s", deviceId, deviceIdFromCertificate)
+        NetworkUtils.assertProtocol(deviceIdFromCertificate == deviceId, {"device id mismatch! expected = $deviceId, got = $deviceIdFromCertificate"})
         logger.debug("remote ssl certificate match deviceId = {}", deviceId)
     }
 
@@ -210,13 +197,14 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
                         return keystoreHandlerFromCache
                     }
                 }
-                var keystoreAlgo = configuration.keystoreAlgo
-                if (isBlank(keystoreAlgo)) {
-                    keystoreAlgo = KeyStore.getDefaultType()
-                    checkNotNull(keystoreAlgo)
-                    logger.debug("keystore algo set to {}", keystoreAlgo)
-                    configuration.edit().setKeystoreAlgo(keystoreAlgo)
-                }
+                val keystoreAlgo = configuration.keystoreAlgo?.let { algo ->
+                    if (!algo.isBlank()) algo else null
+                } ?: {
+                    val defaultAlgo = KeyStore.getDefaultType()!!
+                    logger.debug("keystore algo set to {}", defaultAlgo)
+                    configuration.Editor().setKeystoreAlgo(defaultAlgo)
+                    defaultAlgo
+                }()
                 var keyStore: Pair<KeyStore, String>? = null
                 if (keystoreData != null) {
                     try {
@@ -242,7 +230,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
                 val keystoreHandler = KeystoreHandler(keyStore.left)
                 if (isNew) {
                     keystoreData = keystoreHandler.exportKeystoreToData()
-                    configuration.edit()
+                    configuration.Editor()
                             .setDeviceId(keyStore.right)
                             .setKeystore(keystoreData)
                             .setKeystoreAlgo(keystoreAlgo)
@@ -302,7 +290,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
                 keyStore.load(ByteArrayInputStream(keystoreData), JKS_PASSWORD.toCharArray())
                 val alias = keyStore.aliases().nextElement()
                 val certificate = keyStore.getCertificate(alias)
-                checkArgument(certificate is X509Certificate)
+                NetworkUtils.assertProtocol(certificate is X509Certificate)
                 val derData = certificate.encoded
                 val deviceId = derDataToDeviceIdString(derData)
                 logger.debug("loaded device id from cert = {}", deviceId)
@@ -349,22 +337,22 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         }
 
         fun hashDataToDeviceIdString(hashData: ByteArray): String {
-            checkArgument(hashData.size == Hashing.sha256().bits() / 8)
+            NetworkUtils.assertProtocol(hashData.size == Hashing.sha256().bits() / 8)
             var string = BaseEncoding.base32().encode(hashData).replace("=+$".toRegex(), "")
-            string = Joiner.on("").join(Iterables.transform(Splitter.fixedLength(13).split(string)) { part -> part!! + generateLuhn32Checksum(part) })
-            return Joiner.on("-").join(Splitter.fixedLength(7).split(string))
+            string = string.chunked(13).map { part -> part + generateLuhn32Checksum(part) }.joinToString("")
+            return string.chunked(7).joinToString("-")
         }
 
         fun deviceIdStringToHashData(deviceId: String): ByteArray {
-            checkArgument(deviceId.matches("^[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}$".toRegex()), "device id syntax error for deviceId = %s", deviceId)
+            NetworkUtils.assertProtocol(deviceId.matches("^[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}$".toRegex()), {"device id syntax error for deviceId = $deviceId"})
             val base32data = deviceId.replaceFirst("(.{7})-(.{6}).-(.{7})-(.{6}).-(.{7})-(.{6}).-(.{7})-(.{6}).".toRegex(), "$1$2$3$4$5$6$7$8") + "==="
             val binaryData = BaseEncoding.base32().decode(base32data)
-            checkArgument(binaryData.size == Hashing.sha256().bits() / 8)
+            NetworkUtils.assertProtocol(binaryData.size == Hashing.sha256().bits() / 8)
             return binaryData
         }
 
         fun validateDeviceId(peer: String) {
-            checkArgument(equal(hashDataToDeviceIdString(deviceIdStringToHashData(peer)), peer))
+            NetworkUtils.assertProtocol(hashDataToDeviceIdString(deviceIdStringToHashData(peer)) == peer)
         }
 
         // TODO serialize keystore
@@ -375,7 +363,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
             val n = alphabet.length
             for (character in string.toCharArray()) {
                 val index = alphabet.indexOf(character)
-                checkArgument(index >= 0)
+                NetworkUtils.assertProtocol(index >= 0)
                 var add = factor * index
                 factor = if (factor == 2) 1 else 2
                 add = add / n + add % n

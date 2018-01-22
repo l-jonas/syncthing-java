@@ -11,15 +11,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.syncthing.java.core.configuration.gsonbeans
+package net.syncthing.java.core.beans
 
-class FolderConfig {
-
-    var folder: String? = null
-    var label: String? = null
-
-    override fun toString(): String {
-        return "FolderConfig{folder=$folder, label=$label}"
-    }
-
-}
+data class BlockInfo(val offset: Long, val size: Int, val hash: String)

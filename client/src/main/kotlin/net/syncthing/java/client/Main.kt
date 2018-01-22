@@ -13,10 +13,6 @@
  */
 package net.syncthing.java.client
 
-import com.google.common.base.Preconditions.checkArgument
-import com.google.common.collect.Lists
-import net.syncthing.java.bep.IndexBrowser
-import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.configuration.ConfigurationService
@@ -45,13 +41,13 @@ class Main(private val commandLine: CommandLine) {
             val configFile = if (cmd.hasOption("C")) File(cmd.getOptionValue("C"))
             else                                     File(System.getProperty("user.home"), ".s-client.properties")
 
-            ConfigurationService.newLoader().loadFrom(configFile).use { configuration ->
+            ConfigurationService.Loader().loadFrom(configFile).use { configuration ->
                 SyncthingClient(configuration).use { syncthingClient ->
                     System.out.println("using config file = $configFile")
                     FileUtils.cleanDirectory(configuration.temp)
                     KeystoreHandler.Loader().loadAndStore(configuration)
-                    System.out.println("configuration =\n${configuration.newWriter().dumpToString()}")
-                    System.out.println(configuration.storageInfo.dumpAvailableSpace())
+                    System.out.println("configuration =\n${configuration.Writer().dumpToString()}")
+                    System.out.println(configuration.getStorageInfo().dumpAvailableSpace())
                     val main = Main(cmd)
                     cmd.options.forEach { main.handleOption(it, configuration, syncthingClient) }
                 }
@@ -90,12 +86,12 @@ class Main(private val commandLine: CommandLine) {
                         .filterNot { it.isEmpty() }
                         .toList()
                 System.out.println("set peers = $peers")
-                configuration.edit().setPeers(emptyList<DeviceInfo>())
+                configuration.Editor().setPeers(emptyList())
                 for (peer in peers) {
                     KeystoreHandler.validateDeviceId(peer)
-                    configuration.edit().addPeers(DeviceInfo(peer, null))
+                    configuration.Editor().addPeers(DeviceInfo(peer, null))
                 }
-                configuration.edit().persistNow()
+                configuration.Editor().persistNow()
             }
             "p" -> {
                 val folderAndPath = option.value
@@ -131,7 +127,7 @@ class Main(private val commandLine: CommandLine) {
             "P" -> {
                 var path = option.value
                 val file = File(commandLine.getOptionValue("i"))
-                checkArgument(!path.startsWith("/")) //TODO check path syntax
+                assert(!path.startsWith("/")) //TODO check path syntax
                 System.out.println("file path = $path")
                 val folder = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
                 path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
@@ -221,8 +217,8 @@ class Main(private val commandLine: CommandLine) {
             "a" -> {
                 syncthingClient.discoveryHandler.newDeviceAddressSupplier().use { deviceAddressSupplier ->
                     var deviceAddressesStr = ""
-                    for (deviceAddress in Lists.newArrayList<DeviceAddress>(deviceAddressSupplier)) {
-                        deviceAddressesStr += "\n" + deviceAddress.deviceId + " : " + deviceAddress.address
+                    for (deviceAddress in deviceAddressSupplier.toList()) {
+                        deviceAddressesStr += "\n" + deviceAddress?.deviceId + " : " + deviceAddress?.address
                     }
                     System.out.println("device addresses:\n$deviceAddressesStr\n")
                 }

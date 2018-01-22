@@ -13,37 +13,28 @@
  */
 package net.syncthing.java.client
 
-import com.google.common.collect.Lists
-import com.google.common.collect.Sets
 import com.google.common.eventbus.Subscribe
-import net.syncthing.java.core.beans.DeviceAddress
-import net.syncthing.java.core.beans.FileBlocks
-import net.syncthing.java.core.beans.FileInfo
-import net.syncthing.java.core.cache.BlockCache
-import net.syncthing.java.core.configuration.ConfigurationService
-import net.syncthing.java.core.security.KeystoreHandler
-import net.syncthing.java.devices.DevicesHandler
-import net.syncthing.java.discovery.DeviceAddressSupplier
-import net.syncthing.java.discovery.DiscoveryHandler
-import net.syncthing.java.repository.repo.SqlRepository
 import net.syncthing.java.bep.BlockExchangeConnectionHandler
-import net.syncthing.java.bep.BlockPuller
 import net.syncthing.java.bep.BlockPuller.FileDownloadObserver
 import net.syncthing.java.bep.BlockPusher
 import net.syncthing.java.bep.BlockPusher.FileUploadObserver
 import net.syncthing.java.bep.IndexHandler
-import org.apache.commons.lang3.tuple.Pair
-import org.slf4j.Logger
+import net.syncthing.java.core.beans.DeviceAddress
+import net.syncthing.java.core.beans.FileInfo
+import net.syncthing.java.core.beans.FolderInfo
+import net.syncthing.java.core.cache.BlockCache
+import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.security.KeystoreHandler
+import net.syncthing.java.devices.DevicesHandler
+import net.syncthing.java.discovery.DiscoveryHandler
+import net.syncthing.java.repository.repo.SqlRepository
 import org.slf4j.LoggerFactory
-
 import java.io.Closeable
 import java.io.IOException
 import java.io.InputStream
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
-
-import com.google.common.base.Preconditions.checkNotNull
-import net.syncthing.java.core.beans.FolderInfo
+import kotlin.collections.ArrayList
 
 class SyncthingClient(private val configuration: ConfigurationService) : Closeable {
 
@@ -51,7 +42,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
     val discoveryHandler: DiscoveryHandler
     private val sqlRepository = SqlRepository(configuration)
     val indexHandler: IndexHandler
-    private val connections = Collections.synchronizedList(Lists.newArrayList<BlockExchangeConnectionHandler>())
+    private val connections = Collections.synchronizedList(mutableListOf<BlockExchangeConnectionHandler>())
     val devicesHandler: DevicesHandler
 
     init {
@@ -64,7 +55,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
     fun clearCacheAndIndex() {
         logger.info("clear cache")
         indexHandler.clearIndex()
-        configuration.edit().setFolders(emptyList<FolderInfo>()).persistLater()
+        configuration.Editor().setFolders(emptyList()).persistLater()
         BlockCache.getBlockCache(configuration).clear()
     }
 
@@ -127,7 +118,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
     private fun getPeerConnections(listener: (connection: BlockExchangeConnectionHandler) -> Unit, completeListener: () -> Unit) {
         Thread {
             val addressesSupplier = discoveryHandler.newDeviceAddressSupplier()
-            val connectedDevices = Sets.newHashSet<String>()
+            val connectedDevices = mutableSetOf<String>()
             addressesSupplier
                     .takeWhile { it != null }
                     .filterNotNull()
@@ -152,7 +143,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
         // TODO: if there is already an index update in progress, do nothing
         //       this should probably be handled in IndexHandler
         //       at the moment, this is handled on the Android side
-        val indexUpdateComplete = Sets.newHashSet<String>()
+        val indexUpdateComplete = mutableSetOf<String>()
         getPeerConnections({ connection ->
             try {
                 indexHandler.waitForRemoteIndexAquired(connection)
@@ -161,7 +152,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
                 logger.warn("exception while waiting for index", ex)
             }
         }, {
-            val indexUpdateFailed = Sets.difference(configuration.peerIds, indexUpdateComplete)
+            val indexUpdateFailed = configuration.getPeerIds() - indexUpdateComplete
             listener(indexUpdateComplete, indexUpdateFailed)
         })
     }
@@ -171,8 +162,8 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
         getConnectionForFolder(fileInfo.folder, { connection ->
             try {
                 val fileInfoAndBlocks = indexHandler.waitForRemoteIndexAquired(connection).getFileInfoAndBlocksByPath(fileInfo.folder, fileInfo.path)
-                checkNotNull(fileInfoAndBlocks, "file not found in local index for folder = %s path = %s", fileInfo.folder, fileInfo.path)
-                val observer = connection.getBlockPuller().pullBlocks(fileInfoAndBlocks!!.value)
+                        ?: error("file not found in local index for folder = ${fileInfo.folder} path = ${fileInfo.path}")
+                val observer = connection.getBlockPuller().pullBlocks(fileInfoAndBlocks.value)
                 listener(observer)
             } catch (e: InterruptedException) {
                 logger.warn("Failed to pull file", e)

@@ -13,13 +13,15 @@
  */
 package net.syncthing.java.core.utils
 
-import com.google.common.hash.Hashing
-import com.google.common.io.BaseEncoding
 import net.syncthing.java.core.beans.BlockInfo
+import org.bouncycastle.util.encoders.Hex
+import java.security.MessageDigest
 
 object BlockUtils {
 
     fun hashBlocks(blocks: List<BlockInfo>): String {
-        return BaseEncoding.base16().encode(Hashing.sha256().hashBytes((blocks.map { input -> input.hash }.joinToString(",")).toByteArray()).asBytes())
+        val string = blocks.joinToString(",") { it.hash }.toByteArray()
+        val hash = MessageDigest.getInstance("SHA-256").digest(string)
+        return Hex.toHexString(hash)
     }
 }

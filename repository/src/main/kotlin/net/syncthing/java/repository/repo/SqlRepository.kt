@@ -13,18 +13,10 @@
  */
 package net.syncthing.java.repository.repo
 
-import com.google.common.base.Objects.equal
 import com.google.common.base.Optional
-import com.google.common.base.Preconditions.checkArgument
-import com.google.common.base.Preconditions.checkNotNull
-import com.google.common.base.Strings.emptyToNull
-import com.google.common.base.Strings.nullToEmpty
 import com.google.common.cache.CacheBuilder
 import com.google.common.cache.CacheLoader
-import com.google.common.collect.Iterables
-import com.google.common.collect.Lists
 import com.google.common.eventbus.EventBus
-import com.google.common.io.BaseEncoding
 import com.google.protobuf.ByteString
 import com.google.protobuf.InvalidProtocolBufferException
 import com.zaxxer.hikari.HikariConfig
@@ -41,6 +33,7 @@ import net.syncthing.java.core.interfaces.Sequencer
 import net.syncthing.java.core.interfaces.TempRepository
 import org.apache.commons.lang3.tuple.Pair
 import org.apache.http.util.TextUtils.isBlank
+import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.File
@@ -61,30 +54,23 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     private val indexInfoByDeviceIdAndFolder = CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.DAYS)
             .build(object : CacheLoader<Pair<String, String>, Optional<IndexInfo>>() {
                 @Throws(Exception::class)
-                override fun load(key: Pair<String, String>): Optional<IndexInfo> {
-                    return Optional.fromNullable(doFindIndexInfoByDeviceAndFolder(key.left, key.right))
-                }
-
+                override fun load(key: Pair<String, String>) = Optional.fromNullable(doFindIndexInfoByDeviceAndFolder(key.left, key.right))
             })
     private val folderStatsByFolder = CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.DAYS)
             .build(object : CacheLoader<String, Optional<FolderStats>>() {
                 @Throws(Exception::class)
-                override fun load(key: String): Optional<FolderStats> {
-                    return Optional.fromNullable(doFindFolderStats(key))
-                }
-
+                override fun load(key: String) = Optional.fromNullable(doFindFolderStats(key))
             })
 
-    private val connection: Connection
-        @Throws(SQLException::class)
-        get() = dataSource.connection
+    @Throws(SQLException::class)
+    private fun getConnection() = dataSource.connection
 
     init {
         logger.info("starting sql database")
         val dbDir = File(configuration.database, "h2_index_database")
         dbDir.mkdirs()
-        checkArgument(dbDir.isDirectory && dbDir.canWrite())
-        val jdbcUrl = "jdbc:h2:file:" + File(dbDir, "index").absolutePath + nullToEmpty(configuration.repositoryH2Config)
+        assert(dbDir.isDirectory && dbDir.canWrite())
+        val jdbcUrl = "jdbc:h2:file:" + File(dbDir, "index").absolutePath + (configuration.repositoryH2Config ?: "")
         logger.debug("jdbc url = {}", jdbcUrl)
         val hikariConfig = HikariConfig()
         hikariConfig.driverClassName = "org.h2.Driver"
@@ -113,19 +99,17 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         logger.debug("database ready")
     }
 
-    override fun getEventBus(): EventBus {
-        return eventBus
-    }
+    override fun getEventBus(): EventBus = eventBus
 
     private fun checkDb() {
         logger.debug("check db")
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT version_number FROM version").use { statement ->
                     val resultSet = statement.executeQuery()
-                    checkArgument(resultSet.first())
+                    assert(resultSet.first())
                     val version = resultSet.getInt(1)
-                    checkArgument(version == VERSION, "database version mismatch, expected %s, found %s", VERSION, version)
+                    assert(version == VERSION, {"database version mismatch, expected $VERSION, found $version"})
                     logger.info("database check ok, version = {}", version)
                 }
             }
@@ -139,13 +123,13 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     private fun initDb() {
         logger.info("init db")
         try {
-            connection.use { connection -> connection.prepareStatement("DROP ALL OBJECTS").use { prepareStatement -> prepareStatement.execute() } }
+            getConnection().use { connection -> connection.prepareStatement("DROP ALL OBJECTS").use { prepareStatement -> prepareStatement.execute() } }
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
 
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("CREATE TABLE index_sequence (index_id BIGINT NOT NULL PRIMARY KEY, current_sequence BIGINT NOT NULL)").use { prepareStatement -> prepareStatement.execute() }
                 connection.prepareStatement("CREATE TABLE folder_index_info (folder VARCHAR NOT NULL,"
                         + "device_id VARCHAR NOT NULL,"
@@ -194,11 +178,11 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                     val newStartingSequence = Math.abs(Random().nextLong()) + 1
                     prepareStatement.setLong(1, newIndexId)
                     prepareStatement.setLong(2, newStartingSequence)
-                    checkArgument(prepareStatement.executeUpdate() == 1)
+                    assert(prepareStatement.executeUpdate() == 1)
                 }
                 connection.prepareStatement("INSERT INTO version (version_number) VALUES (?)").use { prepareStatement ->
                     prepareStatement.setInt(1, VERSION)
-                    checkArgument(prepareStatement.executeUpdate() == 1)
+                    assert(prepareStatement.executeUpdate() == 1)
                 }
             }
         } catch (ex: SQLException) {
@@ -211,7 +195,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     private fun recreateTemporaryTables() {
         logger.info("recreateTemporaryTables BEGIN")
         try {
-            connection.use { connection -> connection.prepareStatement("CREATE CACHED TEMPORARY TABLE IF NOT EXISTS temporary_data (record_key VARCHAR NOT NULL PRIMARY KEY," + "record_data BINARY NOT NULL)").use { prepareStatement -> prepareStatement.execute() } }
+            getConnection().use { connection -> connection.prepareStatement("CREATE CACHED TEMPORARY TABLE IF NOT EXISTS temporary_data (record_key VARCHAR NOT NULL PRIMARY KEY," + "record_data BINARY NOT NULL)").use { prepareStatement -> prepareStatement.execute() } }
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
@@ -219,9 +203,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         logger.info("recreateTemporaryTables END")
     }
 
-    override fun getSequencer(): Sequencer {
-        return sequencer
-    }
+    override fun getSequencer(): Sequencer = sequencer
 
     //INDEX INFO
     @Throws(SQLException::class)
@@ -237,7 +219,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
 
     override fun updateIndexInfo(indexInfo: IndexInfo) {
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("MERGE INTO folder_index_info"
                         + " (folder,device_id,index_id,local_sequence,max_sequence)"
                         + " VALUES (?,?,?,?,?)").use { prepareStatement ->
@@ -262,7 +244,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
 
     private fun doFindIndexInfoByDeviceAndFolder(deviceId: String, folder: String): IndexInfo? {
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM folder_index_info WHERE device_id=? AND folder=?").use { prepareStatement ->
                     prepareStatement.setString(1, deviceId)
                     prepareStatement.setString(2, folder)
@@ -277,13 +259,12 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
     }
 
     // FILE INFO
     override fun findFileInfo(folder: String, path: String): FileInfo? {
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM file_info WHERE folder=? AND path=?").use { prepareStatement ->
                     prepareStatement.setString(1, folder)
                     prepareStatement.setString(2, path)
@@ -298,12 +279,11 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
     }
 
     override fun findFileInfoLastModified(folder: String, path: String): Date? {
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT last_modified FROM file_info WHERE folder=? AND path=?").use { prepareStatement ->
                     prepareStatement.setString(1, folder)
                     prepareStatement.setString(2, path)
@@ -318,12 +298,11 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
     }
 
     override fun findNotDeletedFileInfo(folder: String, path: String): FileInfo? {
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM file_info WHERE folder=? AND path=? AND is_deleted=FALSE").use { prepareStatement ->
                     prepareStatement.setString(1, folder)
                     prepareStatement.setString(2, path)
@@ -338,7 +317,6 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
     }
 
     @Throws(SQLException::class)
@@ -355,7 +333,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                 .setLastModified(lastModified)
                 .setVersionList(versionList)
                 .setDeleted(isDeleted)
-        return if (equal(fileType, FileType.DIRECTORY)) {
+        return if (fileType == FileType.DIRECTORY) {
             builder.setTypeDir().build()
         } else {
             builder.setTypeFile().setSize(resultSet.getLong("size")).setHash(resultSet.getString("hash")).build()
@@ -364,7 +342,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
 
     override fun findFileBlocks(folder: String, path: String): FileBlocks? {
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM file_blocks WHERE folder=? AND path=?").use { prepareStatement ->
                     prepareStatement.setString(1, folder)
                     prepareStatement.setString(2, path)
@@ -381,22 +359,23 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: InvalidProtocolBufferException) {
             throw RuntimeException(ex)
         }
-
     }
 
     @Throws(SQLException::class, InvalidProtocolBufferException::class)
     private fun readFileBlocks(resultSet: ResultSet): FileBlocks {
         val blocks = BlockExchangeExtraProtos.Blocks.parseFrom(resultSet.getBytes("blocks"))
-        val blockList = Lists.transform(blocks.blocksList, { record -> BlockInfo(record!!.getOffset(), record.getSize(), BaseEncoding.base16().encode(record.getHash().toByteArray())) })
+        val blockList = blocks.blocksList.map { record ->
+            BlockInfo(record!!.offset, record.size, Hex.toHexString(record.hash.toByteArray()))
+        }
         return FileBlocks(resultSet.getString("folder"), resultSet.getString("path"), blockList)
     }
 
     override fun updateFileInfo(newFileInfo: FileInfo, newFileBlocks: FileBlocks?) {
         var folderStats: FolderStats? = null
-        val version = Iterables.getLast(newFileInfo.versionList)
+        val version = newFileInfo.versionList.last()
         //TODO open transsaction, rollback
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 if (newFileBlocks != null) {
                     FileInfo.checkBlocks(newFileInfo, newFileBlocks)
                     connection.prepareStatement("MERGE INTO file_blocks"
@@ -407,11 +386,11 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                         prepareStatement.setString(3, newFileBlocks.hash)
                         prepareStatement.setLong(4, newFileBlocks.size)
                         prepareStatement.setBytes(5, BlockExchangeExtraProtos.Blocks.newBuilder()
-                                .addAllBlocks(Iterables.transform(newFileBlocks.blocks) { input ->
+                                .addAllBlocks(newFileBlocks.blocks.map { input ->
                                     BlockExchangeProtos.BlockInfo.newBuilder()
-                                            .setOffset(input!!.offset)
+                                            .setOffset(input.offset)
                                             .setSize(input.size)
-                                            .setHash(ByteString.copyFrom(BaseEncoding.base16().decode(input.hash)))
+                                            .setHash(ByteString.copyFrom(Hex.decode(input.hash)))
                                             .build()
                                 }).build().toByteArray())
                         prepareStatement.executeUpdate()
@@ -430,7 +409,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                     prepareStatement.setLong(9, version.id)
                     prepareStatement.setLong(10, version.value)
                     prepareStatement.setBoolean(11, newFileInfo.isDeleted)
-                    if (newFileInfo.isDirectory) {
+                    if (newFileInfo.isDirectory()) {
                         prepareStatement.setNull(5, Types.BIGINT)
                         prepareStatement.setNull(6, Types.VARCHAR)
                     } else {
@@ -445,8 +424,8 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                 var deltaSize: Long = 0
                 val oldMissing = oldFileInfo == null || oldFileInfo.isDeleted
                 val newMissing = newFileInfo.isDeleted
-                val oldSizeMissing = oldMissing || !oldFileInfo!!.isFile
-                val newSizeMissing = newMissing || !newFileInfo.isFile
+                val oldSizeMissing = oldMissing || !oldFileInfo!!.isFile()
+                val newSizeMissing = newMissing || !newFileInfo.isFile()
                 if (!oldSizeMissing) {
                     deltaSize -= oldFileInfo!!.size!!
                 }
@@ -454,16 +433,16 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                     deltaSize += newFileInfo.size!!
                 }
                 if (!oldMissing) {
-                    if (oldFileInfo!!.isFile) {
+                    if (oldFileInfo!!.isFile()) {
                         deltaFileCount--
-                    } else if (oldFileInfo.isDirectory) {
+                    } else if (oldFileInfo.isDirectory()) {
                         deltaDirCount--
                     }
                 }
                 if (!newMissing) {
-                    if (newFileInfo.isFile) {
+                    if (newFileInfo.isFile()) {
                         deltaFileCount++
-                    } else if (newFileInfo.isDirectory) {
+                    } else if (newFileInfo.isDirectory()) {
                         deltaDirCount++
                     }
                 }
@@ -473,7 +452,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
             throw RuntimeException(ex)
         }
 
-        folderStatsByFolder.put(folderStats!!.folder, Optional.of(folderStats))
+        folderStatsByFolder.put(folderStats!!.folder, Optional.fromNullable(folderStats))
         eventBus.post(object : IndexRepository.FolderStatsUpdatedEvent() {
             override fun getFolderStats(): List<FolderStats> {
                 return listOf(folderStats!!)
@@ -482,9 +461,9 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     }
 
     override fun findNotDeletedFilesByFolderAndParent(folder: String, parentPath: String): MutableList<FileInfo> {
-        val list = Lists.newArrayList<FileInfo>()
+        val list = mutableListOf<FileInfo>()
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM file_info WHERE folder=? AND parent=? AND is_deleted=FALSE").use { prepareStatement ->
                     prepareStatement.setString(1, folder)
                     prepareStatement.setString(2, parentPath)
@@ -497,17 +476,16 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
         return list
     }
 
     override fun findFileInfoBySearchTerm(query: String): List<FileInfo> {
-        checkArgument(!isBlank(query))
+        assert(!isBlank(query))
         //        checkArgument(maxResult > 0);
-        val list = Lists.newArrayList<FileInfo>()
+        val list = mutableListOf<FileInfo>()
         //        try (Connection connection = getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM file_info WHERE LOWER(file_name) LIKE ? AND is_deleted=FALSE LIMIT ?")) {
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM file_info WHERE LOWER(file_name) REGEXP ? AND is_deleted=FALSE").use { preparedStatement ->
                     //        try (Connection connection = getConnection(); PreparedStatement prepareStatement = connection.prepareStatement("SELECT * FROM file_info LIMIT 10")) {
                     //            preparedStatement.setString(1, "%" + query.trim().toLowerCase() + "%");
@@ -522,26 +500,24 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
         return list
     }
 
     override fun countFileInfoBySearchTerm(query: String): Long {
-        checkArgument(!isBlank(query))
+        assert(!isBlank(query))
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT COUNT(*) FROM file_info WHERE LOWER(file_name) REGEXP ? AND is_deleted=FALSE").use { preparedStatement ->
                     //        try (Connection connection = getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("SELECT COUNT(*) FROM file_info")) {
                     preparedStatement.setString(1, query.trim { it <= ' ' }.toLowerCase())
                     val resultSet = preparedStatement.executeQuery()
-                    checkArgument(resultSet.first())
+                    assert(resultSet.first())
                     return resultSet.getLong(1)
                 }
             }
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
     }
 
     // FILE INFO - END
@@ -555,7 +531,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     // FOLDER STATS - BEGIN
     @Throws(SQLException::class)
     private fun readFolderStats(resultSet: ResultSet): FolderStats {
-        return FolderStats.newBuilder()
+        return FolderStats.Builder()
                 .setFolder(resultSet.getString("folder"))
                 .setDirCount(resultSet.getLong("dir_count"))
                 .setFileCount(resultSet.getLong("file_count"))
@@ -570,7 +546,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
 
     private fun doFindFolderStats(folder: String): FolderStats? {
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM folder_stats WHERE folder=?").use { prepareStatement ->
                     prepareStatement.setString(1, folder)
                     val resultSet = prepareStatement.executeQuery()
@@ -584,13 +560,12 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
     }
 
     override fun findAllFolderStats(): List<FolderStats> {
-        val list = Lists.newArrayList<FolderStats>()
+        val list = mutableListOf<FolderStats>()
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM folder_stats").use { prepareStatement ->
                     val resultSet = prepareStatement.executeQuery()
                     while (resultSet.next()) {
@@ -603,7 +578,6 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
         return list
     }
 
@@ -612,7 +586,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         val oldFolderStats = findFolderStats(folder)
         val newFolderStats: FolderStats
         if (oldFolderStats == null) {
-            newFolderStats = FolderStats.newBuilder()
+            newFolderStats = FolderStats.Builder()
                     .setDirCount(deltaDirCount)
                     .setFileCount(deltaFileCount)
                     .setFolder(folder)
@@ -687,9 +661,9 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     //    }
     @Throws(SQLException::class)
     private fun updateFolderStats(connection: Connection, folderStats: FolderStats) {
-        checkArgument(folderStats.fileCount >= 0)
-        checkArgument(folderStats.dirCount >= 0)
-        checkArgument(folderStats.size >= 0)
+        assert(folderStats.fileCount >= 0)
+        assert(folderStats.dirCount >= 0)
+        assert(folderStats.size >= 0)
         connection.prepareStatement("MERGE INTO folder_stats"
                 + " (folder,file_count,dir_count,size,last_update)"
                 + " VALUES (?,?,?,?,?)").use { prepareStatement ->
@@ -713,9 +687,8 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
 
     override fun pushTempData(data: ByteArray): String {
         val key = UUID.randomUUID().toString()
-        checkNotNull(data)
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("INSERT INTO temporary_data"
                         + " (record_key,record_data)"
                         + " VALUES (?,?)").use { prepareStatement ->
@@ -727,33 +700,30 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
         return key
     }
 
     override fun popTempData(key: String): ByteArray {
-        checkNotNull<String>(emptyToNull(key))
+        assert(!key.isEmpty())
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 var data: ByteArray? = null
                 connection.prepareStatement("SELECT record_data FROM temporary_data WHERE record_key = ?").use { statement ->
                     statement.setString(1, key)
                     val resultSet = statement.executeQuery()
-                    checkArgument(resultSet.first())
+                    assert(resultSet.first())
                     data = resultSet.getBytes(1)
                 }
                 connection.prepareStatement("DELETE FROM temporary_data WHERE record_key = ?").use { statement ->
                     statement.setString(1, key)
                     val count = statement.executeUpdate()
-                    checkArgument(count == 1)
+                    assert(count == 1)
                 }
-                checkNotNull(data)
                 return data!!
             }
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
     }
 
     //SEQUENCER
@@ -764,10 +734,10 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
 
         @Synchronized private fun loadFromDb() {
             try {
-                connection.use { connection ->
+                getConnection().use { connection ->
                     connection.prepareStatement("SELECT index_id,current_sequence FROM index_sequence").use { statement ->
                         val resultSet = statement.executeQuery()
-                        checkArgument(resultSet.first())
+                        assert(resultSet.first())
                         indexId = resultSet.getLong("index_id")
                         currentSequence = resultSet.getLong("current_sequence")
                         logger.info("loaded index info from db, index_id = {}, current_sequence = {}", indexId, currentSequence)
@@ -776,7 +746,6 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
             } catch (ex: SQLException) {
                 throw RuntimeException(ex)
             }
-
         }
 
         @Synchronized override fun indexId(): Long {
@@ -789,10 +758,10 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         @Synchronized override fun nextSequence(): Long {
             val nextSequence = currentSequence() + 1
             try {
-                connection.use { connection ->
+                getConnection().use { connection ->
                     connection.prepareStatement("UPDATE index_sequence SET current_sequence=?").use { statement ->
                         statement.setLong(1, nextSequence)
-                        checkArgument(statement.executeUpdate() == 1)
+                        assert(statement.executeUpdate() == 1)
                         logger.debug("update local index sequence to {}", nextSequence)
                     }
                 }
@@ -812,11 +781,10 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         }
     }
 
-    /* device BEGIN */
     @Throws(SQLException::class)
     private fun readDeviceAddress(resultSet: ResultSet): DeviceAddress {
         val instanceId = resultSet.getLong("instance_id")
-        return DeviceAddress.newBuilder()
+        return DeviceAddress.Builder()
                 .setAddress(resultSet.getString("address_url"))
                 .setDeviceId(resultSet.getString("device_id"))
                 .setInstanceId(if (instanceId == 0L) null else instanceId)
@@ -827,9 +795,9 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     }
 
     override fun findAllDeviceAddress(): List<DeviceAddress> {
-        val list = Lists.newArrayList<DeviceAddress>()
+        val list = mutableListOf<DeviceAddress>()
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM device_address ORDER BY last_modified DESC").use { prepareStatement ->
                     val resultSet = prepareStatement.executeQuery()
                     while (resultSet.next()) {
@@ -840,13 +808,12 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
         return list
     }
 
     override fun updateDeviceAddress(deviceAddress: DeviceAddress) {
         try {
-            connection.use { connection ->
+            getConnection().use { connection ->
                 connection.prepareStatement("MERGE INTO device_address"
                         + " (device_id,instance_id,address_url,address_producer,address_type,address_score,is_working,last_modified)"
                         + " VALUES (?,?,?,?,?,?,?,?)").use { prepareStatement ->
@@ -858,9 +825,9 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                     }
                     prepareStatement.setString(3, deviceAddress.address)
                     prepareStatement.setString(4, deviceAddress.producer.name)
-                    prepareStatement.setString(5, deviceAddress.type.name)
+                    prepareStatement.setString(5, deviceAddress.getType().name)
                     prepareStatement.setInt(6, deviceAddress.score)
-                    prepareStatement.setBoolean(7, deviceAddress.isWorking)
+                    prepareStatement.setBoolean(7, deviceAddress.isWorking())
                     prepareStatement.setLong(8, deviceAddress.lastModified.time)
                     prepareStatement.executeUpdate()
                 }
@@ -868,12 +835,9 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
     }
 
     companion object {
         private val VERSION = 13
     }
-
-    /* device END */
 }

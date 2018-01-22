@@ -13,8 +13,6 @@
  */
 package net.syncthing.java.discovery.protocol
 
-import com.google.common.base.Preconditions.checkArgument
-import com.google.common.collect.HashMultimap
 import com.google.common.eventbus.AsyncEventBus
 import com.google.common.eventbus.Subscribe
 import com.google.protobuf.ByteString
@@ -23,6 +21,7 @@ import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.events.DeviceAddressReceivedEvent
 import net.syncthing.java.core.security.KeystoreHandler
+import net.syncthing.java.core.utils.NetworkUtils
 import net.syncthing.java.discovery.protocol.LocalDiscoveryProtos.Announce
 import org.apache.commons.io.IOUtils
 import org.slf4j.LoggerFactory
@@ -51,7 +50,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
     private val listeningExecutor = Executors.newSingleThreadScheduledExecutor()
     private val processingExecutor = Executors.newCachedThreadPool()
     val eventBus = AsyncEventBus(processingExecutor)
-    private val localDiscoveryRecords = HashMultimap.create<String, DeviceAddress>()
+    private val localDiscoveryRecords = mutableMapOf<String, List<DeviceAddress>>()
 
     private var datagramSocket: DatagramSocket? = null
 
@@ -79,7 +78,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
         }
         close()
         synchronized(localDiscoveryRecords) {
-            return localDiscoveryRecords.get(deviceId)
+            return localDiscoveryRecords[deviceId] ?: listOf()
         }
     }
 
@@ -89,7 +88,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
                 val out = ByteArrayOutputStream()
                 DataOutputStream(out).writeInt(MAGIC)
                 Announce.newBuilder()
-                        .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId)))
+                        .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId!!)))
                         .setInstanceId(configuration.instanceId)
                         .build().writeTo(out)
                 val data = out.toByteArray()
@@ -156,7 +155,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
             val byteBuffer = ByteBuffer.wrap(
                     datagramPacket.data, datagramPacket.offset, datagramPacket.length)
             val magic = byteBuffer.int
-            checkArgument(magic == MAGIC, "magic mismatch, expected %s, got %s", MAGIC, magic)
+            NetworkUtils.assertProtocol(magic == MAGIC, {"magic mismatch, expected $MAGIC, got $magic"})
             val announce = Announce.parseFrom(ByteString.copyFrom(byteBuffer))
             val deviceId = KeystoreHandler.hashDataToDeviceIdString(announce.id.toByteArray())
 
@@ -164,7 +163,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
             if (deviceId == configuration.deviceId)
                 return
 
-            if (!configuration.peerIds.contains(deviceId)) {
+            if (!configuration.getPeerIds().contains(deviceId)) {
                 logger.trace("Received local announce from $deviceId which is not a peer, ignoring")
                 return
             }
@@ -175,7 +174,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
                 // When interpreting addresses with an unspecified address, e.g.,
                 // tcp://0.0.0.0:22000 or tcp://:42424, the source address of the
                 // discovery announcement is to be used.
-                DeviceAddress.newBuilder()
+                DeviceAddress.Builder()
                         .setAddress(address.replaceFirst("tcp://(0.0.0.0|):".toRegex(), "tcp://$sourceAddress:"))
                         .setDeviceId(deviceId)
                         .setInstanceId(announce.instanceId)
@@ -184,8 +183,8 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
             }
             var isNew = false
             synchronized(localDiscoveryRecords) {
-                isNew = !localDiscoveryRecords.removeAll(deviceId).isEmpty()
-                localDiscoveryRecords.putAll(deviceId, deviceAddresses)
+                isNew = localDiscoveryRecords.remove(deviceId)?.isEmpty() == false
+                localDiscoveryRecords.put(deviceId, deviceAddresses)
             }
             eventBus.post(object : MessageReceivedEvent() {
 

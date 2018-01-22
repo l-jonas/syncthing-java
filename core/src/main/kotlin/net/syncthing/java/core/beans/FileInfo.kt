@@ -13,19 +13,9 @@
  */
 package net.syncthing.java.core.beans
 
-import com.google.common.base.MoreObjects
-import com.google.common.base.Strings
-import com.google.common.collect.Iterables
-import com.google.common.collect.Lists
 import net.syncthing.java.core.utils.PathUtils
 import org.apache.commons.io.FileUtils
-import java.util.Collections
-import java.util.Date
-
-import com.google.common.base.Objects.equal
-import com.google.common.base.Preconditions.checkArgument
-import com.google.common.base.Preconditions.checkNotNull
-import com.google.common.base.Strings.emptyToNull
+import java.util.*
 
 class FileInfo private constructor(val folder: String, val type: FileType, val path: String, size: Long?, lastModified: Date?, hash: String?, versionList: List<Version>?, val isDeleted: Boolean) {
     val fileName: String
@@ -35,16 +25,12 @@ class FileInfo private constructor(val folder: String, val type: FileType, val p
     val lastModified: Date
     val versionList: List<Version>
 
-    val isDirectory: Boolean
-        get() = equal(type, FileType.DIRECTORY)
+    fun isDirectory(): Boolean = type == FileType.DIRECTORY
 
-    val isFile: Boolean
-        get() = equal(type, FileType.FILE)
+    fun isFile(): Boolean = type == FileType.FILE
 
     init {
-        checkNotNull<String>(Strings.emptyToNull(folder))
-        checkNotNull(path)//allow empty for 'fake' root path
-        checkNotNull(type)
+        assert(!folder.isEmpty())
         if (PathUtils.isParent(path)) {
             this.fileName = PathUtils.PARENT_PATH
             this.parent = PathUtils.ROOT_PATH
@@ -52,29 +38,27 @@ class FileInfo private constructor(val folder: String, val type: FileType, val p
             this.fileName = PathUtils.getFileName(path)
             this.parent = if (PathUtils.isRoot(path)) PathUtils.ROOT_PATH else PathUtils.getParentPath(path)
         }
-        this.lastModified = MoreObjects.firstNonNull(lastModified, Date(0))
+        this.lastModified = lastModified ?: Date(0)
         if (type == FileType.DIRECTORY) {
             this.size = null
             this.hash = null
         } else {
-            checkNotNull<Long>(size)
-            checkNotNull<String>(emptyToNull(hash))
+            assert(size != null)
+            assert(!hash.isNullOrEmpty())
             this.size = size
             this.hash = hash
         }
-        this.versionList = Collections.unmodifiableList(MoreObjects.firstNonNull(versionList, emptyList()))
+        this.versionList = versionList ?: emptyList()
     }
 
     enum class FileType {
         FILE, DIRECTORY
     }
 
-    fun describeSize(): String {
-        return if (isFile) FileUtils.byteCountToDisplaySize(size!!) else ""
-    }
+    fun describeSize(): String = if (isFile()) FileUtils.byteCountToDisplaySize(size!!) else ""
 
     override fun toString(): String {
-        return "FileRecord{" + "folder=" + folder + ", path=" + path + ", size=" + size + ", lastModified=" + lastModified + ", type=" + type + ", last version = " + Iterables.getLast(versionList, null) + '}'
+        return "FileRecord{" + "folder=" + folder + ", path=" + path + ", size=" + size + ", lastModified=" + lastModified + ", type=" + type + ", last version = " + versionList.lastOrNull() + '}'
     }
 
     class Version(val id: Long, val value: Long) {
@@ -151,7 +135,7 @@ class FileInfo private constructor(val folder: String, val type: FileType, val p
         }
 
         fun setVersionList(versionList: Iterable<Version>?): Builder {
-            this.versionList = if (versionList == null) null else Lists.newArrayList(versionList)
+            this.versionList = versionList?.toList()
             return this
         }
 
@@ -182,11 +166,11 @@ class FileInfo private constructor(val folder: String, val type: FileType, val p
     companion object {
 
         fun checkBlocks(fileInfo: FileInfo, fileBlocks: FileBlocks) {
-            checkArgument(equal(fileBlocks.folder, fileInfo.folder), "file info folder not match file block folder")
-            checkArgument(equal(fileBlocks.path, fileInfo.path), "file info path does not match file block path")
-            checkArgument(fileInfo.isFile, "file info must be of type 'FILE' to have blocks")
-            checkArgument(equal(fileBlocks.size, fileInfo.size), "file info size does not match file block size")
-            checkArgument(equal(fileBlocks.hash, fileInfo.hash), "file info hash does not match file block hash")
+            assert(fileBlocks.folder == fileInfo.folder, {"file info folder not match file block folder"})
+            assert(fileBlocks.path == fileInfo.path, {"file info path does not match file block path"})
+            assert(fileInfo.isFile(), {"file info must be of type 'FILE' to have blocks"})
+            assert(fileBlocks.size == fileInfo.size, {"file info size does not match file block size"})
+            assert(fileBlocks.hash == fileInfo.hash, {"file info hash does not match file block hash"})
         }
     }
 

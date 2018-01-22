@@ -44,7 +44,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
     private var shouldLoadFromGlobal = true
     private var shouldStartLocalDiscovery = true
 
-    fun getAllWorkingDeviceAddresses() = deviceAddressMap.values.filter { it.isWorking }
+    fun getAllWorkingDeviceAddresses() = deviceAddressMap.values.filter { it.isWorking() }
 
     init {
         logger.info("Initializing discovery handler")
@@ -74,7 +74,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
         if (shouldLoadFromGlobal) {
             shouldLoadFromGlobal = false //TODO timeout for reload
             executorService.submit {
-                for (deviceId in configuration.peerIds) {
+                for (deviceId in configuration.getPeerIds()) {
                     globalDiscoveryHandler.query(deviceId, this::processDeviceAddressBg)
                 }
             }
@@ -88,7 +88,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
             executorService.submit {
                 logger.info("processing device address list")
                 val list = deviceAddresses.toList()
-                val peers = configuration.peerIds.toSet()
+                val peers = configuration.getPeerIds().toSet()
                 //do not process address already processed
                 list.filter { deviceAddress ->
                     !peers.contains(deviceAddress.deviceId) || deviceAddressMap.containsKey(Pair.of(deviceAddress.deviceId, deviceAddress.address))

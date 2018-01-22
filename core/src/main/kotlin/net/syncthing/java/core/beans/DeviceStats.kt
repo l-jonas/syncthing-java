@@ -13,21 +13,14 @@
  */
 package net.syncthing.java.core.beans
 
-import java.util.Date
-
-import com.google.common.base.Preconditions.checkNotNull
-import com.google.common.base.Strings.emptyToNull
-import org.apache.commons.lang3.StringUtils.isBlank
+import java.util.*
 
 class DeviceStats private constructor(val deviceId: String, name: String, val lastActive: Date, val lastSeen: Date, val status: DeviceStatus) {
     val name: String
 
     init {
-        checkNotNull<String>(emptyToNull(deviceId))
-        checkNotNull(status)
-        checkNotNull(lastActive)
-        checkNotNull(lastSeen)
-        this.name = if (isBlank(name)) deviceId.substring(0, 7) else name
+        assert(!deviceId.isEmpty())
+        this.name = if (name.isBlank()) deviceId.substring(0, 7) else name
     }
 
     fun copyBuilder(): Builder {
@@ -52,7 +45,7 @@ class DeviceStats private constructor(val deviceId: String, name: String, val la
 
         private var status = DeviceStatus.OFFLINE
 
-        internal constructor() {}
+        internal constructor()
 
         internal constructor(deviceId: String, name: String, lastActive: Date, lastSeen: Date, status: DeviceStatus) {
             this.deviceId = deviceId

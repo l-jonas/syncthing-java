@@ -14,22 +14,22 @@
 package net.syncthing.java.bep
 
 import com.google.common.eventbus.Subscribe
-import com.google.common.hash.Hashing
-import com.google.common.io.BaseEncoding
 import com.google.protobuf.ByteString
-import net.syncthing.java.bep.BlockExchangeConnectionHandler.Companion.assertProtocol
 import net.syncthing.java.bep.BlockExchangeConnectionHandler.ResponseMessageReceivedEvent
 import net.syncthing.java.bep.BlockExchangeProtos.ErrorCode
 import net.syncthing.java.bep.BlockExchangeProtos.Request
 import net.syncthing.java.core.beans.FileBlocks
 import net.syncthing.java.core.cache.BlockCache
 import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.io.FileUtils
+import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
 import java.io.Closeable
 import java.io.InputStream
 import java.io.SequenceInputStream
+import java.security.MessageDigest
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
@@ -46,7 +46,7 @@ class BlockPuller internal constructor(configuration: ConfigurationService,
 
     fun pullBlocks(fileBlocks: FileBlocks): FileDownloadObserver {
         logger.info("pulling file = {}", fileBlocks)
-        assertProtocol(connectionHandler.hasFolder(fileBlocks.folder), {"supplied connection handler $connectionHandler will not share folder ${fileBlocks.folder}"})
+        NetworkUtils.assertProtocol(connectionHandler.hasFolder(fileBlocks.folder), {"supplied connection handler $connectionHandler will not share folder ${fileBlocks.folder}"})
         val lock = Object()
         val error = AtomicReference<Exception>()
         val listener = object : Any() {
@@ -56,9 +56,9 @@ class BlockPuller internal constructor(configuration: ConfigurationService,
                     if (!requestIds.contains(event.message.id)) {
                         return
                     }
-                    assertProtocol(event.message.code == ErrorCode.NO_ERROR, {"received error response, code = ${event.message.code}"})
+                    NetworkUtils.assertProtocol(event.message.code == ErrorCode.NO_ERROR, {"received error response, code = ${event.message.code}"})
                     val data = event.message.data.toByteArray()
-                    val hash = BaseEncoding.base16().encode(Hashing.sha256().hashBytes(data).asBytes())
+                    val hash = Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(data))
                     blockCache.pushBlock(data)
                     if (missingHashes.remove(hash)) {
                         blocksByHash.put(hash, data)
@@ -84,7 +84,7 @@ class BlockPuller internal constructor(configuration: ConfigurationService,
             override fun isCompleted() = missingHashes.isEmpty()
 
             override fun inputStream(): InputStream {
-                    assertProtocol(missingHashes.isEmpty(), {"pull failed, some blocks are still missing"})
+                    NetworkUtils.assertProtocol(missingHashes.isEmpty(), {"pull failed, some blocks are still missing"})
                     val blockList = hashList.map { blocksByHash[it] }.toList()
                     return SequenceInputStream(Collections.enumeration(blockList.map { ByteArrayInputStream(it) }))
                 }
@@ -135,7 +135,7 @@ class BlockPuller internal constructor(configuration: ConfigurationService,
                             .setName(fileBlocks.path)
                             .setOffset(block.offset)
                             .setSize(block.size)
-                            .setHash(ByteString.copyFrom(BaseEncoding.base16().decode(block.hash)))
+                            .setHash(ByteString.copyFrom(Hex.decode(block.hash)))
                             .build())
                     logger.debug("sent request for block, hash = {}", block.hash)
                 }

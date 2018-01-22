@@ -46,7 +46,7 @@ internal class AddressRanker private constructor(private val sourceAddresses: Li
     private fun addHttpRelays(list: List<DeviceAddress>): List<DeviceAddress> {
         val httpRelays = list
                 .filter { address ->
-                    address.type == AddressType.RELAY && address.containsUriParamValue("httpUrl")
+                    address.getType() == AddressType.RELAY && address.containsUriParamValue("httpUrl")
                 }
                 .map { address ->
                     val httpUrl = address.getUriParam("httpUrl")
@@ -57,7 +57,7 @@ internal class AddressRanker private constructor(private val sourceAddresses: Li
 
     private fun testAndRankAndWait(): List<DeviceAddress> {
         return addHttpRelays(sourceAddresses)
-                .filter { ACCEPTED_ADDRESS_TYPES.contains(it.type) }
+                .filter { ACCEPTED_ADDRESS_TYPES.contains(it.getType()) }
                 .map { executorService.submit<DeviceAddress> { pingAddresses(it) } }
                 .mapNotNull { future ->
                     try {
@@ -78,7 +78,7 @@ internal class AddressRanker private constructor(private val sourceAddresses: Li
         try {
             Socket().use { socket ->
                 socket.soTimeout = TCP_CONNECTION_TIMEOUT
-                socket.connect(deviceAddress.socketAddress, TCP_CONNECTION_TIMEOUT)
+                socket.connect(deviceAddress.getSocketAddress(), TCP_CONNECTION_TIMEOUT)
             }
         } catch (ex: IOException) {
             logger.debug("address unreacheable = {}", deviceAddress, ex)
@@ -87,7 +87,7 @@ internal class AddressRanker private constructor(private val sourceAddresses: Li
         val ping = (System.currentTimeMillis() - startTime).toInt()
         logger.debug("tcp connection to address = {} is ok, time = {} ms", deviceAddress, ping)
 
-        val baseScore = BASE_SCORE_MAP[deviceAddress.type] ?: 0
+        val baseScore = BASE_SCORE_MAP[deviceAddress.getType()] ?: 0
         return deviceAddress.copyBuilder().setScore(ping + baseScore).build()
     }
 

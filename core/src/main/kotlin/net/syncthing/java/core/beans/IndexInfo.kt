@@ -13,16 +13,13 @@
  */
 package net.syncthing.java.core.beans
 
-import com.google.common.base.Preconditions.checkNotNull
-import com.google.common.base.Strings.emptyToNull
 
 class IndexInfo private constructor(folder: String, val deviceId: String, val indexId: Long, val localSequence: Long, val maxSequence: Long) : FolderInfo(folder) {
 
-    val completed: Double
-        get() = if (maxSequence > 0) localSequence.toDouble() / maxSequence else 0.0
+    fun getCompleted(): Double = if (maxSequence > 0) localSequence.toDouble() / maxSequence else 0.0
 
     init {
-        checkNotNull<String>(emptyToNull(deviceId))
+        assert(!deviceId.isEmpty())
     }
 
     fun copyBuilder(): Builder {
@@ -41,11 +38,11 @@ class IndexInfo private constructor(folder: String, val deviceId: String, val in
         private var localSequence: Long = 0
         private var maxSequence: Long = 0
 
-        internal constructor() {}
+        internal constructor()
 
         internal constructor(folder: String, indexId: Long, deviceId: String, localSequence: Long, maxSequence: Long) {
-            checkNotNull<String>(emptyToNull(folder))
-            checkNotNull<String>(emptyToNull(deviceId))
+            assert(!folder.isEmpty())
+            assert(!deviceId.isEmpty())
             this.folder = folder
             this.indexId = indexId
             this.deviceId = deviceId

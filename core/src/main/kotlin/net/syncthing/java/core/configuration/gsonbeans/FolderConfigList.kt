@@ -11,19 +11,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.syncthing.java.core.utils
+package net.syncthing.java.core.configuration.gsonbeans
 
-import net.syncthing.java.core.configuration.ConfigurationService
-
-import java.io.File
-import java.util.UUID
-
-object FileUtils {
-
-    fun createTempFile(configuration: ConfigurationService): File {
-        val tempFile = File(configuration.temp, UUID.randomUUID().toString())
-        tempFile.deleteOnExit()
-        return tempFile
-    }
-
-}
+data class FolderConfigList(val folders: MutableList<FolderConfig> = mutableListOf())

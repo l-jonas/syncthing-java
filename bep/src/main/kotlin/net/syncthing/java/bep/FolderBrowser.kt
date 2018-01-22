@@ -27,7 +27,7 @@ class FolderBrowser internal constructor(private val indexHandler: IndexHandler)
             .build(object : CacheLoader<String, FolderStats>() {
                 @Throws(Exception::class)
                 override fun load(folder: String): FolderStats {
-                    return FolderStats.newBuilder()
+                    return FolderStats.Builder()
                             .setFolder(folder)
                             .build()
                 }

@@ -11,14 +11,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.syncthing.java.core.beans
+package net.syncthing.java.core.configuration.gsonbeans
 
-import com.google.common.base.Preconditions.checkNotNull
-
-class BlockInfo(val offset: Long, val size: Int, val hash: String) {
-
-    init {
-        checkNotNull(hash)
-    }
-
-}
+data class FolderConfig(val folder: String, val label: String)

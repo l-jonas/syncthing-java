@@ -13,24 +13,15 @@
  */
 package net.syncthing.java.core.cache
 
-import com.google.common.collect.Iterables
-import com.google.common.collect.Lists
-import com.google.common.collect.Ordering
-import com.google.common.hash.Hashing
-import com.google.common.io.BaseEncoding
 import org.apache.commons.io.FileUtils
-import org.slf4j.Logger
+import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
-import java.util.Collections
-import java.util.concurrent.ExecutorService
+import java.security.MessageDigest
 import java.util.concurrent.Executors
 
-import com.google.common.base.Objects.equal
-import com.google.common.base.Preconditions.checkArgument
-
-class FileBlockCache(private val dir: File) : BlockCache() {
+internal class FileBlockCache(private val dir: File) : BlockCache() {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private var size: Long = 0
@@ -39,13 +30,13 @@ class FileBlockCache(private val dir: File) : BlockCache() {
         if (!dir.exists()) {
             dir.mkdirs()
         }
-        checkArgument(dir.isDirectory && dir.canWrite())
+        assert(dir.isDirectory && dir.canWrite())
         size = FileUtils.sizeOfDirectory(dir)
         runCleanup()
     }
 
     override fun pushBlock(data: ByteArray): String? {
-        val code = BaseEncoding.base16().encode(Hashing.sha256().hashBytes(data).asBytes())
+        val code = Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(data))
         return if (pushData(code, data)) code else null
     }
 
@@ -53,10 +44,10 @@ class FileBlockCache(private val dir: File) : BlockCache() {
         val MAX_SIZE = (50 * 1024 * 1024).toLong()
         if (size > MAX_SIZE) {
             logger.info("starting cleanup of cache directory, initial size = {}", FileUtils.byteCountToDisplaySize(size))
-            val files = Lists.newArrayList(*dir.listFiles()!!)
+            val files = mutableListOf(*dir.listFiles()!!)
             files.sortBy { it.lastModified() }
             val PERC_TO_DELETE = 0.5
-            for (file in Iterables.limit(files, (files.size * PERC_TO_DELETE).toInt())) {
+            for (file in files.take((files.size * PERC_TO_DELETE).toInt())) {
                 logger.debug("delete file {}", file)
                 FileUtils.deleteQuietly(file)
             }
@@ -76,8 +67,8 @@ class FileBlockCache(private val dir: File) : BlockCache() {
             try {
                 val data = FileUtils.readFileToByteArray(file)
                 if (shouldCheck) {
-                    val cachedDataCode = BaseEncoding.base16().encode(Hashing.sha256().hashBytes(data).asBytes())
-                    checkArgument(equal(code, cachedDataCode), "cached data code %s does not match code %s", cachedDataCode, code)
+                    val cachedDataCode = Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(data))
+                    assert(code == cachedDataCode, {"cached data code $cachedDataCode does not match code $code"})
                 }
                 writerThread.submit {
                     try {

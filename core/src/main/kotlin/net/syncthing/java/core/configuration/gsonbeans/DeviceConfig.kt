@@ -13,12 +13,4 @@
  */
 package net.syncthing.java.core.configuration.gsonbeans
 
-class DeviceConfig {
-    var deviceId: String? = null
-    var name: String? = null
-
-    override fun toString(): String {
-        return "DeviceConfig{deviceId=$deviceId, name=$name}"
-    }
-
-}
+data class DeviceConfig(val deviceId: String, val name: String)

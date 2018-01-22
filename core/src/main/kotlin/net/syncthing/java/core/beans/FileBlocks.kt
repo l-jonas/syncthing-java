@@ -13,25 +13,18 @@
  */
 package net.syncthing.java.core.beans
 
-import com.google.common.collect.Lists
 import net.syncthing.java.core.utils.BlockUtils
 
-import java.util.Collections
-
-import com.google.common.base.Preconditions.checkNotNull
-import com.google.common.base.Strings.emptyToNull
-
-class FileBlocks(val folder: String, val path: String, blocks: Iterable<BlockInfo>) {
+class FileBlocks(val folder: String, val path: String, blocks: List<BlockInfo>) {
 
     val blocks: List<BlockInfo>
     val hash: String
     val size: Long
 
     init {
-        checkNotNull<String>(emptyToNull(folder))
-        checkNotNull<String>(emptyToNull(path))
-        checkNotNull(blocks)
-        this.blocks = Collections.unmodifiableList(Lists.newArrayList(blocks))
+        assert(!folder.isEmpty())
+        assert(!path.isEmpty())
+        this.blocks = blocks.toList()
         var num: Long = 0
         for (block in blocks) {
             num += block.size.toLong()

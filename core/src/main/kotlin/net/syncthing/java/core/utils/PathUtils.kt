@@ -13,11 +13,7 @@
  */
 package net.syncthing.java.core.utils
 
-import com.google.common.base.Strings
 import org.apache.commons.io.FilenameUtils
-
-import com.google.common.base.Objects.equal
-import com.google.common.base.Preconditions.checkArgument
 
 object PathUtils {
 
@@ -25,20 +21,20 @@ object PathUtils {
     val PATH_SEPARATOR = "/"
     val PARENT_PATH = ".."
 
-    fun normalizePath(path: String): String {
+    private fun normalizePath(path: String): String {
         return FilenameUtils.normalizeNoEndSeparator(path, true).replaceFirst(("^" + PATH_SEPARATOR).toRegex(), "")
     }
 
     fun isRoot(path: String): Boolean {
-        return Strings.isNullOrEmpty(path)
+        return path.isEmpty()
     }
 
     fun isParent(path: String): Boolean {
-        return equal(path, PARENT_PATH)
+        return path == PARENT_PATH
     }
 
     fun getParentPath(path: String): String {
-        checkArgument(!isRoot(path), "cannot get parent of root path")
+        assert(!isRoot(path), {"cannot get parent of root path"})
         return normalizePath(path + PATH_SEPARATOR + PARENT_PATH)
     }
 

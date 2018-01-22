@@ -13,16 +13,12 @@
  */
 package net.syncthing.java.core.beans
 
-import com.google.common.base.MoreObjects.firstNonNull
-import com.google.common.base.Preconditions.checkNotNull
-import com.google.common.base.Strings.emptyToNull
-
 open class FolderInfo @JvmOverloads constructor(val folder: String, label: String? = null) {
     val label: String
 
     init {
-        checkNotNull<String>(emptyToNull(folder))
-        this.label = firstNonNull(emptyToNull(label), folder)
+        assert(!folder.isEmpty())
+        this.label = if (label != null && !label.isEmpty()) label else folder
     }
 
     override fun toString(): String {

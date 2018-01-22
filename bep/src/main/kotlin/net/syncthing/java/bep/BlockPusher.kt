@@ -14,7 +14,6 @@
 package net.syncthing.java.bep
 
 import com.google.common.eventbus.Subscribe
-import net.syncthing.java.bep.BlockExchangeConnectionHandler.Companion.assertProtocol
 import com.google.common.hash.Hashing
 import com.google.common.io.BaseEncoding
 import com.google.protobuf.ByteString
@@ -25,10 +24,11 @@ import net.syncthing.java.core.beans.FileInfo.Version
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.BlockUtils
-import net.syncthing.java.core.utils.FileUtils.createTempFile
+import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.tuple.Pair
+import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.ByteBuffer
@@ -46,7 +46,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun pushDelete(fileInfo: FileInfo, folder: String, path: String): IndexEditObserver {
-        assertProtocol(connectionHandler.hasFolder(fileInfo.folder), {"supplied connection handler $connectionHandler will not share folder ${fileInfo.folder}"})
+        NetworkUtils.assertProtocol(connectionHandler.hasFolder(fileInfo.folder), {"supplied connection handler $connectionHandler will not share folder ${fileInfo.folder}"})
         return IndexEditObserver(sendIndexUpdate(folder, BlockExchangeProtos.FileInfo.newBuilder()
                 .setName(path)
                 .setType(FileInfoType.valueOf(fileInfo.type.name))
@@ -54,7 +54,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
     }
 
     fun pushDir(folder: String, path: String): IndexEditObserver {
-        assertProtocol(connectionHandler.hasFolder(folder), {"supplied connection handler $connectionHandler will not share folder $folder"})
+        NetworkUtils.assertProtocol(connectionHandler.hasFolder(folder), {"supplied connection handler $connectionHandler will not share folder $folder"})
         return IndexEditObserver(sendIndexUpdate(folder, BlockExchangeProtos.FileInfo.newBuilder()
                 .setName(path)
                 .setType(BlockExchangeProtos.FileInfoType.DIRECTORY), null))
@@ -74,7 +74,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
     }
 
     fun pushFile(dataSource: DataSource, fileInfo: FileInfo?, folder: String, path: String): FileUploadObserver {
-        assertProtocol(connectionHandler.hasFolder(folder), {"supplied connection handler $connectionHandler will not share folder $folder"})
+        NetworkUtils.assertProtocol(connectionHandler.hasFolder(folder), {"supplied connection handler $connectionHandler will not share folder $folder"})
         assert(fileInfo == null || fileInfo.folder == folder)
         assert(fileInfo == null || fileInfo.path == path)
         val monitoringProcessExecutorService = Executors.newCachedThreadPool()
@@ -88,7 +88,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
             fun handleRequestMessageReceivedEvent(event: BlockExchangeConnectionHandler.RequestMessageReceivedEvent) {
                 val request = event.message
                 if (request.folder == folder && request.name == path) {
-                    val hash = BaseEncoding.base16().encode(request.hash.toByteArray())
+                    val hash = Hex.toHexString(request.hash.toByteArray())
                     logger.debug("handling block request = {}:{}-{} ({})", request.name, request.offset, request.size, hash)
                     val data = dataSource.getBlock(request.offset, request.size, hash)
                     val future = connectionHandler.sendMessage(Response.newBuilder()
@@ -180,7 +180,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
             val nextSequence = indexHandler.sequencer().nextSequence()
             val list = oldVersions ?: emptyList()
             logger.debug("version list = {}", list)
-            val id = ByteBuffer.wrap(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId)).long
+            val id = ByteBuffer.wrap(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId!!)).long
             val version = Counter.newBuilder()
                     .setId(id)
                     .setValue(nextSequence)
@@ -202,6 +202,12 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
                 .build()
         logger.debug("index update = {}", fileInfo)
         return Pair.of(connectionHandler.sendMessage(indexUpdate), indexUpdate)
+    }
+
+    fun createTempFile(configuration: ConfigurationService): File {
+        val tempFile = File(configuration.temp, UUID.randomUUID().toString())
+        tempFile.deleteOnExit()
+        return tempFile
     }
 
     abstract inner class FileUploadObserver : Closeable {
@@ -229,28 +235,22 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
     inner class IndexEditObserver(private val future: Future<*>, val indexUpdate: IndexUpdate) : Closeable {
 
         //throw exception if job has errors
-        val isCompleted: Boolean
-            get() {
-                return if (future.isDone) {
-                    try {
-                        future.get()
-                    } catch (ex: InterruptedException) {
-                        throw RuntimeException(ex)
-                    } catch (ex: ExecutionException) {
-                        throw RuntimeException(ex)
-                    }
-                    true
-                } else {
-                    false
+        fun isCompleted(): Boolean {
+            return if (future.isDone) {
+                try {
+                    future.get()
+                } catch (ex: InterruptedException) {
+                    throw RuntimeException(ex)
+                } catch (ex: ExecutionException) {
+                    throw RuntimeException(ex)
                 }
+                true
+            } else {
+                false
             }
-
-        init {
-            checkNotNull(future)
-            checkNotNull(indexUpdate)
         }
 
-        constructor(pair: Pair<Future<*>, IndexUpdate>) : this(pair.left, pair.right) {}
+        constructor(pair: Pair<Future<*>, IndexUpdate>) : this(pair.left, pair.right)
 
         @Throws(InterruptedException::class)
         fun waitForComplete() {
@@ -350,7 +350,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
                 inputStream.use { it ->
                     IOUtils.skipFully(it, offset)
                     IOUtils.readFully(it, buffer)
-                    assertProtocol(BaseEncoding.base16().encode(Hashing.sha256().hashBytes(buffer).asBytes()) == hash, {"block hash mismatch!"})
+                    NetworkUtils.assertProtocol(BaseEncoding.base16().encode(Hashing.sha256().hashBytes(buffer).asBytes()) == hash, {"block hash mismatch!"})
                     return buffer
                 }
             } catch (ex: IOException) {

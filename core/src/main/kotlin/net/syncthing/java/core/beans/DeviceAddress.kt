@@ -13,94 +13,69 @@
  */
 package net.syncthing.java.core.beans
 
-import com.google.common.base.Preconditions
-import com.google.common.base.Strings
-import com.google.common.collect.ImmutableMap
-import com.google.common.collect.Iterables
-import org.apache.http.NameValuePair
 import org.apache.http.client.utils.URLEncodedUtils
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URI
 import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
-import java.util.Date
-import java.util.Objects
-
-import com.google.common.base.MoreObjects.firstNonNull
-import com.google.common.base.Objects.equal
-import com.google.common.base.Strings.emptyToNull
+import java.util.*
 
 class DeviceAddress private constructor(val deviceId: String, val instanceId: Long?, val address: String, producer: AddressProducer?, score: Int?, lastModified: Date?) {
     val producer: AddressProducer
     val score: Int
     val lastModified: Date
 
-    val inetAddress: InetAddress
-        @Throws(UnknownHostException::class)
-        get() = InetAddress.getByName(address.replaceFirst("^[^:]+://".toRegex(), "").replaceFirst("(:[0-9]+)?(/.*)?$".toRegex(), ""))
+    @Throws(UnknownHostException::class)
+    private fun getInetAddress(): InetAddress = InetAddress.getByName(address.replaceFirst("^[^:]+://".toRegex(), "").replaceFirst("(:[0-9]+)?(/.*)?$".toRegex(), ""))
 
-    val port: Int
-        get() = if (address.matches("^[a-z]+://[^:]+:([0-9]+).*".toRegex())) {
+    private fun getPort(): Int = if (address.matches("^[a-z]+://[^:]+:([0-9]+).*".toRegex())) {
             Integer.parseInt(address.replaceFirst("^[a-z]+://[^:]+:([0-9]+).*".toRegex(), "$1"))
         } else {
-            DEFAULT_PORT_BY_PROTOCOL[type]!!
+            DEFAULT_PORT_BY_PROTOCOL[getType()]!!
         }
 
-    val type: AddressType
-        get() = if (Strings.isNullOrEmpty(address)) {
-            AddressType.NULL
-        } else if (address.startsWith("tcp://")) {
-            AddressType.TCP
-        } else if (address.startsWith("relay://")) {
-            AddressType.RELAY
-        } else if (address.startsWith("relay-http://")) {
-            AddressType.HTTP_RELAY
-        } else if (address.startsWith("relay-https://")) {
-            AddressType.HTTPS_RELAY
-        } else {
-            AddressType.OTHER
-        }
+    fun getType(): AddressType = when {
+        address.isEmpty() -> AddressType.NULL
+        address.startsWith("tcp://") -> AddressType.TCP
+        address.startsWith("relay://") -> AddressType.RELAY
+        address.startsWith("relay-http://") -> AddressType.HTTP_RELAY
+        address.startsWith("relay-https://") -> AddressType.HTTPS_RELAY
+        else -> AddressType.OTHER
+    }
 
-    val socketAddress: InetSocketAddress
-        @Throws(UnknownHostException::class)
-        get() = InetSocketAddress(inetAddress, port)
+    @Throws(UnknownHostException::class)
+    fun getSocketAddress(): InetSocketAddress = InetSocketAddress(getInetAddress(), getPort())
 
-    val isWorking: Boolean
-        get() = score < Integer.MAX_VALUE
-
-    val isTcp: Boolean
-        get() = equal(type, AddressType.TCP)
+    fun isWorking(): Boolean = score < Integer.MAX_VALUE
 
     //} catch (Exception ex) {
     //    logger.warn("processing invalid url = {}, ex = {}; stripping params", getAddress(), ex.toString());
     //    return URI.create(getAddress().replaceFirst("^([^/]+://[^/]+)(/.*)?$", "$1"));
     //}
-    val uriSafe: URI
-        get() = URI.create(address)
+    private fun getUriSafe(): URI = URI.create(address)
 
     init {
-        this.producer = firstNonNull(producer, AddressProducer.UNKNOWN)
-        this.score = firstNonNull(score, Integer.MAX_VALUE)
-        this.lastModified = firstNonNull(lastModified, Date())
+        this.producer = producer ?: AddressProducer.UNKNOWN
+        this.score = score ?: Integer.MAX_VALUE
+        this.lastModified = lastModified ?: Date()
     }
 
-    constructor(deviceId: String, address: String) : this(deviceId, null, address, null, null, null) {}
+    constructor(deviceId: String, address: String) : this(deviceId, null, address, null, null, null)
 
     fun containsUriParam(key: String): Boolean {
         return getUriParam(key) != null
     }
 
     fun containsUriParamValue(key: String): Boolean {
-        return !Strings.isNullOrEmpty(getUriParam(key))
+        return !getUriParam(key).isNullOrEmpty()
     }
 
     fun getUriParam(key: String): String? {
-        Preconditions.checkNotNull<String>(emptyToNull(key))
-        return URLEncodedUtils.parse(uriSafe, StandardCharsets.UTF_8.name())
-                .find { input -> input.getName() == key }
+        assert(!key.isEmpty())
+        return URLEncodedUtils.parse(getUriSafe(), StandardCharsets.UTF_8.name())
+                .find { it.name == key }
                 ?.value
     }
 
@@ -153,7 +128,7 @@ class DeviceAddress private constructor(val deviceId: String, val instanceId: Lo
         private var score: Int? = null
         private var lastModified: Date? = null
 
-        internal constructor() {}
+        constructor()
 
         internal constructor(deviceId: String, instanceId: Long?, address: String, producer: AddressProducer, score: Int?, lastModified: Date) {
             this.deviceId = deviceId
@@ -226,15 +201,10 @@ class DeviceAddress private constructor(val deviceId: String, val instanceId: Lo
     companion object {
 
         private val logger = LoggerFactory.getLogger(DeviceAddress::class.java)
-        private val DEFAULT_PORT_BY_PROTOCOL = ImmutableMap.builder<AddressType, Int>()
-                .put(AddressType.TCP, 22000)
-                .put(AddressType.RELAY, 22067)
-                .put(AddressType.HTTP_RELAY, 80)
-                .put(AddressType.HTTPS_RELAY, 443)
-                .build()
-
-        fun newBuilder(): Builder {
-            return Builder()
-        }
+        private val DEFAULT_PORT_BY_PROTOCOL = mapOf(
+                AddressType.TCP to 22000,
+                AddressType.RELAY to 22067,
+                AddressType.HTTP_RELAY to 80,
+                AddressType.HTTPS_RELAY to 443)
     }
 }

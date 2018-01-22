@@ -13,12 +13,6 @@
  */
 package net.syncthing.java.core.configuration
 
-import com.google.common.base.Joiner
-import com.google.common.base.MoreObjects
-import com.google.common.base.Strings
-import com.google.common.collect.Lists
-import com.google.common.collect.Maps
-import com.google.common.collect.Sets
 import com.google.common.io.BaseEncoding
 import com.google.gson.Gson
 import net.syncthing.java.core.beans.DeviceInfo
@@ -29,20 +23,13 @@ import net.syncthing.java.core.configuration.gsonbeans.FolderConfig
 import net.syncthing.java.core.configuration.gsonbeans.FolderConfigList
 import net.syncthing.java.core.utils.ExecutorUtils
 import org.apache.commons.io.FileUtils
-import org.slf4j.Logger
+import org.apache.commons.lang3.StringUtils.isBlank
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.net.InetAddress
 import java.net.UnknownHostException
 import java.util.*
 import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
-
-import com.google.common.base.Objects.equal
-import com.google.common.base.Preconditions.checkArgument
-import com.google.common.base.Preconditions.checkNotNull
-import com.google.common.base.Strings.emptyToNull
-import org.apache.commons.lang3.StringUtils.isBlank
 
 class ConfigurationService private constructor(properties: Properties) : Closeable {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -50,41 +37,36 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
     private val gson = Gson()
     val instanceId = Math.abs(Random().nextLong())
     private var isDirty = false
-    var cache: File? = null
-        private set
-    var temp: File? = null
-        private set
-    var database: File? = null
-        private set
+    val cache: File
+    var temp: File
+    var database: File
     private var configuration: File? = null
     val clientVersion: String
-    var deviceName: String? = null
+    var deviceName: String?
         private set
-    var deviceId: String
+    var deviceId: String?
         private set
-    var keystoreAlgo: String? = null
+    var keystoreAlgo: String?
         private set
-    val repositoryH2Config: String
+    val repositoryH2Config: String?
     private val folders: MutableMap<String, FolderInfo>
     private val peers: MutableMap<String, DeviceInfo>
     var keystore: ByteArray? = null
         private set
     val discoveryServers: List<String>
 
-    val clientName: String
-        get() = "syncthing-client"
+    fun getClientName(): String = "syncthing-client"
 
-    val folderNames: Set<String>
-        get() = Sets.newTreeSet(folders.keys)
+    fun getFolderNames(): Set<String> = folders.keys.toSet()
 
-    val peerIds: Set<String>
-        get() = Sets.newTreeSet(peers.keys)
+    fun getPeerIds(): Set<String> = peers.keys.toSet()
 
-    val storageInfo: StorageInfo
-        get() = StorageInfo()
+    fun getStorageInfo(): StorageInfo = StorageInfo()
+
+    private fun Properties.getPropertySafe(key: String): String? = getProperty(key)
 
     init {
-        deviceName = properties.getProperty(DEVICE_NAME)
+        deviceName = properties.getPropertySafe(DEVICE_NAME)
         if (isBlank(deviceName)) {
             try {
                 deviceName = InetAddress.getLocalHost().hostName
@@ -92,60 +74,61 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
                 logger.warn("", ex)
             }
 
-            if (isBlank(deviceName) || equal(deviceName, "localhost")) {
+            if (isBlank(deviceName) || deviceName == "localhost") {
                 deviceName = "s-client"
             }
         }
-        deviceId = properties.getProperty(DEVICE_ID)
-        keystoreAlgo = properties.getProperty(KEYSTORE_ALGO)
-        folders = Collections.synchronizedMap(Maps.newHashMap())
-        val folderValue = properties.getProperty(FOLDERS)
+        deviceId = properties.getPropertySafe(DEVICE_ID)
+        keystoreAlgo = properties.getPropertySafe(KEYSTORE_ALGO)
+        folders = Collections.synchronizedMap(mutableMapOf())
+        val folderValue: String? = properties.getPropertySafe(FOLDERS)
         val folderConfigList = if (isBlank(folderValue)) FolderConfigList() else gson.fromJson(folderValue, FolderConfigList::class.java)
         for (folderConfig in folderConfigList.folders) {
-            folders.put(folderConfig.folder!!, FolderInfo(folderConfig.folder!!, folderConfig.label))
+            folders.put(folderConfig.folder, FolderInfo(folderConfig.folder, folderConfig.label))
         }
-        val keystoreValue = properties.getProperty(KEYSTORE)
-        if (!Strings.isNullOrEmpty(keystoreValue)) {
+        val keystoreValue = properties.getPropertySafe(KEYSTORE)
+        if (keystoreValue != null && !keystoreValue.isEmpty()) {
             keystore = BaseEncoding.base64().decode(keystoreValue)
         }
-        val cacheDir = properties.getProperty(CACHE)
-        if (!isBlank(cacheDir)) {
-            cache = File(cacheDir)
+        val cacheDir = properties.getPropertySafe(CACHE)
+        cache = if (!isBlank(cacheDir)) {
+            File(cacheDir)
         } else {
-            cache = File(System.getProperty("java.io.tmpdir"), "a_sync_client_cache")
+            File(System.getProperty("java.io.tmpdir"), "a_sync_client_cache")
         }
-        cache!!.mkdirs()
-        checkArgument(cache!!.isDirectory && cache!!.canWrite(), "invalid cache dir = %s", cache)
-        val tempDir = properties.getProperty(TEMP)
-        if (!isBlank(tempDir)) {
-            temp = File(tempDir)
+        cache.mkdirs()
+        assert(cache.isDirectory && cache.canWrite(), {"invalid cache dir = $cache"})
+        val tempDir = properties.getPropertySafe(TEMP)
+        temp = if (!isBlank(tempDir)) {
+            File(tempDir)
         } else {
-            temp = File(System.getProperty("java.io.tmpdir"), "a_sync_client_temp")
+            File(System.getProperty("java.io.tmpdir"), "a_sync_client_temp")
         }
-        temp!!.mkdirs()
-        checkArgument(temp!!.isDirectory && temp!!.canWrite(), "invalid temp dir = %s", temp)
-        val dbDir = properties.getProperty(DATABASE)
-        if (!isBlank(dbDir)) {
-            database = File(dbDir)
+        temp.mkdirs()
+        assert(temp.isDirectory && temp.canWrite(), {"invalid temp dir = $temp"})
+        val dbDir = properties.getPropertySafe(DATABASE)
+        database = if (!isBlank(dbDir)) {
+            File(dbDir)
         } else {
-            database = File(System.getProperty("user.home"), ".config/sclient/db")
+            File(System.getProperty("user.home"), ".config/sclient/db")
         }
-        database!!.mkdirs()
-        checkArgument(database!!.isDirectory && database!!.canWrite(), "invalid database dir = %s", database)
-        peers = Collections.synchronizedMap(Maps.newHashMap())
-        val peersValue = properties.getProperty(PEERS)
+        database.mkdirs()
+        assert(database.isDirectory && database.canWrite(), {"invalid database dir = $database"})
+        peers = Collections.synchronizedMap(mutableMapOf())
+        val peersValue = properties.getPropertySafe(PEERS)
         val deviceConfigList = if (isBlank(peersValue)) DeviceConfigList() else gson.fromJson(peersValue, DeviceConfigList::class.java)
         for (deviceConfig in deviceConfigList.devices) {
-            peers.put(deviceConfig.deviceId!!, DeviceInfo(deviceConfig.deviceId!!, deviceConfig.name))
+            peers.put(deviceConfig.deviceId, DeviceInfo(deviceConfig.deviceId, deviceConfig.name))
         }
-        val discoveryServerValue = properties.getProperty(DISCOVERY_SERVERS)
-        discoveryServers = if (Strings.isNullOrEmpty(discoveryServerValue)) emptyList() else Arrays.asList(*discoveryServerValue.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray())
-        clientVersion = MoreObjects.firstNonNull(emptyToNull(javaClass.`package`.implementationVersion), "0.0.0")// version info from MANIFEST, with 'safe' default fallback
-        val configurationValue = properties.getProperty(CONFIGURATION)
+        val discoveryServerValue: String? = properties.getPropertySafe(DISCOVERY_SERVERS)
+        discoveryServers = if (discoveryServerValue == null || discoveryServerValue.isEmpty()) emptyList()
+                           else discoveryServerValue.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray().toList()
+        clientVersion = javaClass.`package`.implementationVersion ?: "0.0.0"// version info from MANIFEST, with 'safe' default fallback
+        val configurationValue = properties.getPropertySafe(CONFIGURATION)
         if (!isBlank(configurationValue)) {
             configuration = File(configurationValue)
         }
-        repositoryH2Config = properties.getProperty(REPOSITORY_H2_CONFIG)
+        repositoryH2Config = properties.getPropertySafe(REPOSITORY_H2_CONFIG)
     }
 
     @Synchronized private fun export(): Properties {
@@ -165,40 +148,31 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
         }
         val folderConfigList = FolderConfigList()
         for (folderInfo in folders.values) {
-            val folderConfig = FolderConfig()
-            folderConfig.folder = folderInfo.folder
-            folderConfig.label = folderInfo.label
+            val folderConfig = FolderConfig(folderInfo.folder, folderInfo.label)
             folderConfigList.folders.add(folderConfig)
         }
         properties.setProperty(FOLDERS, gson.toJson(folderConfigList))
         val deviceConfigList = DeviceConfigList()
-        for (deviceInfo in peers.values) {
-            val deviceConfig = DeviceConfig()
-            deviceConfig.deviceId = deviceInfo.deviceId
-            deviceConfig.name = deviceInfo.name
-            deviceConfigList.devices.add(deviceConfig)
-        }
+        peers.values
+                .map { DeviceConfig(it.deviceId, it.name) }
+                .forEach { deviceConfigList.devices.add(it) }
         properties.setProperty(PEERS, gson.toJson(deviceConfigList))
-        properties.setProperty(DATABASE, database!!.absolutePath)
-        properties.setProperty(TEMP, temp!!.absolutePath)
-        properties.setProperty(CACHE, cache!!.absolutePath)
+        properties.setProperty(DATABASE, database.absolutePath)
+        properties.setProperty(TEMP, temp.absolutePath)
+        properties.setProperty(CACHE, cache.absolutePath)
         if (keystore != null) {
             properties.setProperty(KEYSTORE, BaseEncoding.base64().encode(keystore!!))
         }
         if (!isBlank(keystoreAlgo)) {
             properties.setProperty(KEYSTORE_ALGO, keystoreAlgo)
         }
-        properties.setProperty(DISCOVERY_SERVERS, Joiner.on(",").join(discoveryServers))
+        properties.setProperty(DISCOVERY_SERVERS, discoveryServers.joinToString(","))
         return properties
     }
 
-    fun getFolders(): List<FolderInfo> {
-        return Lists.newArrayList(folders.values)
-    }
+    fun getFolders(): List<FolderInfo> = folders.values.toList()
 
-    fun getPeers(): List<DeviceInfo> {
-        return Lists.newArrayList(peers.values)
-    }
+    fun getPeers(): List<DeviceInfo> = peers.values.toList()
 
     override fun close() {
         executorService.shutdown()
@@ -207,53 +181,40 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
 
     inner class StorageInfo {
 
-        val availableSpace: Long
-            get() = database!!.freeSpace
-
-        val usedSpace: Long
-            get() = FileUtils.sizeOfDirectory(database!!)
-
-        val usedTempSpace: Long
-            get() = FileUtils.sizeOfDirectory(cache!!) + FileUtils.sizeOfDirectory(temp!!)
-
         fun dumpAvailableSpace(): String {
             val stringWriter = StringWriter()
             stringWriter.append("dir / used space / free space")
             stringWriter.append("\n\tcache = ")
                     .append(cache.toString())
                     .append(" ")
-                    .append(FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(cache!!)))
+                    .append(FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(cache)))
                     .append(" / ")
-                    .append(FileUtils.byteCountToDisplaySize(cache!!.freeSpace))
+                    .append(FileUtils.byteCountToDisplaySize(cache.freeSpace))
             stringWriter.append("\n\ttemp = ")
                     .append(temp.toString())
                     .append(" ")
-                    .append(FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(temp!!)))
+                    .append(FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(temp)))
                     .append(" / ")
-                    .append(FileUtils.byteCountToDisplaySize(temp!!.freeSpace))
+                    .append(FileUtils.byteCountToDisplaySize(temp.freeSpace))
             stringWriter.append("\n\tdatabase = ")
                     .append(database.toString())
                     .append(" ")
-                    .append(FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(database!!)))
+                    .append(FileUtils.byteCountToDisplaySize(FileUtils.sizeOfDirectory(database)))
                     .append(" / ")
-                    .append(FileUtils.byteCountToDisplaySize(database!!.freeSpace))
+                    .append(FileUtils.byteCountToDisplaySize(database.freeSpace))
             return stringWriter.toString()
         }
 
     }
 
-    fun edit(): Editor {
-        return Editor()
-    }
+    inner class Editor {
 
-    inner class Editor internal constructor() {
-
-        fun setKeystore(keystore: ByteArray?): Editor {
+        fun setKeystore(keystore: ByteArray): Editor {
             this@ConfigurationService.keystore = keystore
             return this
         }
 
-        fun setKeystoreAlgo(keystoreAlgo: String?): Editor {
+        fun setKeystoreAlgo(keystoreAlgo: String): Editor {
             this@ConfigurationService.keystoreAlgo = keystoreAlgo
             return this
         }
@@ -270,38 +231,20 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
             return this
         }
 
-        fun addFolders(vararg folders: FolderInfo): Boolean {
-            return addFolders(Lists.newArrayList(*folders))
-        }
-
-        fun addFolders(newFolders: Iterable<FolderInfo>?): Boolean {
-            var added = false
-            if (newFolders != null) {
-                for (folderInfo in newFolders) {
-                    val old = folders.put(folderInfo.folder, folderInfo)
-                    if (old == null) {
-                        added = true
-                    }
-                }
-            }
-            return added
+        fun addFolders(newFolders: Iterable<FolderInfo>): Boolean {
+            return newFolders
+                    .map { folders.put(it.folder, it) }
+                    .contains(null)
         }
 
         fun addPeers(vararg peers: DeviceInfo): Boolean {
             return addPeers(Arrays.asList(*peers))
         }
 
-        fun addPeers(peers: Iterable<DeviceInfo>?): Boolean {
-            var added = false
-            if (peers != null) {
-                for (deviceInfo in peers) {
-                    val old = this@ConfigurationService.peers.put(deviceInfo.deviceId, deviceInfo)
-                    if (old == null) {
-                        added = true
-                    }
-                }
-            }
-            return added
+        fun addPeers(peers: Iterable<DeviceInfo>): Boolean {
+            return peers
+                    .map { this@ConfigurationService.peers.put(it.deviceId, it) }
+                    .contains(null)
         }
 
         fun setPeers(peers: Iterable<DeviceInfo>): Editor {
@@ -326,24 +269,18 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
         }
 
         private fun storeConfiguration() {
-            if (configuration != null) {
+            configuration?.let {
                 if (isDirty) {
                     isDirty = false
-                    newWriter().writeTo(configuration!!)
+                    Writer().writeTo(configuration!!)
                 }
-            } else {
-                logger.debug("dummy save config, no file set")
-            }
+            } ?: logger.debug("dummy save config, no file set")
         }
 
         fun setDeviceId(deviceId: String): Editor {
             this@ConfigurationService.deviceId = deviceId
             return this
         }
-    }
-
-    fun newWriter(): Writer {
-        return Writer()
     }
 
     class Loader {
@@ -394,7 +331,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
         }
     }
 
-    inner class Writer internal constructor() {
+    inner class Writer {
 
         fun writeTo(file: File) {
             val properties = export()
@@ -416,7 +353,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
             try {
                 val properties = export()
                 properties.setProperty("volatile_instanceid", instanceId.toString())
-                properties.setProperty("volatile_clientname", clientName)
+                properties.setProperty("volatile_clientname", getClientName())
                 properties.setProperty("volatile_clientversion", clientVersion)
                 val stringWriter = StringWriter()
                 properties.store(stringWriter, null)
@@ -444,9 +381,5 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
         private val DISCOVERY_SERVERS = "discoveryserver"
         private val CONFIGURATION = "configuration"
         private val REPOSITORY_H2_CONFIG = "repository.h2.dboptions"
-
-        fun newLoader(): Loader {
-            return Loader()
-        }
     }
 }

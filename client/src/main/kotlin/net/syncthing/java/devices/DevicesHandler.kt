@@ -13,38 +13,24 @@
  */
 package net.syncthing.java.devices
 
-import com.google.common.collect.Lists
-import com.google.common.collect.Maps
 import com.google.common.eventbus.EventBus
 import com.google.common.eventbus.Subscribe
-import net.syncthing.java.core.beans.DeviceAddress
-import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.DeviceStats
 import net.syncthing.java.core.beans.DeviceStats.DeviceStatus
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.events.DeviceAddressActiveEvent
 import net.syncthing.java.core.events.DeviceAddressReceivedEvent
 import net.syncthing.java.core.utils.ExecutorUtils
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-
 import java.io.Closeable
 import java.util.*
 import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
-
-import com.google.common.base.Preconditions.checkNotNull
-import java.util.Collections.singletonList
-import net.syncthing.java.devices.DevicesHandler.DeviceStatsUpdateEvent
-import org.apache.http.client.methods.RequestBuilder.post
-
-
 
 class DevicesHandler(private val configuration: ConfigurationService) : Closeable {
 
     private val logger = LoggerFactory.getLogger(DevicesHandler::class.java)
-    private val deviceStatsMap = Collections.synchronizedMap(Maps.newHashMap<String, DeviceStats>())
+    private val deviceStatsMap = Collections.synchronizedMap(mutableMapOf<String, DeviceStats>())
     private val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     val eventBus = EventBus()
 
@@ -55,10 +41,9 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
         }
 
     init {
-        checkNotNull(configuration)
         loadDevicesFromConfiguration()
         scheduledExecutorService.scheduleAtFixedRate({
-            for (deviceStats in Lists.newArrayList(deviceStatsMap.values)) {
+            for (deviceStats in deviceStatsMap.values) {
                 when (deviceStats.status) {
                     DeviceStats.DeviceStatus.ONLINE_ACTIVE -> if (Date().time - deviceStats.lastActive.time > 5 * 1000) {
                         pushDeviceStats(deviceStats.copyBuilder().setStatus(DeviceStatus.ONLINE_INACTIVE).build())
@@ -80,7 +65,7 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
     @Subscribe
     fun handleDeviceAddressReceivedEvent(event: DeviceAddressReceivedEvent) {
         for (deviceAddress in event.getDeviceAddresses()) {
-            if (deviceAddress.isWorking) {
+            if (deviceAddress.isWorking()) {
                 val deviceStats = getDeviceStats(deviceAddress.deviceId)
                 val newStatus: DeviceStatus
                 when (deviceStats.status) {

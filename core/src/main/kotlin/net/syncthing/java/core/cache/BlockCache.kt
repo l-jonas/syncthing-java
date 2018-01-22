@@ -32,9 +32,7 @@ abstract class BlockCache {
 
     abstract fun pullData(code: String): ByteArray?
 
-    open fun clear() {
-
-    }
+    open fun clear() {}
 
     private class DummyBlockCache : BlockCache() {
 
@@ -59,7 +57,7 @@ abstract class BlockCache {
     companion object {
 
         fun getBlockCache(configuration: ConfigurationService): BlockCache {
-            return configuration.cache?.let { FileBlockCache(it) } ?: DummyBlockCache()
+            return FileBlockCache(configuration.cache)
         }
     }
 

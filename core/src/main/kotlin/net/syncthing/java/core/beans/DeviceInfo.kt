@@ -11,12 +11,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.syncthing.java.core.configuration.gsonbeans
+package net.syncthing.java.core.beans
 
-import com.google.common.collect.Lists
+import net.syncthing.java.core.security.KeystoreHandler
 
-class DeviceConfigList {
+class DeviceInfo(val deviceId: String, name: String?) {
+    val name: String
 
-    var devices: MutableList<DeviceConfig> = Lists.newArrayList()
+    init {
+        KeystoreHandler.validateDeviceId(deviceId)
+        this.name = if (name.isNullOrBlank()) deviceId.substring(0, 7) else name!!
+    }
+
+    override fun toString(): String {
+        return "DeviceInfo{deviceId=$deviceId, name=$name}"
+    }
 
 }

@@ -13,8 +13,6 @@
  */
 package net.syncthing.java.bep
 
-import com.google.common.collect.ImmutableBiMap
-import com.google.common.collect.Maps
 import com.google.common.eventbus.EventBus
 import com.google.common.eventbus.Subscribe
 import com.google.protobuf.ByteString
@@ -27,7 +25,7 @@ import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.events.DeviceAddressActiveEvent
 import net.syncthing.java.core.security.KeystoreHandler
-import net.syncthing.java.core.security.KeystoreHandler.*
+import net.syncthing.java.core.utils.NetworkUtils
 import net.syncthing.java.httprelay.HttpRelayClient
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.tuple.Pair
@@ -40,6 +38,7 @@ import java.lang.reflect.InvocationTargetException
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.security.cert.CertificateException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
@@ -67,7 +66,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
     fun deviceId(): String = address.deviceId
 
     private fun checkNotClosed() {
-        assertProtocol(!isClosed, {"connection $this closed"})
+        NetworkUtils.assertProtocol(!isClosed, {"connection $this closed"})
     }
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
@@ -78,10 +77,10 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
 
         val keystoreHandler = KeystoreHandler.Loader().loadAndStore(configuration)
 
-        socket = when (address.type) {
+        socket = when (address.getType()) {
             DeviceAddress.AddressType.TCP -> {
                 logger.debug("opening tcp ssl connection")
-                keystoreHandler.createSocket(address.socketAddress, KeystoreHandler.BEP)
+                keystoreHandler.createSocket(address.getSocketAddress(), KeystoreHandler.BEP)
             }
             DeviceAddress.AddressType.RELAY -> {
                 logger.debug("opening relay connection")
@@ -91,13 +90,13 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                 logger.debug("opening http relay connection")
                 keystoreHandler.wrapSocket(HttpRelayClient().openRelayConnection(address), KeystoreHandler.BEP)
             }
-            else -> throw UnsupportedOperationException("unsupported address type = " + address.type)
+            else -> throw UnsupportedOperationException("unsupported address type = " + address.getType())
         }
         inputStream = DataInputStream(socket!!.getInputStream())
         outputStream = DataOutputStream(socket!!.getOutputStream())
 
         sendHelloMessage(BlockExchangeProtos.Hello.newBuilder()
-                .setClientName(configuration.clientName)
+                .setClientName(configuration.getClientName())
                 .setClientVersion(configuration.clientVersion)
                 .setDeviceName(configuration.deviceName)
                 .build().toByteArray())
@@ -118,12 +117,12 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
 
         run {
             val clusterConfigBuilder = ClusterConfig.newBuilder()
-            for (folder in configuration.folderNames) {
+            for (folder in configuration.getFolderNames()) {
                 val folderBuilder = clusterConfigBuilder.addFoldersBuilder().setId(folder)
                 run {
                     //our device
                     val deviceBuilder = folderBuilder.addDevicesBuilder()
-                            .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId)))
+                            .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId!!)))
                     deviceBuilder.setIndexId(indexHandler.sequencer().indexId()).maxSequence = indexHandler.sequencer().currentSequence()
                 }
                 run {
@@ -177,7 +176,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
             }
             eventBus.unregister(listener)
         }
-        for (folder in configuration.folderNames) {
+        for (folder in configuration.getFolderNames()) {
             if (hasFolder(folder)) {
                 sendIndexMessage(folder)
             }
@@ -209,9 +208,9 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
     private fun receiveHelloMessage(): BlockExchangeProtos.Hello {
         logger.trace("receiving hello message")
         val magic = inputStream!!.readInt()
-        assertProtocol(magic == MAGIC, {"magic mismatch, expected $MAGIC, got $magic"})
+        NetworkUtils.assertProtocol(magic == MAGIC, {"magic mismatch, expected $MAGIC, got $magic"})
         val length = inputStream!!.readShort().toInt()
-        assertProtocol(length > 0, {"invalid lenght, must be >0, got $length"})
+        NetworkUtils.assertProtocol(length > 0, {"invalid lenght, must be >0, got $length"})
         val buffer = ByteArray(length)
         inputStream!!.readFully(buffer)
         logger.trace("received hello message")
@@ -256,7 +255,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
             headerLength = inputStream!!.readShort().toInt()
         }
         markActivityOnSocket()
-        assertProtocol(headerLength > 0, {"invalid lenght, must be >0, got $headerLength"})
+        NetworkUtils.assertProtocol(headerLength > 0, {"invalid lenght, must be >0, got $headerLength"})
         val headerBuffer = ByteArray(headerLength)
         inputStream!!.readFully(headerBuffer)
         val header = BlockExchangeProtos.Header.parseFrom(headerBuffer)
@@ -266,7 +265,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
             logger.warn("received readInt() == 0, expecting 'bep message header length' (int >0), ignoring (keepalive?)")
             messageLength = inputStream!!.readInt()
         }
-        assertProtocol(messageLength >= 0, {"invalid lenght, must be >=0, got $messageLength"})
+        NetworkUtils.assertProtocol(messageLength >= 0, {"invalid lenght, must be >=0, got $messageLength"})
         var messageBuffer = ByteArray(messageLength)
         inputStream!!.readFully(messageBuffer)
         markActivityOnSocket()
@@ -274,7 +273,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
             val uncompressedLength = ByteBuffer.wrap(messageBuffer).int
             messageBuffer = LZ4Factory.fastestInstance().fastDecompressor().decompress(messageBuffer, 4, uncompressedLength)
         }
-        assertProtocol(messageTypes.containsKey(header.type), {"unsupported message type = ${header.type}"})
+        NetworkUtils.assertProtocol(messageTypes.containsKey(header.type), {"unsupported message type = ${header.type}"})
         try {
             val message = messageTypes[header.type]?.getMethod("parseFrom", ByteArray::class.java)?.invoke(null, messageBuffer as Any) as GeneratedMessage
             return Pair.of(header.type, message)
@@ -292,7 +291,8 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
         assert(messageTypes.containsValue(message.javaClass))
         val header = BlockExchangeProtos.Header.newBuilder()
                 .setCompression(BlockExchangeProtos.MessageCompression.NONE)
-                .setType(messageTypes.inverse()[message.javaClass])
+                // invert map
+                .setType(messageTypes.entries.associateBy({ it.value }) { it.key }[message.javaClass])
                 .build()
         val headerData = header.toByteArray()
         val messageData = message.toByteArray() //TODO compression
@@ -382,14 +382,15 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                                 closeBg()
                             }
                             BlockExchangeProtos.MessageType.CLUSTER_CONFIG -> {
-                                assertProtocol(clusterConfigInfo == null, {"received cluster config message twice!"})
+                                NetworkUtils.assertProtocol(clusterConfigInfo == null, {"received cluster config message twice!"})
                                 clusterConfigInfo = ClusterConfigInfo()
                                 val clusterConfig = message.value as ClusterConfig
                                 for (folder in clusterConfig.foldersList ?: emptyList()) {
                                     val folderInfo = ClusterConfigFolderInfo(folder.id, folder.label)
-                                    val devicesById = Maps.uniqueIndex(folder.devicesList ?: emptyList()) {
-                                        input -> KeystoreHandler.hashDataToDeviceIdString(input!!.id!!.toByteArray())
-                                    }
+                                    val devicesById = (folder.devicesList ?: emptyList())
+                                            .associateBy { input ->
+                                                KeystoreHandler.hashDataToDeviceIdString(input.id!!.toByteArray())
+                                            }
                                     val otherDevice = devicesById[address.deviceId]
                                     val ourDevice = devicesById[configuration.deviceId]
                                     if (otherDevice != null) {
@@ -398,8 +399,8 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                                     if (ourDevice != null) {
                                         folderInfo.isShared = true
                                         logger.info("folder shared from device = {} folder = {}", address.deviceId, folderInfo)
-                                        if (!configuration.folderNames.contains(folderInfo.folder)) {
-                                            configuration.edit().addFolders(FolderInfo(folderInfo.folder, folderInfo.label))
+                                        if (!configuration.getFolderNames().contains(folderInfo.folder)) {
+                                            configuration.Editor().addFolders(setOf(FolderInfo(folderInfo.folder, folderInfo.label)))
                                             logger.info("new folder shared = {}", folderInfo)
                                             eventBus.post(object : NewFolderSharedEvent() {
                                                 override val folder: String
@@ -412,7 +413,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                                     }
                                     clusterConfigInfo!!.putFolderInfo(folderInfo)
                                 }
-                                configuration.edit().persistLater()
+                                configuration.Editor().persistLater()
                                 eventBus.post(ClusterConfigMessageProcessedEvent(clusterConfig))
                             }
                         }
@@ -494,14 +495,14 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
 
     inner internal class ClusterConfigInfo {
 
-        private val folderInfoById = Maps.newConcurrentMap<String, ClusterConfigFolderInfo>()
+        private val folderInfoById = ConcurrentHashMap<String, ClusterConfigFolderInfo>()
 
         val sharedFolders: Set<String>
             get() = folderInfoById.values.filter { it.isShared }.map { it.folder }.toSet()
 
         fun getFolderInfo(folderId: String): ClusterConfigFolderInfo {
             return folderInfoById[folderId] ?: let {
-                val fi = ClusterConfigFolderInfo(folderId, null)
+                val fi = ClusterConfigFolderInfo(folderId)
                 folderInfoById.put(folderId, fi)
                 fi
             }
@@ -526,16 +527,15 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
 
         private val MAGIC = 0x2EA7D90B
 
-        private val messageTypes = ImmutableBiMap.builder<BlockExchangeProtos.MessageType, Class<out GeneratedMessage>>()
-                .put(BlockExchangeProtos.MessageType.CLOSE, BlockExchangeProtos.Close::class.java)
-                .put(BlockExchangeProtos.MessageType.CLUSTER_CONFIG, BlockExchangeProtos.ClusterConfig::class.java)
-                .put(BlockExchangeProtos.MessageType.DOWNLOAD_PROGRESS, BlockExchangeProtos.DownloadProgress::class.java)
-                .put(BlockExchangeProtos.MessageType.INDEX, BlockExchangeProtos.Index::class.java)
-                .put(BlockExchangeProtos.MessageType.INDEX_UPDATE, BlockExchangeProtos.IndexUpdate::class.java)
-                .put(BlockExchangeProtos.MessageType.PING, BlockExchangeProtos.Ping::class.java)
-                .put(BlockExchangeProtos.MessageType.REQUEST, BlockExchangeProtos.Request::class.java)
-                .put(BlockExchangeProtos.MessageType.RESPONSE, BlockExchangeProtos.Response::class.java)
-                .build()
+        private val messageTypes: Map<MessageType, Class<out GeneratedMessage>> = mapOf(
+                BlockExchangeProtos.MessageType.CLOSE to BlockExchangeProtos.Close::class.java,
+                BlockExchangeProtos.MessageType.CLUSTER_CONFIG to BlockExchangeProtos.ClusterConfig::class.java,
+                BlockExchangeProtos.MessageType.DOWNLOAD_PROGRESS to BlockExchangeProtos.DownloadProgress::class.java,
+                BlockExchangeProtos.MessageType.INDEX to BlockExchangeProtos.Index::class.java,
+                BlockExchangeProtos.MessageType.INDEX_UPDATE to BlockExchangeProtos.IndexUpdate::class.java,
+                BlockExchangeProtos.MessageType.PING to BlockExchangeProtos.Ping::class.java,
+                BlockExchangeProtos.MessageType.REQUEST to BlockExchangeProtos.Request::class.java,
+                BlockExchangeProtos.MessageType.RESPONSE to BlockExchangeProtos.Response::class.java)
 
         /**
          * get id for message bean/instance, for log tracking
@@ -548,13 +548,6 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                 is Request -> Integer.toString(message.id)
                 is Response -> Integer.toString(message.id)
                 else -> Integer.toString(Math.abs(message.hashCode()))
-            }
-        }
-
-        @Throws(IOException::class)
-        internal fun assertProtocol(value: Boolean, lazyMessage: () -> String) {
-            if (!value) {
-                throw IOException(lazyMessage())
             }
         }
     }

@@ -15,21 +15,14 @@ package net.syncthing.java.httprelay
 
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceAddress.AddressType
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-
-import java.util.EnumSet
-
-import com.google.common.base.Preconditions.checkArgument
-import com.google.common.base.Preconditions.checkNotNull
 
 class HttpRelayClient {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun openRelayConnection(deviceAddress: DeviceAddress): HttpRelayConnection {
-        checkNotNull(deviceAddress)
-        checkArgument(EnumSet.of(AddressType.HTTP_RELAY, AddressType.HTTPS_RELAY).contains(deviceAddress.type))
+        assert(setOf(AddressType.HTTP_RELAY, AddressType.HTTPS_RELAY).contains(deviceAddress.getType()))
         val httpRelayServerUrl = deviceAddress.address.replaceFirst("^relay-".toRegex(), "")
         val deviceId = deviceAddress.deviceId
         logger.info("open http relay connection, relay url = {}, target device id = {}", httpRelayServerUrl, deviceId)

@@ -13,28 +13,23 @@
  */
 package net.syncthing.java.httprelay
 
-import com.google.common.base.Strings
-import com.google.common.collect.Queues
 import com.google.protobuf.ByteString
 import net.syncthing.java.core.interfaces.RelayConnection
+import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.http.HttpStatus
-import org.apache.http.client.HttpClient
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.entity.ByteArrayEntity
 import org.apache.http.impl.client.HttpClients
 import org.apache.http.util.EntityUtils
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-
 import java.io.*
 import java.net.*
-import java.util.concurrent.*
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 
-import com.google.common.base.Objects.equal
-import com.google.common.base.Preconditions.checkArgument
-import com.google.common.base.Preconditions.checkNotNull
-
-class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: String) : RelayConnection, Closeable {
+class HttpRelayConnection internal constructor(private val httpRelayServerUrl: String, deviceId: String) : RelayConnection, Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private val outgoingExecutorService = Executors.newSingleThreadExecutor()
@@ -43,7 +38,7 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
     private var peerToRelaySequence: Long = 0
     private var relayToPeerSequence: Long = 0
     private val sessionId: String
-    private val incomingDataQueue = Queues.newLinkedBlockingQueue<ByteArray>()
+    private val incomingDataQueue = LinkedBlockingQueue<ByteArray>()
     private val socket: Socket
     private val isServerSocket: Boolean
     private val inputStream: InputStream
@@ -52,20 +47,16 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
     var isClosed = false
         private set
 
-    override fun getSocket(): Socket {
-        return socket
-    }
+    override fun getSocket() = socket
 
-    override fun isServerSocket(): Boolean {
-        return isServerSocket
-    }
+    override fun isServerSocket() = isServerSocket
 
     init {
         val serverMessage = sendMessage(HttpRelayProtos.HttpRelayPeerMessage.newBuilder()
                 .setMessageType(HttpRelayProtos.HttpRelayPeerMessageType.CONNECT)
                 .setDeviceId(deviceId))
-        checkArgument(equal(serverMessage.messageType, HttpRelayProtos.HttpRelayServerMessageType.PEER_CONNECTED))
-        checkNotNull<String>(Strings.emptyToNull(serverMessage.sessionId))
+        assert(serverMessage.messageType == HttpRelayProtos.HttpRelayServerMessageType.PEER_CONNECTED)
+        assert(!serverMessage.sessionId.isNullOrEmpty())
         sessionId = serverMessage.sessionId
         isServerSocket = serverMessage.isServerSocket
         outputStream = object : OutputStream() {
@@ -89,29 +80,29 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
             @Synchronized
             @Throws(IOException::class)
             override fun write(i: Int) {
-                checkArgument(!this@HttpRelayConnection.isClosed)
+                NetworkUtils.assertProtocol(!this@HttpRelayConnection.isClosed)
                 buffer.write(i)
             }
 
             @Synchronized
             @Throws(IOException::class)
             override fun write(bytes: ByteArray, offset: Int, size: Int) {
-                checkArgument(!this@HttpRelayConnection.isClosed)
+                NetworkUtils.assertProtocol(!this@HttpRelayConnection.isClosed)
                 buffer.write(bytes, offset, size)
             }
 
             @Synchronized
             @Throws(IOException::class)
             override fun flush() {
-                val data = ByteString.copyFrom(buffer.toByteArray())
+                val data = buffer.toByteArray().copyOf().toList()
                 buffer = ByteArrayOutputStream()
                 try {
-                    if (!data.isEmpty) {
+                    if (!data.isEmpty()) {
                         outgoingExecutorService.submit {
                             sendMessage(HttpRelayProtos.HttpRelayPeerMessage.newBuilder()
                                     .setMessageType(HttpRelayProtos.HttpRelayPeerMessageType.PEER_TO_RELAY)
                                     .setSequence(++peerToRelaySequence)
-                                    .setData(data))
+                                    .setData(data as ByteString))
                         }.get()
                     }
                     lastFlush = System.currentTimeMillis()
@@ -130,7 +121,7 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
             @Synchronized
             @Throws(IOException::class)
             override fun write(bytes: ByteArray) {
-                checkArgument(!this@HttpRelayConnection.isClosed)
+                NetworkUtils.assertProtocol(!this@HttpRelayConnection.isClosed)
                 buffer.write(bytes)
             }
 
@@ -141,8 +132,8 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
                 if (isClosed) {
                     return@submit
                 }
-                checkArgument(equal(serverMessage1.messageType, HttpRelayProtos.HttpRelayServerMessageType.RELAY_TO_PEER))
-                checkArgument(serverMessage1.sequence == relayToPeerSequence + 1)
+                NetworkUtils.assertProtocol(serverMessage1.messageType == HttpRelayProtos.HttpRelayServerMessageType.RELAY_TO_PEER)
+                NetworkUtils.assertProtocol(serverMessage1.sequence == relayToPeerSequence + 1)
                 if (!serverMessage1.data.isEmpty) {
                     incomingDataQueue.add(serverMessage1.data.toByteArray())
                 }
@@ -156,7 +147,7 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
 
             @Throws(IOException::class)
             override fun read(): Int {
-                checkArgument(!this@HttpRelayConnection.isClosed)
+                NetworkUtils.assertProtocol(!this@HttpRelayConnection.isClosed)
                 if (noMoreData) {
                     return -1
                 }
@@ -167,7 +158,7 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
                         val data = incomingDataQueue.poll(1, TimeUnit.SECONDS)
                         if (data == null) {
                             //continue
-                        } else if (data == STREAM_CLOSED) {
+                        } else if (data.contentEquals(STREAM_CLOSED)) {
                             noMoreData = true
                             return -1
                         } else {
@@ -212,14 +203,15 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
 
             @Throws(IOException::class)
             override fun getOutputStream(): OutputStream {
-                return outputStream
+                return this@HttpRelayConnection.outputStream
             }
 
             @Throws(IOException::class)
             override fun getInputStream(): InputStream {
-                return inputStream
+                return this@HttpRelayConnection.inputStream
             }
 
+            @Throws(UnknownHostException::class)
             override fun getRemoteSocketAddress(): SocketAddress {
                 return InetSocketAddress(inetAddress, port)
             }
@@ -228,13 +220,9 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
                 return 22067
             }
 
+            @Throws(UnknownHostException::class)
             override fun getInetAddress(): InetAddress {
-                try {
-                    return InetAddress.getByName(URI.create(this@HttpRelayConnection.httpRelayServerUrl).host)
-                } catch (ex: UnknownHostException) {
-                    throw RuntimeException(ex)
-                }
-
+                return InetAddress.getByName(URI.create(this@HttpRelayConnection.httpRelayServerUrl).host)
             }
 
         }
@@ -247,7 +235,7 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
 
     private fun sendMessage(peerMessageBuilder: HttpRelayProtos.HttpRelayPeerMessage.Builder): HttpRelayProtos.HttpRelayServerMessage {
         try {
-            if (!Strings.isNullOrEmpty(sessionId)) {
+            if (!sessionId.isEmpty()) {
                 peerMessageBuilder.sessionId = sessionId
             }
             logger.debug("send http relay peer message = {} session id = {} sequence = {}", peerMessageBuilder.messageType, peerMessageBuilder.sessionId, peerMessageBuilder.sequence)
@@ -257,16 +245,11 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
             val httpPost = HttpPost(httpRelayServerUrl)
             httpPost.entity = ByteArrayEntity(peerMessageBuilder.build().toByteArray())
             val serverMessage = httpClient.execute(httpPost) { response ->
-                checkArgument(equal(response.statusLine.statusCode, HttpStatus.SC_OK), "http error %s", response.statusLine)
+                NetworkUtils.assertProtocol(response.statusLine.statusCode == HttpStatus.SC_OK, {"http error ${response.statusLine}"})
                 HttpRelayProtos.HttpRelayServerMessage.parseFrom(EntityUtils.toByteArray(response.entity))
             }
-            logger.debug("received http relay server message = {}", serverMessage.getMessageType())
-            checkArgument(!equal(serverMessage.getMessageType(), HttpRelayProtos.HttpRelayServerMessageType.ERROR), "server error : %s", object : Any() {
-                override fun toString(): String {
-                    return serverMessage.getData().toStringUtf8()
-                }
-
-            })
+            logger.debug("received http relay server message = {}", serverMessage.messageType)
+            NetworkUtils.assertProtocol(serverMessage.messageType != HttpRelayProtos.HttpRelayServerMessageType.ERROR, {"server error : ${serverMessage.data.toStringUtf8()}"})
             return serverMessage
         } catch (ex: IOException) {
             throw RuntimeException(ex)
@@ -279,7 +262,7 @@ class HttpRelayConnection(private val httpRelayServerUrl: String, deviceId: Stri
             isClosed = true
             logger.info("closing http relay connection {} : {}", httpRelayServerUrl, sessionId)
             flusherStreamService.shutdown()
-            if (!Strings.isNullOrEmpty(sessionId)) {
+            if (!sessionId.isEmpty()) {
                 try {
                     outputStream.flush()
                     sendMessage(HttpRelayProtos.HttpRelayPeerMessage.newBuilder().setMessageType(HttpRelayProtos.HttpRelayPeerMessageType.PEER_CLOSING))

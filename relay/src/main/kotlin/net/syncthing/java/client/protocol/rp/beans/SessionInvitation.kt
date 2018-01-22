@@ -13,22 +13,13 @@
  */
 package net.syncthing.java.client.protocol.rp.beans
 
-import com.google.common.base.Strings
-
 import java.net.InetAddress
-import java.net.InetSocketAddress
-
-import com.google.common.base.Preconditions.checkNotNull
 
 class SessionInvitation private constructor(val from: String, val key: String, val address: InetAddress, val port: Int, val isServerSocket: Boolean) {
 
-    val socketAddress: InetSocketAddress
-        get() = InetSocketAddress(address, port)
-
     init {
-        checkNotNull<String>(Strings.emptyToNull(from))
-        checkNotNull<String>(Strings.emptyToNull(key))
-        checkNotNull(address)
+        assert(!from.isEmpty())
+        assert(!key.isEmpty())
     }
 
     class Builder {
@@ -39,25 +30,11 @@ class SessionInvitation private constructor(val from: String, val key: String, v
         private var port: Int = 0
         private var isServerSocket: Boolean = false
 
-        fun getFrom(): String? {
-            return from
-        }
-
-        fun getKey(): String? {
-            return key
-        }
-
-        fun getAddress(): InetAddress? {
-            return address
-        }
-
-        fun getPort(): Int {
-            return port
-        }
-
-        fun isServerSocket(): Boolean {
-            return isServerSocket
-        }
+        fun getFrom() = from
+        fun getKey() = key
+        fun getAddress() = address
+        fun getPort() =  port
+        fun isServerSocket() = isServerSocket
 
         fun setFrom(from: String): Builder {
             this.from = from

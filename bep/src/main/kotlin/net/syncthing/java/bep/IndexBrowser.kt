@@ -15,11 +15,11 @@ package net.syncthing.java.bep
 
 import com.google.common.cache.CacheBuilder
 import com.google.common.cache.CacheLoader
+import com.google.common.collect.ComparisonChain
 import com.google.common.eventbus.Subscribe
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.interfaces.IndexRepository
 import net.syncthing.java.core.utils.ExecutorUtils
-import net.syncthing.java.core.utils.FileInfoOrdering.ALPHA_ASC_DIR_FIRST
 import net.syncthing.java.core.utils.PathUtils
 import org.apache.commons.lang3.StringUtils
 import org.slf4j.LoggerFactory
@@ -31,6 +31,24 @@ import java.util.concurrent.TimeUnit
 class IndexBrowser internal constructor(private val indexRepository: IndexRepository, private val indexHandler: IndexHandler,
                                        val folder: String, private val includeParentInList: Boolean = false,
                                        private val allowParentInRoot: Boolean = false, ordering: Comparator<FileInfo>?) : Closeable {
+
+    private fun isParent(fileInfo: FileInfo) = PathUtils.isParent(fileInfo.path)
+
+    val ALPHA_ASC_DIR_FIRST = Comparator<FileInfo> { a, b ->
+        ComparisonChain.start()
+                .compareTrueFirst(isParent(a), isParent(b))
+                .compare(if (a.isDirectory()) 1 else 2, if (b.isDirectory()) 1 else 2)
+                .compare(a.path, b.path)
+                .result()
+    }
+
+    val LAST_MOD_DESC = Comparator<FileInfo> { a, b ->
+        ComparisonChain.start()
+                .compareTrueFirst(isParent(a), isParent(b))
+                .compare(b.lastModified, a.lastModified)
+                .compare(a.path, b.path)
+                .result()
+    }
 
     private val ordering = ordering ?: ALPHA_ASC_DIR_FIRST
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -153,7 +171,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
                                 listFiles(parent)
                             }
                             for (record in listFiles(preloadPath)) {
-                                if (record.path == PARENT_FILE_INFO.path && record.isDirectory) {
+                                if (record.path == PARENT_FILE_INFO.path && record.isDirectory()) {
                                     listFiles(record.path)
                                 }
                             }
@@ -206,7 +224,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
     }
 
     fun navigateTo(fileInfo: FileInfo) {
-        assert(fileInfo.isDirectory)
+        assert(fileInfo.isDirectory())
         assert(fileInfo.folder == folder)
         return if (fileInfo.path == PARENT_FILE_INFO.path)
             navigateToAbsolutePath(PathUtils.getParentPath(currentPath))
@@ -225,7 +243,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
             currentPath = PathUtils.ROOT_PATH
         } else {
             val fileInfo = getFileInfoByAbsolutePath(newPath)
-            assert(fileInfo.isDirectory, {"cannot navigate to path ${fileInfo.path}: not a directory"})
+            assert(fileInfo.isDirectory(), {"cannot navigate to path ${fileInfo.path}: not a directory"})
             currentPath = fileInfo.path
         }
         logger.info("navigate to path = '{}'", currentPath)

@@ -13,8 +13,6 @@
  */
 package net.syncthing.java.discovery
 
-import com.google.common.base.Preconditions.checkArgument
-import com.google.common.collect.Ordering
 import com.google.common.eventbus.Subscribe
 import net.syncthing.java.core.beans.DeviceAddress
 import org.slf4j.LoggerFactory
@@ -24,12 +22,12 @@ import java.util.*
 class DeviceAddressSupplier(private val discoveryHandler: DiscoveryHandler) : Closeable, Iterable<DeviceAddress?> {
 
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val deviceAddressQueue = PriorityQueue<DeviceAddress>(11, Ordering.natural<Int>().onResultOf({ it?.score }))
+    private val deviceAddressQueue = PriorityQueue<DeviceAddress>(11, compareBy { it.score })
     private val queueLock = Object()
     private val discoveryHandlerListener = object : Any() {
         @Subscribe
         fun handleNewDeviceAddressAcquiredEvent(event: DiscoveryHandler.DeviceAddressUpdateEvent) {
-            if (event.deviceAddress.isWorking) {
+            if (event.deviceAddress.isWorking()) {
                 synchronized(queueLock) {
                     deviceAddressQueue.add(event.deviceAddress)
                     queueLock.notify()
@@ -38,14 +36,14 @@ class DeviceAddressSupplier(private val discoveryHandler: DiscoveryHandler) : Cl
         }
     }
 
-    val deviceAddress: DeviceAddress?
-        get() = synchronized(queueLock) {
+    fun getDeviceAddress(): DeviceAddress? {
+        synchronized(queueLock) {
             return deviceAddressQueue.poll()
         }
+    }
 
-    val deviceAddressOrWait: DeviceAddress?
-        @Throws(InterruptedException::class)
-        get() = getDeviceAddressOrWait(5000)
+    @Throws(InterruptedException::class)
+    fun getDeviceAddressOrWait(): DeviceAddress? = getDeviceAddressOrWait(5000)
 
     init {
         synchronized(queueLock) {
@@ -60,7 +58,7 @@ class DeviceAddressSupplier(private val discoveryHandler: DiscoveryHandler) : Cl
             if (deviceAddressQueue.isEmpty()) {
                 queueLock.wait(timeout)
             }
-            return deviceAddress
+            return getDeviceAddress()
         }
     }
 
@@ -77,7 +75,7 @@ class DeviceAddressSupplier(private val discoveryHandler: DiscoveryHandler) : Cl
             override fun hasNext(): Boolean {
                 if (hasNext == null) {
                     try {
-                        next = deviceAddressOrWait
+                        next = getDeviceAddressOrWait()
                     } catch (ex: InterruptedException) {
                         logger.warn("", ex)
                     }
@@ -88,7 +86,7 @@ class DeviceAddressSupplier(private val discoveryHandler: DiscoveryHandler) : Cl
             }
 
             override fun next(): DeviceAddress? {
-                checkArgument(hasNext())
+                assert(hasNext())
                 val res = next
                 hasNext = null
                 next = null

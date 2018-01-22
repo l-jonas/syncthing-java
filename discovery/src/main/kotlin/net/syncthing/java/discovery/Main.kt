@@ -41,12 +41,12 @@ class Main {
             val configFile = if (cmd.hasOption("C")) File(cmd.getOptionValue("C"))
             else                                     File(System.getProperty("user.home"), ".s-client.properties")
 
-            ConfigurationService.newLoader().loadFrom(configFile).use { configuration ->
+            ConfigurationService.Loader().loadFrom(configFile).use { configuration ->
                 System.out.println("using config file = $configFile")
                 FileUtils.cleanDirectory(configuration.temp)
                 KeystoreHandler.Loader().loadAndStore(configuration)
-                System.out.println("configuration =\n${configuration.newWriter().dumpToString()}")
-                System.out.println(configuration.storageInfo.dumpAvailableSpace())
+                System.out.println("configuration =\n${configuration.Writer().dumpToString()}")
+                System.out.println(configuration.getStorageInfo().dumpAvailableSpace())
                 val main = Main()
                 cmd.options.forEach { main.handleOption(it, configuration) }
             }

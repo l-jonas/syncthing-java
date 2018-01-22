@@ -13,12 +13,8 @@
  */
 package net.syncthing.java.bep
 
-import com.google.common.base.Preconditions.checkArgument
-import com.google.common.base.Preconditions.checkNotNull
-import com.google.common.base.Stopwatch
 import com.google.common.eventbus.EventBus
 import com.google.common.eventbus.Subscribe
-import com.google.common.io.BaseEncoding
 import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.beans.FileInfo.Version
 import net.syncthing.java.core.configuration.ConfigurationService
@@ -27,14 +23,15 @@ import net.syncthing.java.core.interfaces.Sequencer
 import net.syncthing.java.core.interfaces.TempRepository
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.ExecutorUtils
+import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.lang3.tuple.Pair
 import org.apache.http.util.TextUtils
+import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.IOException
 import java.util.*
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 class IndexHandler(private val configuration: ConfigurationService, val indexRepository: IndexRepository,
                    private val tempRepository: TempRepository) : Closeable {
@@ -98,7 +95,8 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         synchronized(indexWaitLock) {
             while (!isRemoteIndexAquired(connectionHandler.clusterConfigInfo!!, connectionHandler.deviceId())) {
                 indexWaitLock.wait(timeoutMillis)
-                checkArgument(connectionHandler.getLastActive() < timeoutMillis || lastActive() < timeoutMillis, "unable to aquire index from connection %s, timeout reached!", connectionHandler)
+                NetworkUtils.assertProtocol(connectionHandler.getLastActive() < timeoutMillis || lastActive() < timeoutMillis,
+                        {"unable to aquire index from connection $connectionHandler, timeout reached!"})
             }
         }
         logger.debug("aquired all indexes on connection {}", connectionHandler)
@@ -139,7 +137,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         when (bepFileInfo.type) {
             BlockExchangeProtos.FileInfoType.FILE -> {
                 fileBlocks = FileBlocks(folder, builder.getPath()!!, ((bepFileInfo.blocksList ?: emptyList())).map { record ->
-                    BlockInfo(record.offset, record.size, BaseEncoding.base16().encode(record.hash.toByteArray()))
+                    BlockInfo(record.offset, record.size, Hex.toHexString(record.hash.toByteArray()))
                 })
                 builder
                         .setTypeFile()
@@ -222,9 +220,9 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         return if (fileInfo == null) {
             null
         } else {
-            checkArgument(fileInfo.isFile)
+            assert(fileInfo.isFile())
             val fileBlocks = indexRepository.findFileBlocks(folder, path)
-            checkNotNull(fileBlocks, "file blocks not found for file info = %s", fileInfo)
+            checkNotNull(fileBlocks, {"file blocks not found for file info = $fileInfo"})
             Pair.of(fileInfo, fileBlocks)
         }
     }
@@ -307,7 +305,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         //        , delay = 0;
         //        private boolean addProcessingDelayForInterface = true;
         //        private final int MIN_DELAY = 0, MAX_DELAY = 5000, MAX_RECORD_PER_PROCESS = 16, DELAY_FACTOR = 1;
-        private var stopwatch: Stopwatch? = null
+        private var startTime: Long? = null
 
         fun handleIndexMessageReceivedEvent(event: BlockExchangeConnectionHandler.AnyIndexMessageReceivedEvent<*>) {
             logger.info("received index message event, preparing (queued records = {} event record count = {})", queuedRecords, event.filesList.size)
@@ -370,13 +368,13 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         private abstract inner class ProcessingRunnable : Runnable {
 
             override fun run() {
-                stopwatch = Stopwatch.createStarted()
+                startTime = System.currentTimeMillis()
                 runProcess()
                 queuedMessages--
                 //                lastRecordProcessingTime = stopwatch.elapsed(TimeUnit.MILLISECONDS) - delay;
                 //                logger.info("processed a bunch of records, {}*{} remaining", queuedMessages, MAX_RECORD_PER_PROCESS);
                 //                logger.debug("processed index message in {} secs", lastRecordProcessingTime / 1000d);
-                stopwatch = null
+                startTime = null
             }
 
             protected abstract fun runProcess()
@@ -430,7 +428,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
                     //                    }
                 }
                 val newIndexInfo = updateIndexInfo(folder, peerDeviceId, null, null, sequence)
-                val elap = stopwatch!!.elapsed(TimeUnit.MILLISECONDS)
+                val elap = System.currentTimeMillis() - startTime!!
                 queuedRecords -= message.filesCount.toLong()
                 logger.info("processed {} index records, aquired {} ({} secs, {} record/sec)", message.filesCount, newRecords.size, elap / 1000.0, Math.round(message.filesCount / (elap / 1000.0) * 100) / 100.0)
                 logger.info("remaining queue size: messages = {} records = {}; eta {} min", queuedMessages, queuedRecords, Math.round(queuedRecords / message.filesCount * (elap / 1000.0)) / 60.0)
