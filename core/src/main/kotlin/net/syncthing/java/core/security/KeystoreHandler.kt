@@ -25,6 +25,7 @@ import org.bouncycastle.cert.jcajce.JcaX509v1CertificateBuilder
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.OperatorCreationException
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
+import org.eclipse.jetty.alpn.ALPN
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -38,46 +39,17 @@ import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.*
-import javax.net.ssl.*
+import javax.net.ssl.SSLPeerUnverifiedException
+import javax.net.ssl.SSLSocket
 import javax.security.auth.x500.X500Principal
 
 class KeystoreHandler private constructor(private val keyStore: KeyStore) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    val keyManagers: Array<KeyManager>
-        @Throws(KeyStoreException::class, NoSuchAlgorithmException::class, UnrecoverableKeyException::class)
-        get() {
-            val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-            keyManagerFactory.init(keyStore, KEY_PASSWORD.toCharArray())
-            return keyManagerFactory.keyManagers
-        }
-
-    private val socketFactory: SSLSocketFactory
-        @Throws(KeyManagementException::class, NoSuchAlgorithmException::class, KeyStoreException::class, UnrecoverableKeyException::class)
-        get() {
-            val sslContext = SSLContext.getInstance(TLS_VERSION)
-            sslContext.init(keyManagers, arrayOf<TrustManager>(object : X509TrustManager {
-                @Throws(CertificateException::class)
-                override fun checkClientTrusted(xcs: Array<X509Certificate>, string: String) {
-                }
-
-                @Throws(CertificateException::class)
-                override fun checkServerTrusted(xcs: Array<X509Certificate>, string: String) {
-                }
-
-                override fun getAcceptedIssuers(): Array<X509Certificate>? {
-                    return null
-                }
-            }), null)
-            return sslContext.socketFactory
-        }
-
     class CryptoException internal constructor(t: Throwable) : GeneralSecurityException(t)
 
-    init {
-        checkNotNull(keyStore)
-    }
+    private val socketFactory = TLSSocketFactory(keyStore)
 
     private fun exportKeystoreToData(): ByteArray {
         val out = ByteArrayOutputStream()
@@ -92,12 +64,11 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         } catch (ex: CertificateException) {
             throw RuntimeException(ex)
         }
-
         return out.toByteArray()
     }
 
     @Throws(CryptoException::class, IOException::class)
-    fun wrapSocket(socket: Socket, isServerSocket: Boolean, vararg protocols: String): Socket {
+    private fun wrapSocket(socket: Socket, isServerSocket: Boolean, vararg protocols: String): Socket {
         try {
             logger.debug("wrapping plain socket, server mode = {}", isServerSocket)
             val sslSocket = socketFactory.createSocket(socket, null, socket.port, true) as SSLSocket
@@ -140,18 +111,18 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     private fun enableALPN(socket: SSLSocket, vararg protocols: String) {
         try {
             Class.forName("org.eclipse.jetty.alpn.ALPN")
-            org.eclipse.jetty.alpn.ALPN.put(socket, object : org.eclipse.jetty.alpn.ALPN.ClientProvider {
+            ALPN.put(socket, object : ALPN.ClientProvider {
 
                 override fun protocols(): List<String> {
                     return Arrays.asList(*protocols)
                 }
 
                 override fun unsupported() {
-                    org.eclipse.jetty.alpn.ALPN.remove(socket)
+                    ALPN.remove(socket)
                 }
 
                 override fun selected(protocol: String) {
-                    org.eclipse.jetty.alpn.ALPN.remove(socket)
+                    ALPN.remove(socket)
                     logger.debug("ALPN select protocol = {}", protocol)
                 }
             })
