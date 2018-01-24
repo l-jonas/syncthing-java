@@ -1,7 +1,5 @@
 buildscript {
     ext.kotlin_version = '1.2.20'
-    // Use protobuf 2.x because it is smaller
-    ext.protobuf_version = '2.6.1'
     repositories {
         jcenter()
     }
@@ -28,16 +26,37 @@ subprojects {
     targetCompatibility = 1.8
     compileKotlin.kotlinOptions.jvmTarget = "1.6"
 
-    protobuf.protoc {
-        artifact = "com.google.protobuf:protoc:$protobuf_version"
+    protobuf {
+        protoc {
+            // You still need protoc like in the non-Android case
+            //artifact = "com.google.protobuf:protoc:3.5.1-1"
+        }
+        plugins {
+            javalite {
+                // The codegen for lite comes as a separate artifact
+                artifact = "com.google.protobuf:protoc-gen-javalite:3.0.0"
+            }
+        }
+        generateProtoTasks {
+            all().each { task ->
+                task.builtins {
+                    // In most cases you don't need the full Java output
+                    // if you use the lite output.
+                    remove java
+                }
+                task.plugins {
+                    javalite { }
+                }
+            }
+        }
     }
 
     // Make sure Intellij can find generated protobuf files.
-    idea.module.sourceDirs += file("${protobuf.generatedFilesBaseDir}/main/java")
+    idea.module.sourceDirs += file("${protobuf.generatedFilesBaseDir}/main/javalite")
 
     // Workaround for https://github.com/google/protobuf-gradle-plugin/issues/100
     compileKotlin.dependsOn('generateProto')
-    sourceSets.main.kotlin.srcDirs += file("${protobuf.generatedFilesBaseDir}/main/java")
+    sourceSets.main.kotlin.srcDirs += file("${protobuf.generatedFilesBaseDir}/main/javalite")
 
     repositories {
         mavenLocal()
@@ -46,5 +65,6 @@ subprojects {
 
     dependencies {
         compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+        compile "com.google.protobuf:protobuf-lite:3.0.1"
     }
 }

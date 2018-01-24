@@ -1,5 +1,7 @@
 package net.syncthing.java.bep;
 
+option optimize_for = LITE_RUNTIME;
+
 import "blockExchangeProtos.proto";
 
 message Blocks {

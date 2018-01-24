@@ -16,7 +16,7 @@ package net.syncthing.java.bep
 import com.google.common.eventbus.EventBus
 import com.google.common.eventbus.Subscribe
 import com.google.protobuf.ByteString
-import com.google.protobuf.GeneratedMessage
+import com.google.protobuf.MessageLite
 import net.jpountz.lz4.LZ4Factory
 import net.syncthing.java.bep.BlockExchangeProtos.*
 import net.syncthing.java.client.protocol.rp.RelayClient
@@ -118,27 +118,32 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
         run {
             val clusterConfigBuilder = ClusterConfig.newBuilder()
             for (folder in configuration.getFolderNames()) {
-                val folderBuilder = clusterConfigBuilder.addFoldersBuilder().setId(folder)
+                val folderBuilder = Folder.newBuilder().setId(folder)
                 run {
                     //our device
-                    val deviceBuilder = folderBuilder.addDevicesBuilder()
+                    val deviceBuilder = Device.newBuilder()
                             .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId!!)))
-                    deviceBuilder.setIndexId(indexHandler.sequencer().indexId()).maxSequence = indexHandler.sequencer().currentSequence()
+                            .setIndexId(indexHandler.sequencer().indexId())
+                            .setMaxSequence(indexHandler.sequencer().currentSequence())
+                    folderBuilder.addDevices(deviceBuilder)
                 }
                 run {
                     //other device
-                    val deviceBuilder = folderBuilder.addDevicesBuilder()
+                    val deviceBuilder = Device.newBuilder()
                             .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(address.deviceId)))
                     val indexSequenceInfo = indexHandler.indexRepository.findIndexInfoByDeviceAndFolder(address.deviceId, folder)
-                    if (indexSequenceInfo != null) {
+                    indexSequenceInfo?.let {
                         deviceBuilder
-                                .setIndexId(indexSequenceInfo.indexId).maxSequence = indexSequenceInfo.localSequence
+                                .setIndexId(indexSequenceInfo.indexId)
+                                .setMaxSequence(indexSequenceInfo.localSequence)
                         logger.info("send delta index info device = {} index = {} max (local) sequence = {}",
                                 indexSequenceInfo.deviceId,
                                 indexSequenceInfo.indexId,
                                 indexSequenceInfo.localSequence)
                     }
+                    folderBuilder.addDevices(deviceBuilder)
                 }
+                clusterConfigBuilder.addFolders(folderBuilder)
                 //TODO other devices??
             }
             sendMessage(clusterConfigBuilder.build())
@@ -247,7 +252,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
     }
 
     @Throws(IOException::class)
-    private fun receiveMessage(): Pair<BlockExchangeProtos.MessageType, GeneratedMessage> {
+    private fun receiveMessage(): Pair<BlockExchangeProtos.MessageType, MessageLite> {
         logger.trace("receiving message")
         var headerLength = inputStream!!.readShort().toInt()
         while (headerLength == 0) {
@@ -275,7 +280,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
         }
         NetworkUtils.assertProtocol(messageTypes.containsKey(header.type), {"unsupported message type = ${header.type}"})
         try {
-            val message = messageTypes[header.type]?.getMethod("parseFrom", ByteArray::class.java)?.invoke(null, messageBuffer as Any) as GeneratedMessage
+            val message = messageTypes[header.type]?.getMethod("parseFrom", ByteArray::class.java)?.invoke(null, messageBuffer as Any) as MessageLite
             return Pair.of(header.type, message)
         } catch (e: Exception) {
             when (e) {
@@ -286,7 +291,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
         }
     }
 
-    internal fun sendMessage(message: GeneratedMessage): Future<*> {
+    internal fun sendMessage(message: MessageLite): Future<*> {
         checkNotClosed()
         assert(messageTypes.containsValue(message.javaClass))
         val header = BlockExchangeProtos.Header.newBuilder()
@@ -527,7 +532,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
 
         private val MAGIC = 0x2EA7D90B
 
-        private val messageTypes: Map<MessageType, Class<out GeneratedMessage>> = mapOf(
+        private val messageTypes: Map<MessageType, Class<out MessageLite>> = mapOf(
                 BlockExchangeProtos.MessageType.CLOSE to BlockExchangeProtos.Close::class.java,
                 BlockExchangeProtos.MessageType.CLUSTER_CONFIG to BlockExchangeProtos.ClusterConfig::class.java,
                 BlockExchangeProtos.MessageType.DOWNLOAD_PROGRESS to BlockExchangeProtos.DownloadProgress::class.java,
@@ -543,7 +548,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
          * @param message
          * @return id for message bean
          */
-        private fun getIdForMessage(message: GeneratedMessage): String {
+        private fun getIdForMessage(message: MessageLite): String {
             return when (message) {
                 is Request -> Integer.toString(message.id)
                 is Response -> Integer.toString(message.id)

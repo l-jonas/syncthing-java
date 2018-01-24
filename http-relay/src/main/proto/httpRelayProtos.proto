@@ -1,5 +1,7 @@
 package net.syncthing.java.httprelay;
 
+option optimize_for = LITE_RUNTIME;
+
 message HttpRelayPeerMessage{
     optional HttpRelayPeerMessageType message_type = 1;
     optional string session_id = 2;

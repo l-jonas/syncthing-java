@@ -1,4 +1,3 @@
 dependencies {
   compile project(':relay')
-  compile "com.google.protobuf:protobuf-java:$protobuf_version"
 }
