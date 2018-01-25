@@ -13,10 +13,6 @@
  */
 package net.syncthing.java.repository.repo
 
-import com.google.common.base.Optional
-import com.google.common.cache.CacheBuilder
-import com.google.common.cache.CacheLoader
-import com.google.common.eventbus.EventBus
 import com.google.protobuf.ByteString
 import com.google.protobuf.InvalidProtocolBufferException
 import com.zaxxer.hikari.HikariConfig
@@ -42,7 +38,6 @@ import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Types
 import java.util.*
-import java.util.concurrent.TimeUnit
 
 class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepository, DeviceAddressRepository, TempRepository {
 
@@ -50,17 +45,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     private var sequencer: Sequencer = IndexRepoSequencer()
     private val dataSource: HikariDataSource
     //    private final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-    private val eventBus = EventBus()
-    private val indexInfoByDeviceIdAndFolder = CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.DAYS)
-            .build(object : CacheLoader<Pair<String, String>, Optional<IndexInfo>>() {
-                @Throws(Exception::class)
-                override fun load(key: Pair<String, String>) = Optional.fromNullable(doFindIndexInfoByDeviceAndFolder(key.left, key.right))
-            })
-    private val folderStatsByFolder = CacheBuilder.newBuilder().expireAfterAccess(1, TimeUnit.DAYS)
-            .build(object : CacheLoader<String, Optional<FolderStats>>() {
-                @Throws(Exception::class)
-                override fun load(key: String) = Optional.fromNullable(doFindFolderStats(key))
-            })
+    private var onFolderStatsUpdatedListener: ((IndexRepository.FolderStatsUpdatedEvent) -> Unit)? = null
 
     @Throws(SQLException::class)
     private fun getConnection() = dataSource.connection
@@ -99,7 +84,9 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         logger.debug("database ready")
     }
 
-    override fun getEventBus(): EventBus = eventBus
+    override fun setOnFolderStatsUpdatedListener(listener: ((IndexRepository.FolderStatsUpdatedEvent) -> Unit)?) {
+        onFolderStatsUpdatedListener = listener
+    }
 
     private fun checkDb() {
         logger.debug("check db")
@@ -234,19 +221,18 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
-        indexInfoByDeviceIdAndFolder.put(Pair.of(indexInfo.deviceId, indexInfo.folder), Optional.of(indexInfo))
     }
 
-    override fun findIndexInfoByDeviceAndFolder(deviceId: String, folder: String): IndexInfo? {
-        return indexInfoByDeviceIdAndFolder.getUnchecked(Pair.of(deviceId, folder)).orNull()
+    override fun findIndexInfoByDeviceAndFolder(deviceId: DeviceId, folder: String): IndexInfo? {
+        val key = Pair.of(deviceId, folder)
+        return doFindIndexInfoByDeviceAndFolder(key.left, key.right)
     }
 
-    private fun doFindIndexInfoByDeviceAndFolder(deviceId: String, folder: String): IndexInfo? {
+    private fun doFindIndexInfoByDeviceAndFolder(deviceId: DeviceId, folder: String): IndexInfo? {
         try {
             getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM folder_index_info WHERE device_id=? AND folder=?").use { prepareStatement ->
-                    prepareStatement.setString(1, deviceId)
+                    prepareStatement.setString(1, deviceId.deviceId)
                     prepareStatement.setString(2, folder)
                     val resultSet = prepareStatement.executeQuery()
                     return if (resultSet.first()) {
@@ -371,7 +357,6 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     }
 
     override fun updateFileInfo(newFileInfo: FileInfo, newFileBlocks: FileBlocks?) {
-        var folderStats: FolderStats? = null
         val version = newFileInfo.versionList.last()
         //TODO open transsaction, rollback
         try {
@@ -446,43 +431,41 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                         deltaDirCount++
                     }
                 }
-                folderStats = updateFolderStats(connection, newFileInfo.folder, deltaFileCount, deltaDirCount, deltaSize, newFileInfo.lastModified)
+                val folderStats = updateFolderStats(connection, newFileInfo.folder, deltaFileCount, deltaDirCount, deltaSize, newFileInfo.lastModified)
+
+                onFolderStatsUpdatedListener?.invoke(object : IndexRepository.FolderStatsUpdatedEvent() {
+                    override fun getFolderStats(): List<FolderStats> {
+                        return listOf(folderStats)
+                    }
+                })
             }
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-
-        folderStatsByFolder.put(folderStats!!.folder, Optional.fromNullable(folderStats))
-        eventBus.post(object : IndexRepository.FolderStatsUpdatedEvent() {
-            override fun getFolderStats(): List<FolderStats> {
-                return listOf(folderStats!!)
-            }
-        })
     }
 
     override fun findNotDeletedFilesByFolderAndParent(folder: String, parentPath: String): MutableList<FileInfo> {
-        val list = mutableListOf<FileInfo>()
         try {
             getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM file_info WHERE folder=? AND parent=? AND is_deleted=FALSE").use { prepareStatement ->
                     prepareStatement.setString(1, folder)
                     prepareStatement.setString(2, parentPath)
                     val resultSet = prepareStatement.executeQuery()
+                    val list = mutableListOf<FileInfo>()
                     while (resultSet.next()) {
                         list.add(readFileInfo(resultSet))
                     }
+                    return list
                 }
             }
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-        return list
     }
 
     override fun findFileInfoBySearchTerm(query: String): List<FileInfo> {
         assert(!isBlank(query))
         //        checkArgument(maxResult > 0);
-        val list = mutableListOf<FileInfo>()
         //        try (Connection connection = getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM file_info WHERE LOWER(file_name) LIKE ? AND is_deleted=FALSE LIMIT ?")) {
         try {
             getConnection().use { connection ->
@@ -492,15 +475,16 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                     preparedStatement.setString(1, query.trim { it <= ' ' }.toLowerCase())
                     //            preparedStatement.setInt(2, maxResult);
                     val resultSet = preparedStatement.executeQuery()
+                    val list = mutableListOf<FileInfo>()
                     while (resultSet.next()) {
                         list.add(readFileInfo(resultSet))
                     }
+                    return list
                 }
             }
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-        return list
     }
 
     override fun countFileInfoBySearchTerm(query: String): Long {
@@ -524,8 +508,6 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     override fun clearIndex() {
         initDb()
         sequencer = IndexRepoSequencer()
-        indexInfoByDeviceIdAndFolder.invalidateAll()
-        folderStatsByFolder.invalidateAll()
     }
 
     // FOLDER STATS - BEGIN
@@ -541,7 +523,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     }
 
     override fun findFolderStats(folder: String): FolderStats? {
-        return folderStatsByFolder.getUnchecked(folder).orNull()
+        return doFindFolderStats(folder)
     }
 
     private fun doFindFolderStats(folder: String): FolderStats? {
@@ -563,22 +545,21 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     }
 
     override fun findAllFolderStats(): List<FolderStats> {
-        val list = mutableListOf<FolderStats>()
         try {
             getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM folder_stats").use { prepareStatement ->
                     val resultSet = prepareStatement.executeQuery()
+                    val list = mutableListOf<FolderStats>()
                     while (resultSet.next()) {
                         val folderStats = readFolderStats(resultSet)
                         list.add(folderStats)
-                        folderStatsByFolder.put(folderStats.folder, Optional.of(folderStats))
                     }
+                    return list
                 }
             }
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-        return list
     }
 
     @Throws(SQLException::class)
@@ -686,9 +667,9 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     }
 
     override fun pushTempData(data: ByteArray): String {
-        val key = UUID.randomUUID().toString()
         try {
             getConnection().use { connection ->
+                val key = UUID.randomUUID().toString()
                 connection.prepareStatement("INSERT INTO temporary_data"
                         + " (record_key,record_data)"
                         + " VALUES (?,?)").use { prepareStatement ->
@@ -696,11 +677,11 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                     prepareStatement.setBytes(2, data)
                     prepareStatement.executeUpdate()
                 }
+                return key
             }
         } catch (ex: SQLException) {
             throw RuntimeException(ex)
         }
-        return key
     }
 
     override fun popTempData(key: String): ByteArray {
@@ -838,6 +819,6 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
     }
 
     companion object {
-        private val VERSION = 13
+        private const val VERSION = 13
     }
 }

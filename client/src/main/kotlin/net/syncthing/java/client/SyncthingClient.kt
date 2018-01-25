@@ -13,15 +13,14 @@
  */
 package net.syncthing.java.client
 
-import com.google.common.eventbus.Subscribe
 import net.syncthing.java.bep.BlockExchangeConnectionHandler
 import net.syncthing.java.bep.BlockPuller.FileDownloadObserver
 import net.syncthing.java.bep.BlockPusher
 import net.syncthing.java.bep.BlockPusher.FileUploadObserver
 import net.syncthing.java.bep.IndexHandler
 import net.syncthing.java.core.beans.DeviceAddress
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.FileInfo
-import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.java.core.cache.BlockCache
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.security.KeystoreHandler
@@ -47,9 +46,8 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
 
     init {
         indexHandler = IndexHandler(configuration, sqlRepository, sqlRepository)
-        discoveryHandler = DiscoveryHandler(configuration, sqlRepository)
         devicesHandler = DevicesHandler(configuration)
-        discoveryHandler.eventBus.register(devicesHandler)
+        discoveryHandler = DiscoveryHandler(configuration, sqlRepository, devicesHandler::handleDeviceAddressReceivedEvent)
     }
 
     fun clearCacheAndIndex() {
@@ -61,21 +59,11 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
     private fun openConnection(deviceAddress: DeviceAddress): BlockExchangeConnectionHandler {
-        val connectionHandler = BlockExchangeConnectionHandler(configuration, deviceAddress, indexHandler)
-        connectionHandler.eventBus.register(indexHandler)
-        connectionHandler.eventBus.register(devicesHandler)
         val shouldRestartForNewFolder = AtomicBoolean(false)
-        connectionHandler.eventBus.register(object : Any() {
-            @Subscribe
-            fun handleConnectionClosedEvent(event: BlockExchangeConnectionHandler.ConnectionClosedEvent) {
-                connections.remove(connectionHandler)
-            }
-
-            @Subscribe
-            fun handleNewFolderSharedEvent(event: BlockExchangeConnectionHandler.NewFolderSharedEvent) {
-                shouldRestartForNewFolder.set(true)
-            }
-        })
+        val connectionHandler = BlockExchangeConnectionHandler(
+                configuration, deviceAddress, indexHandler, devicesHandler::handleDeviceAddressActiveEvent,
+                { shouldRestartForNewFolder.set(true) },
+                { connections.remove(it)})
         connectionHandler.connect()
         connections.add(connectionHandler)
         return if (shouldRestartForNewFolder.get()) {
@@ -135,15 +123,14 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
                         }
                     }
             completeListener()
-            addressesSupplier.close()
         }.start()
     }
 
-    fun updateIndexFromPeers(listener: (successes: Set<String>, failures: Set<String>) -> Unit) {
+    fun updateIndexFromPeers(listener: (successes: Set<DeviceId>, failures: Set<DeviceId>) -> Unit) {
         // TODO: if there is already an index update in progress, do nothing
         //       this should probably be handled in IndexHandler
         //       at the moment, this is handled on the Android side
-        val indexUpdateComplete = mutableSetOf<String>()
+        val indexUpdateComplete = mutableSetOf<DeviceId>()
         getPeerConnections({ connection ->
             try {
                 indexHandler.waitForRemoteIndexAquired(connection)

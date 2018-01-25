@@ -13,8 +13,8 @@
  */
 package net.syncthing.java.core.configuration
 
-import com.google.common.io.BaseEncoding
 import com.google.gson.Gson
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.java.core.configuration.gsonbeans.DeviceConfig
@@ -24,6 +24,8 @@ import net.syncthing.java.core.configuration.gsonbeans.FolderConfigList
 import net.syncthing.java.core.utils.ExecutorUtils
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang3.StringUtils.isBlank
+import org.bouncycastle.util.encoders.Base64
+import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.net.InetAddress
@@ -44,13 +46,13 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
     val clientVersion: String
     var deviceName: String?
         private set
-    var deviceId: String?
+    var deviceId: DeviceId?
         private set
     var keystoreAlgo: String?
         private set
     val repositoryH2Config: String?
     private val folders: MutableMap<String, FolderInfo>
-    private val peers: MutableMap<String, DeviceInfo>
+    private val peers: MutableMap<DeviceId, DeviceInfo>
     var keystore: ByteArray? = null
         private set
     val discoveryServers: List<String>
@@ -59,7 +61,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
 
     fun getFolderNames(): Set<String> = folders.keys.toSet()
 
-    fun getPeerIds(): Set<String> = peers.keys.toSet()
+    fun getPeerIds(): Set<DeviceId> = peers.keys.toSet()
 
     fun getStorageInfo(): StorageInfo = StorageInfo()
 
@@ -78,7 +80,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
                 deviceName = "s-client"
             }
         }
-        deviceId = properties.getPropertySafe(DEVICE_ID)
+        deviceId = properties.getPropertySafe(DEVICE_ID)?.let { DeviceId(it) }
         keystoreAlgo = properties.getPropertySafe(KEYSTORE_ALGO)
         folders = Collections.synchronizedMap(mutableMapOf())
         val folderValue: String? = properties.getPropertySafe(FOLDERS)
@@ -88,7 +90,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
         }
         val keystoreValue = properties.getPropertySafe(KEYSTORE)
         if (keystoreValue != null && !keystoreValue.isEmpty()) {
-            keystore = BaseEncoding.base64().decode(keystoreValue)
+            keystore = Base64.decode(keystoreValue)
         }
         val cacheDir = properties.getPropertySafe(CACHE)
         cache = if (!isBlank(cacheDir)) {
@@ -122,7 +124,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
         }
         val discoveryServerValue: String? = properties.getPropertySafe(DISCOVERY_SERVERS)
         discoveryServers = if (discoveryServerValue == null || discoveryServerValue.isEmpty()) emptyList()
-                           else discoveryServerValue.split(",".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray().toList()
+                           else discoveryServerValue.split(",".toRegex()).dropLastWhile { it.isEmpty() }
         clientVersion = javaClass.`package`.implementationVersion ?: "0.0.0"// version info from MANIFEST, with 'safe' default fallback
         val configurationValue = properties.getPropertySafe(CONFIGURATION)
         if (!isBlank(configurationValue)) {
@@ -143,8 +145,8 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
         if (!isBlank(deviceName)) {
             properties.setProperty(DEVICE_NAME, deviceName)
         }
-        if (!isBlank(deviceId)) {
-            properties.setProperty(DEVICE_ID, deviceId)
+        deviceId?.let {
+            properties.setProperty(DEVICE_ID, it.deviceId)
         }
         val folderConfigList = FolderConfigList()
         for (folderInfo in folders.values) {
@@ -161,7 +163,8 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
         properties.setProperty(TEMP, temp.absolutePath)
         properties.setProperty(CACHE, cache.absolutePath)
         if (keystore != null) {
-            properties.setProperty(KEYSTORE, BaseEncoding.base64().encode(keystore!!))
+            Hex.encode(keystore)
+            properties.setProperty(KEYSTORE, Base64.toBase64String(keystore))
         }
         if (!isBlank(keystoreAlgo)) {
             properties.setProperty(KEYSTORE_ALGO, keystoreAlgo)
@@ -253,7 +256,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
             return this
         }
 
-        fun removePeer(deviceId: String): Editor {
+        fun removePeer(deviceId: DeviceId): Editor {
             peers.remove(deviceId)
             return this
         }
@@ -277,7 +280,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
             } ?: logger.debug("dummy save config, no file set")
         }
 
-        fun setDeviceId(deviceId: String): Editor {
+        fun setDeviceId(deviceId: DeviceId): Editor {
             this@ConfigurationService.deviceId = deviceId
             return this
         }
@@ -368,18 +371,18 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
 
     companion object {
 
-        private val DEVICE_NAME = "devicename"
-        private val FOLDERS = "folders"
-        private val PEERS = "peers"
-        private val INDEX = "index"
-        private val DATABASE = "database"
-        private val TEMP = "temp"
-        private val CACHE = "cache"
-        private val KEYSTORE = "keystore"
-        private val DEVICE_ID = "deviceid"
-        private val KEYSTORE_ALGO = "keystorealgo"
-        private val DISCOVERY_SERVERS = "discoveryserver"
-        private val CONFIGURATION = "configuration"
-        private val REPOSITORY_H2_CONFIG = "repository.h2.dboptions"
+        private const val DEVICE_NAME = "devicename"
+        private const val FOLDERS = "folders"
+        private const val PEERS = "peers"
+        private const val INDEX = "index"
+        private const val DATABASE = "database"
+        private const val TEMP = "temp"
+        private const val CACHE = "cache"
+        private const val KEYSTORE = "keystore"
+        private const val DEVICE_ID = "deviceid"
+        private const val KEYSTORE_ALGO = "keystorealgo"
+        private const val DISCOVERY_SERVERS = "discoveryserver"
+        private const val CONFIGURATION = "configuration"
+        private const val REPOSITORY_H2_CONFIG = "repository.h2.dboptions"
     }
 }

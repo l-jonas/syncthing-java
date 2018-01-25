@@ -13,17 +13,15 @@
  */
 package net.syncthing.java.bep
 
-import com.google.common.eventbus.EventBus
-import com.google.common.eventbus.Subscribe
 import com.google.protobuf.ByteString
 import com.google.protobuf.MessageLite
 import net.jpountz.lz4.LZ4Factory
 import net.syncthing.java.bep.BlockExchangeProtos.*
 import net.syncthing.java.client.protocol.rp.RelayClient
 import net.syncthing.java.core.beans.DeviceAddress
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.java.core.configuration.ConfigurationService
-import net.syncthing.java.core.events.DeviceAddressActiveEvent
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.NetworkUtils
 import net.syncthing.java.httprelay.HttpRelayClient
@@ -44,7 +42,11 @@ import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLSocket
 
-class BlockExchangeConnectionHandler(private val configuration: ConfigurationService, val address: DeviceAddress, private val indexHandler: IndexHandler) : Closeable {
+class BlockExchangeConnectionHandler(private val configuration: ConfigurationService, val address: DeviceAddress,
+                                     private val indexHandler: IndexHandler,
+                                     private val onDeviceAddressActiveListener: (DeviceId) -> Unit,
+                                     private val onNewFolderSharedListener: (FolderInfo) -> Unit,
+                                     private val onConnectionClosedListener: (BlockExchangeConnectionHandler) -> Unit) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -52,21 +54,33 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
     private val inExecutorService = Executors.newSingleThreadExecutor()
     private val messageProcessingService = Executors.newCachedThreadPool()
     private val periodicExecutorService = Executors.newSingleThreadScheduledExecutor()
-    val eventBus = EventBus()
     private var socket: Socket? = null
     private var inputStream: DataInputStream? = null
     private var outputStream: DataOutputStream? = null
     private var lastActive = Long.MIN_VALUE
     internal var clusterConfigInfo: ClusterConfigInfo? = null
+    private val clusterConfigWaitingLock = Object()
+    private val blockPuller = BlockPuller(configuration, this)
+    private val blockPusher = BlockPusher(configuration, this, indexHandler)
+    private val onRequestMessageReceivedListeners = mutableSetOf<(Request) -> Unit>()
     var isClosed = false
         private set
     var isConnected = false
         private set
 
-    fun deviceId(): String = address.deviceId
+    fun deviceId(): DeviceId = address.deviceId()
 
     private fun checkNotClosed() {
         NetworkUtils.assertProtocol(!isClosed, {"connection $this closed"})
+    }
+
+    internal fun registerOnRequestMessageReceivedListeners(listener: (Request) -> Unit) {
+        onRequestMessageReceivedListeners.add(listener)
+    }
+
+    internal fun unregisterOnRequestMessageReceivedListeners(listener: (Request) -> Unit) {
+        assert(onRequestMessageReceivedListeners.contains(listener))
+        onRequestMessageReceivedListeners.remove(listener)
     }
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
@@ -104,13 +118,8 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
 
         val hello = receiveHelloMessage()
         logger.trace("received hello message = {}", hello)
-        val connectionInfo = ConnectionInfo()
-        connectionInfo.clientName = hello.clientName
-        connectionInfo.clientVersion = hello.clientVersion
-        connectionInfo.deviceName = hello.deviceName
-        logger.info("connected to device = {}", connectionInfo)
         try {
-            keystoreHandler.checkSocketCerificate((socket as SSLSocket?)!!, address.deviceId)
+            keystoreHandler.checkSocketCerificate((socket as SSLSocket?)!!, address.deviceId())
         } catch (e: CertificateException) {
             throw IOException(e)
         }
@@ -122,7 +131,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                 run {
                     //our device
                     val deviceBuilder = Device.newBuilder()
-                            .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId!!)))
+                            .setId(ByteString.copyFrom(configuration.deviceId!!.toHashData()))
                             .setIndexId(indexHandler.sequencer().indexId())
                             .setMaxSequence(indexHandler.sequencer().currentSequence())
                     folderBuilder.addDevices(deviceBuilder)
@@ -130,8 +139,8 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                 run {
                     //other device
                     val deviceBuilder = Device.newBuilder()
-                            .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(address.deviceId)))
-                    val indexSequenceInfo = indexHandler.indexRepository.findIndexInfoByDeviceAndFolder(address.deviceId, folder)
+                            .setId(ByteString.copyFrom(DeviceId(address.deviceId).toHashData()))
+                    val indexSequenceInfo = indexHandler.indexRepository.findIndexInfoByDeviceAndFolder(address.deviceId(), folder)
                     indexSequenceInfo?.let {
                         deviceBuilder
                                 .setIndexId(indexSequenceInfo.indexId)
@@ -148,24 +157,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
             }
             sendMessage(clusterConfigBuilder.build())
         }
-        val clusterConfigWaitingLock = Object()
         synchronized(clusterConfigWaitingLock) {
-            val listener = object : Any() {
-                @Subscribe
-                fun handleClusterConfigMessageProcessedEvent(event: ClusterConfigMessageProcessedEvent) {
-                    synchronized(clusterConfigWaitingLock) {
-                        clusterConfigWaitingLock.notifyAll()
-                    }
-                }
-
-                @Subscribe
-                fun handleConnectionClosedEvent(event: ConnectionClosedEvent) {
-                    synchronized(clusterConfigWaitingLock) {
-                        clusterConfigWaitingLock.notifyAll()
-                    }
-                }
-            }
-            eventBus.register(listener)
             startMessageListenerService()
             while (clusterConfigInfo == null && !isClosed) {
                 logger.debug("wait for cluster config")
@@ -179,7 +171,6 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
             if (clusterConfigInfo == null) {
                 throw IOException("unable to retrieve cluster config from peer!")
             }
-            eventBus.unregister(listener)
         }
         for (folder in configuration.getFolderNames()) {
             if (hasFolder(folder)) {
@@ -192,11 +183,11 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
     }
 
     fun getBlockPuller(): BlockPuller {
-        return BlockPuller(configuration, this)
+        return blockPuller
     }
 
     fun getBlockPusher(): BlockPusher {
-        return BlockPusher(configuration, this, indexHandler)
+        return blockPusher
     }
 
     private fun sendIndexMessage(folder: String) {
@@ -206,7 +197,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
     }
 
     private fun closeBg() {
-        Thread(Runnable { this.close() }).start()
+        Thread { close() }.start()
     }
 
     @Throws(IOException::class)
@@ -332,6 +323,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
             outExecutorService.shutdown()
             inExecutorService.shutdown()
             messageProcessingService.shutdown()
+            assert(onRequestMessageReceivedListeners.isEmpty())
             if (outputStream != null) {
                 IOUtils.closeQuietly(outputStream)
                 outputStream = null
@@ -345,7 +337,10 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                 socket = null
             }
             logger.info("closed connection {}", address)
-            eventBus.post(ConnectionClosedEvent.INSTANCE)
+            synchronized(clusterConfigWaitingLock) {
+                clusterConfigWaitingLock.notifyAll()
+            }
+            onConnectionClosedListener(this)
             try {
                 periodicExecutorService.awaitTermination(2, TimeUnit.SECONDS)
                 outExecutorService.awaitTermination(2, TimeUnit.SECONDS)
@@ -377,10 +372,24 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                     messageProcessingService.submit {
                         logger.debug("processing message type = {} {}", message.left, getIdForMessage(message.right))
                         when (message.left) {
-                            BlockExchangeProtos.MessageType.INDEX -> eventBus.post(IndexMessageReceivedEvent(message.value as Index))
-                            BlockExchangeProtos.MessageType.INDEX_UPDATE -> eventBus.post(IndexUpdateMessageReceivedEvent(message.value as IndexUpdate))
-                            BlockExchangeProtos.MessageType.REQUEST -> eventBus.post(RequestMessageReceivedEvent(message.value as Request))
-                            BlockExchangeProtos.MessageType.RESPONSE -> eventBus.post(ResponseMessageReceivedEvent(message.value as Response))
+                            BlockExchangeProtos.MessageType.INDEX -> {
+                                val index = message.value as Index
+                                indexHandler.handleIndexMessageReceivedEvent(index.folder, index.filesList, this)
+                                onDeviceAddressActive()
+                            }
+                            BlockExchangeProtos.MessageType.INDEX_UPDATE -> {
+                                val update = message.value as IndexUpdate
+                                indexHandler.handleIndexMessageReceivedEvent(update.folder, update.filesList, this)
+                                onDeviceAddressActive()
+                            }
+                            BlockExchangeProtos.MessageType.REQUEST -> {
+                                onRequestMessageReceivedListeners.forEach { it(message.value as Request) }
+                                onDeviceAddressActive()
+                            }
+                            BlockExchangeProtos.MessageType.RESPONSE -> {
+                                blockPuller.onResponseMessageReceived(message.value as Response)
+                                onDeviceAddressActive()
+                            }
                             BlockExchangeProtos.MessageType.PING -> logger.debug("ping message received")
                             BlockExchangeProtos.MessageType.CLOSE -> {
                                 logger.info("received close message = {}", message.value)
@@ -394,9 +403,9 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                                     val folderInfo = ClusterConfigFolderInfo(folder.id, folder.label)
                                     val devicesById = (folder.devicesList ?: emptyList())
                                             .associateBy { input ->
-                                                KeystoreHandler.hashDataToDeviceIdString(input.id!!.toByteArray())
+                                                DeviceId.fromHashData(input.id!!.toByteArray())
                                             }
-                                    val otherDevice = devicesById[address.deviceId]
+                                    val otherDevice = devicesById[address.deviceId()]
                                     val ourDevice = devicesById[configuration.deviceId]
                                     if (otherDevice != null) {
                                         folderInfo.isAnnounced = true
@@ -405,13 +414,10 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                                         folderInfo.isShared = true
                                         logger.info("folder shared from device = {} folder = {}", address.deviceId, folderInfo)
                                         if (!configuration.getFolderNames().contains(folderInfo.folder)) {
-                                            configuration.Editor().addFolders(setOf(FolderInfo(folderInfo.folder, folderInfo.label)))
+                                            val fi = FolderInfo(folderInfo.folder, folderInfo.label)
+                                            configuration.Editor().addFolders(setOf(fi))
+                                            onNewFolderSharedListener(fi)
                                             logger.info("new folder shared = {}", folderInfo)
-                                            eventBus.post(object : NewFolderSharedEvent() {
-                                                override val folder: String
-                                                    get() = folderInfo.folder
-
-                                            })
                                         }
                                     } else {
                                         logger.info("folder not shared from device = {} folder = {}", address.deviceId, folderInfo)
@@ -419,7 +425,11 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                                     clusterConfigInfo!!.putFolderInfo(folderInfo)
                                 }
                                 configuration.Editor().persistLater()
-                                eventBus.post(ClusterConfigMessageProcessedEvent(clusterConfig))
+                                indexHandler.handleClusterConfigMessageProcessedEvent(clusterConfig)
+                                onDeviceAddressActive()
+                                synchronized(clusterConfigWaitingLock) {
+                                    clusterConfigWaitingLock.notifyAll()
+                                }
                             }
                         }
                     }
@@ -434,49 +444,9 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
         }
     }
 
-    abstract inner class MessageReceivedEvent<E> constructor(val message: E) : DeviceAddressActiveEvent {
-
-        val connectionHandler: BlockExchangeConnectionHandler
-            get() = this@BlockExchangeConnectionHandler
-
-        override fun getDeviceAddress(): DeviceAddress {
-            return connectionHandler.address
-        }
-
+    private fun onDeviceAddressActive() {
+        onDeviceAddressActiveListener(deviceId())
     }
-
-    abstract inner class AnyIndexMessageReceivedEvent<E> constructor(message: E) : MessageReceivedEvent<E>(message) {
-
-        abstract val filesList: List<BlockExchangeProtos.FileInfo>
-
-        abstract val folder: String
-    }
-
-    inner class IndexMessageReceivedEvent constructor(message: Index) : AnyIndexMessageReceivedEvent<Index>(message) {
-
-        override val filesList: List<BlockExchangeProtos.FileInfo>
-            get() = message.filesList
-
-        override val folder: String
-            get() = message.folder
-
-    }
-
-    inner class IndexUpdateMessageReceivedEvent constructor(message: IndexUpdate) : AnyIndexMessageReceivedEvent<IndexUpdate>(message) {
-
-        override val filesList: List<BlockExchangeProtos.FileInfo>
-            get() = message.filesList
-
-        override val folder: String
-            get() = message.folder
-
-    }
-
-    inner class RequestMessageReceivedEvent constructor(message: Request) : MessageReceivedEvent<Request>(message)
-
-    inner class ResponseMessageReceivedEvent constructor(message: Response) : MessageReceivedEvent<Response>(message)
-
-    inner class ClusterConfigMessageProcessedEvent constructor(message: ClusterConfig) : MessageReceivedEvent<ClusterConfig>(message)
 
     enum class ConnectionClosedEvent {
         INSTANCE
@@ -486,51 +456,25 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
         return "BlockExchangeConnectionHandler{" + "address=" + address + ", lastActive=" + getLastActive() / 1000.0 + "secs ago}"
     }
 
-    private class ConnectionInfo {
-
-        var deviceName: String? = null
-        var clientName: String? = null
-        var clientVersion: String? = null
-
-        override fun toString(): String {
-            return "ConnectionInfo{deviceName=$deviceName, clientName=$clientName, clientVersion=$clientVersion}"
-        }
-
-    }
-
-    inner internal class ClusterConfigInfo {
+    internal inner class ClusterConfigInfo {
 
         private val folderInfoById = ConcurrentHashMap<String, ClusterConfigFolderInfo>()
 
-        val sharedFolders: Set<String>
-            get() = folderInfoById.values.filter { it.isShared }.map { it.folder }.toSet()
-
-        fun getFolderInfo(folderId: String): ClusterConfigFolderInfo {
-            return folderInfoById[folderId] ?: let {
-                val fi = ClusterConfigFolderInfo(folderId)
-                folderInfoById.put(folderId, fi)
-                fi
-            }
-        }
+        fun getSharedFolders(): Set<String> = folderInfoById.values.filter { it.isShared }.map { it.folder }.toSet()
 
         fun putFolderInfo(folderInfo: ClusterConfigFolderInfo) {
-            folderInfoById.put(folderInfo.folder, folderInfo)
+            folderInfoById[folderInfo.folder] = folderInfo
         }
 
     }
 
     fun hasFolder(folder: String): Boolean {
-        return clusterConfigInfo!!.sharedFolders.contains(folder)
-    }
-
-    abstract inner class NewFolderSharedEvent {
-
-        abstract val folder: String
+        return clusterConfigInfo!!.getSharedFolders().contains(folder)
     }
 
     companion object {
 
-        private val MAGIC = 0x2EA7D90B
+        private const val MAGIC = 0x2EA7D90B
 
         private val messageTypes: Map<MessageType, Class<out MessageLite>> = mapOf(
                 BlockExchangeProtos.MessageType.CLOSE to BlockExchangeProtos.Close::class.java,

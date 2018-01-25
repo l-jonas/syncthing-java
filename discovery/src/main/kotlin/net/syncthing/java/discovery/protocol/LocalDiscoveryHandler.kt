@@ -13,11 +13,10 @@
  */
 package net.syncthing.java.discovery.protocol
 
-import com.google.common.eventbus.AsyncEventBus
-import com.google.common.eventbus.Subscribe
 import com.google.protobuf.ByteString
 import com.google.protobuf.InvalidProtocolBufferException
 import net.syncthing.java.core.beans.DeviceAddress
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.events.DeviceAddressReceivedEvent
 import net.syncthing.java.core.security.KeystoreHandler
@@ -37,50 +36,20 @@ import java.nio.ByteBuffer
 import java.util.*
 import java.util.concurrent.Executors
 
-internal class LocalDiscoveryHandler(private val configuration: ConfigurationService) : Closeable {
+internal class LocalDiscoveryHandler(private val configuration: ConfigurationService,
+                                     private val onMessageReceivedListener: (DeviceId, List<DeviceAddress>) -> Unit) : Closeable {
 
     companion object {
-        private val MAGIC = 0x2EA7D90B
-        private val LISTENING_PORT = 21027
-        private val MAX_WAIT = 60 * 1000
-        private val INCOMING_BUFFER_SIZE = 1024
+        private const val MAGIC = 0x2EA7D90B
+        private const val LISTENING_PORT = 21027
+        private const val INCOMING_BUFFER_SIZE = 1024
     }
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private val listeningExecutor = Executors.newSingleThreadScheduledExecutor()
     private val processingExecutor = Executors.newCachedThreadPool()
-    val eventBus = AsyncEventBus(processingExecutor)
-    private val localDiscoveryRecords = mutableMapOf<String, List<DeviceAddress>>()
 
     private var datagramSocket: DatagramSocket? = null
-
-    fun queryAndClose(deviceId: String): Collection<DeviceAddress> {
-        val lock = Object()
-        eventBus.register(object : Any() {
-            @Subscribe
-            fun handleMessageReceivedEvent(event: MessageReceivedEvent) {
-                synchronized(lock) {
-                    if (deviceId == event.deviceId()) {
-                        lock.notify()
-                    }
-                }
-            }
-        })
-        startListener()
-        sendAnnounceMessage()
-        synchronized(lock) {
-            try {
-                lock.wait(MAX_WAIT.toLong())
-            } catch (ex: InterruptedException) {
-                logger.warn("", ex)
-            }
-
-        }
-        close()
-        synchronized(localDiscoveryRecords) {
-            return localDiscoveryRecords[deviceId] ?: listOf()
-        }
-    }
 
     fun sendAnnounceMessage() {
         processingExecutor.submit {
@@ -88,7 +57,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
                 val out = ByteArrayOutputStream()
                 DataOutputStream(out).writeInt(MAGIC)
                 Announce.newBuilder()
-                        .setId(ByteString.copyFrom(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId!!)))
+                        .setId(ByteString.copyFrom(configuration.deviceId!!.toHashData()))
                         .setInstanceId(configuration.instanceId)
                         .build().writeTo(out)
                 val data = out.toByteArray()
@@ -157,7 +126,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
             val magic = byteBuffer.int
             NetworkUtils.assertProtocol(magic == MAGIC, {"magic mismatch, expected $MAGIC, got $magic"})
             val announce = Announce.parseFrom(ByteString.copyFrom(byteBuffer))
-            val deviceId = KeystoreHandler.hashDataToDeviceIdString(announce.id.toByteArray())
+            val deviceId = DeviceId.fromHashData(announce.id.toByteArray())
 
             // Ignore announcement received from ourselves.
             if (deviceId == configuration.deviceId)
@@ -176,29 +145,12 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
                 // discovery announcement is to be used.
                 DeviceAddress.Builder()
                         .setAddress(address.replaceFirst("tcp://(0.0.0.0|):".toRegex(), "tcp://$sourceAddress:"))
-                        .setDeviceId(deviceId)
+                        .setDeviceId(deviceId.deviceId)
                         .setInstanceId(announce.instanceId)
                         .setProducer(DeviceAddress.AddressProducer.LOCAL_DISCOVERY)
                         .build()
             }
-            var isNew = false
-            synchronized(localDiscoveryRecords) {
-                isNew = localDiscoveryRecords.remove(deviceId)?.isEmpty() == false
-                localDiscoveryRecords.put(deviceId, deviceAddresses)
-            }
-            eventBus.post(object : MessageReceivedEvent() {
-
-                override fun deviceId() = deviceId
-
-                override fun getDeviceAddresses(): List<DeviceAddress> {
-                    return Collections.unmodifiableList(deviceAddresses)
-                }
-            })
-            if (isNew) {
-                eventBus.post(object : NewLocalPeerEvent() {
-                    override fun deviceId() = deviceId
-                })
-            }
+            onMessageReceivedListener(deviceId, deviceAddresses)
         } catch (ex: InvalidProtocolBufferException) {
             logger.warn("error processing datagram", ex)
         }
@@ -215,13 +167,8 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
 
     abstract inner class MessageReceivedEvent : DeviceAddressReceivedEvent {
 
-        abstract fun deviceId(): String
+        abstract fun deviceId(): DeviceId
 
         abstract override fun getDeviceAddresses(): List<DeviceAddress>
-    }
-
-    abstract inner class NewLocalPeerEvent {
-
-        abstract fun deviceId(): String
     }
 }

@@ -13,15 +13,16 @@
  */
 package net.syncthing.java.client.protocol.rp
 
-import com.google.common.io.BaseEncoding
 import net.syncthing.java.client.protocol.rp.beans.SessionInvitation
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceAddress.AddressType
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.interfaces.RelayConnection
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.io.IOUtils
+import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.net.InetAddress
@@ -36,19 +37,19 @@ class RelayClient(configuration: ConfigurationService) {
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
     fun openRelayConnection(address: DeviceAddress): RelayConnection {
         assert(address.getType() == AddressType.RELAY)
-        val sessionInvitation = getSessionInvitation(address.getSocketAddress(), address.deviceId)
+        val sessionInvitation = getSessionInvitation(address.getSocketAddress(), address.deviceId())
         return openConnectionSessionMode(sessionInvitation)
     }
 
     @Throws(IOException::class)
-    fun openConnectionSessionMode(sessionInvitation: SessionInvitation): RelayConnection {
+    private fun openConnectionSessionMode(sessionInvitation: SessionInvitation): RelayConnection {
         logger.debug("connecting to relay = {}:{} (session mode)", sessionInvitation.address, sessionInvitation.port)
         val socket = Socket(sessionInvitation.address, sessionInvitation.port)
         val inputStream = RelayDataInputStream(socket.getInputStream())
         val outputStream = RelayDataOutputStream(socket.getOutputStream())
         run {
             logger.debug("sending join session request, session key = {}", sessionInvitation.key)
-            val key = BaseEncoding.base16().decode(sessionInvitation.key)
+            val key = Hex.decode(sessionInvitation.key)
             val lengthOfKey = key.size
             outputStream.writeHeader(JOIN_SESSION_REQUEST, 4 + lengthOfKey)
             outputStream.writeInt(lengthOfKey)
@@ -77,14 +78,14 @@ class RelayClient(configuration: ConfigurationService) {
     }
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
-    fun getSessionInvitation(relaySocketAddress: InetSocketAddress, deviceId: String): SessionInvitation {
+    fun getSessionInvitation(relaySocketAddress: InetSocketAddress, deviceId: DeviceId): SessionInvitation {
         logger.debug("connecting to relay = {} (temporary protocol mode)", relaySocketAddress)
         keystoreHandler.createSocket(relaySocketAddress, KeystoreHandler.RELAY).use { socket ->
             RelayDataInputStream(socket.getInputStream()).use { `in` ->
                 RelayDataOutputStream(socket.getOutputStream()).use { out ->
                     run {
                         logger.debug("sending connect request for device = {}", deviceId)
-                        val deviceIdData = KeystoreHandler.deviceIdStringToHashData(deviceId)
+                        val deviceIdData = deviceId.toHashData()
                         val lengthOfId = deviceIdData.size
                         out.writeHeader(CONNECT_REQUEST, 4 + lengthOfId)
                         out.writeInt(lengthOfId)
@@ -102,8 +103,8 @@ class RelayClient(configuration: ConfigurationService) {
                         }
                         NetworkUtils.assertProtocol(messageReader.type == SESSION_INVITATION, {"message type mismatch, expected $SESSION_INVITATION, got ${messageReader.type}"})
                         val builder = SessionInvitation.Builder()
-                                .setFrom(KeystoreHandler.hashDataToDeviceIdString(messageReader.readLengthAndData()))
-                                .setKey(BaseEncoding.base16().encode(messageReader.readLengthAndData()))
+                                .setFrom(DeviceId.fromHashData(messageReader.readLengthAndData()).deviceId)
+                                .setKey(Hex.toHexString(messageReader.readLengthAndData()))
                             val address = messageReader.readLengthAndData()
                         if (address.isEmpty()) {
                             builder.setAddress(socket.inetAddress)
@@ -197,14 +198,14 @@ class RelayClient(configuration: ConfigurationService) {
 
     companion object {
 
-        private val MAGIC = -0x618643c0
-        private val JOIN_SESSION_REQUEST = 3
-        private val RESPONSE = 4
-        private val CONNECT_REQUEST = 5
-        private val SESSION_INVITATION = 6
-        private val ResponseSuccess = 0
-        private val ResponseNotFound = 1
-        private val ResponseAlreadyConnected = 2
+        private const val MAGIC = -0x618643c0
+        private const val JOIN_SESSION_REQUEST = 3
+        private const val RESPONSE = 4
+        private const val CONNECT_REQUEST = 5
+        private const val SESSION_INVITATION = 6
+        private const val ResponseSuccess = 0
+        private const val ResponseNotFound = 1
+        private const val ResponseAlreadyConnected = 2
     }
 
 }

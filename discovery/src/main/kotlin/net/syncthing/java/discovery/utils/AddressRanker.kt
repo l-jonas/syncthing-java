@@ -25,7 +25,7 @@ internal class AddressRanker private constructor(private val sourceAddresses: Li
 
     companion object {
 
-        private val TCP_CONNECTION_TIMEOUT = 5000
+        private const val TCP_CONNECTION_TIMEOUT = 5000
         private val BASE_SCORE_MAP = mapOf(
                 AddressType.TCP to 0,
                 AddressType.RELAY to 2000,

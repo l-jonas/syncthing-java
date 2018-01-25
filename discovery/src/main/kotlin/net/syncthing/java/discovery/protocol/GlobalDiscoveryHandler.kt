@@ -15,6 +15,7 @@ package net.syncthing.java.discovery.protocol
 
 import com.google.gson.Gson
 import net.syncthing.java.core.beans.DeviceAddress
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.discovery.utils.AddressRanker
 import org.apache.http.HttpStatus
@@ -36,7 +37,7 @@ internal class GlobalDiscoveryHandler(private val configuration: ConfigurationSe
     private val logger = LoggerFactory.getLogger(javaClass)
     private val gson = Gson()
 
-    fun query(deviceId: String, callback: (List<DeviceAddress>) -> Unit) {
+    fun query(deviceId: DeviceId, callback: (List<DeviceAddress>) -> Unit) {
         val addresses = pickAnnounceServers()
                 .map {
                     try {
@@ -60,7 +61,7 @@ internal class GlobalDiscoveryHandler(private val configuration: ConfigurationSe
     }
 
     @Throws(IOException::class)
-    private fun queryAnnounceServer(server: String, deviceId: String): List<DeviceAddress> {
+    private fun queryAnnounceServer(server: String, deviceId: DeviceId): List<DeviceAddress> {
         try {
             logger.trace("querying server {} for device id {}", server, deviceId)
             val httpClient = HttpClients.custom()
@@ -76,7 +77,7 @@ internal class GlobalDiscoveryHandler(private val configuration: ConfigurationSe
                     HttpStatus.SC_OK -> {
                         val announcementMessageBean = gson.fromJson(EntityUtils.toString(response.entity), AnnouncementMessageBean::class.java)
                         val list = (announcementMessageBean.addresses ?: emptyList())
-                                .map { DeviceAddress(deviceId, it) }
+                                .map { DeviceAddress(deviceId.deviceId, it) }
                         logger.debug("found address list = {}", list)
                         return@execute list
                     }

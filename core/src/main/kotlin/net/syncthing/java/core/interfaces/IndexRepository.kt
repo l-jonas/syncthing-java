@@ -13,22 +13,18 @@
  */
 package net.syncthing.java.core.interfaces
 
-import com.google.common.eventbus.EventBus
-import net.syncthing.java.core.beans.FileBlocks
-import net.syncthing.java.core.beans.FileInfo
-import net.syncthing.java.core.beans.FolderStats
-import net.syncthing.java.core.beans.IndexInfo
-import java.util.Date
+import net.syncthing.java.core.beans.*
+import java.util.*
 
 interface IndexRepository {
 
-    fun getEventBus(): EventBus
+    fun setOnFolderStatsUpdatedListener(listener: ((IndexRepository.FolderStatsUpdatedEvent) -> Unit)?)
 
     fun getSequencer(): Sequencer
 
     fun updateIndexInfo(indexInfo: IndexInfo)
 
-    fun findIndexInfoByDeviceAndFolder(deviceId: String, folder: String): IndexInfo?
+    fun findIndexInfoByDeviceAndFolder(deviceId: DeviceId, folder: String): IndexInfo?
 
     fun findFileInfo(folder: String, path: String): FileInfo?
 

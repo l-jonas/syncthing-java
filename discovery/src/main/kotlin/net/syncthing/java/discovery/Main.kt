@@ -13,6 +13,8 @@
  */
 package net.syncthing.java.discovery
 
+import net.syncthing.java.core.beans.DeviceAddress
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.discovery.protocol.GlobalDiscoveryHandler
@@ -28,6 +30,9 @@ import java.util.concurrent.CountDownLatch
 class Main {
 
     companion object {
+
+        private const val MAX_WAIT = 60 * 1000
+
         @JvmStatic
         fun main(args: Array<String>) {
             val options = generateOptions()
@@ -65,7 +70,7 @@ class Main {
     private fun handleOption(option: Option, configuration: ConfigurationService) {
         when (option.opt) {
             "q" -> {
-                val deviceId = option.value
+                val deviceId = DeviceId(option.value)
                 System.out.println("query device id = $deviceId")
                 val latch = CountDownLatch(1)
                 GlobalDiscoveryHandler(configuration).query(deviceId, { it ->
@@ -76,11 +81,35 @@ class Main {
                 latch.await()
             }
             "d" -> {
-                val deviceId = option.value
+                val deviceId = DeviceId(option.value)
                 System.out.println("discovery device id = $deviceId")
-                val deviceAddresses = LocalDiscoveryHandler(configuration).queryAndClose(deviceId)
+                val deviceAddresses = queryLocalDiscovery(configuration, deviceId)
                 System.out.println("local response = $deviceAddresses")
             }
+        }
+    }
+
+    private fun queryLocalDiscovery(configuration: ConfigurationService, deviceId: DeviceId): Collection<DeviceAddress> {
+        val lock = Object()
+        val discoveredAddresses = mutableListOf<DeviceAddress>()
+        val handler = LocalDiscoveryHandler(configuration, { discoveredDeviceId, deviceAddresses ->
+            synchronized(lock) {
+                if (discoveredDeviceId == deviceId) {
+                    discoveredAddresses.addAll(deviceAddresses)
+                    lock.notify()
+                }
+            }
+        })
+        handler.startListener()
+        handler.sendAnnounceMessage()
+        synchronized(lock) {
+            try {
+                lock.wait(MAX_WAIT.toLong())
+            } catch (ex: InterruptedException) {
+                System.out.println(ex)
+            }
+            handler.close()
+            return discoveredAddresses
         }
     }
 

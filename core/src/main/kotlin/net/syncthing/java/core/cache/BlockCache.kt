@@ -34,26 +34,6 @@ abstract class BlockCache {
 
     open fun clear() {}
 
-    private class DummyBlockCache : BlockCache() {
-
-        override fun pushBlock(data: ByteArray): String? {
-            return null
-        }
-
-        override fun pullBlock(code: String): ByteArray? {
-            return null
-        }
-
-        override fun pushData(code: String, data: ByteArray): Boolean {
-            return false
-        }
-
-        override fun pullData(code: String): ByteArray? {
-            return null
-        }
-
-    }
-
     companion object {
 
         fun getBlockCache(configuration: ConfigurationService): BlockCache {

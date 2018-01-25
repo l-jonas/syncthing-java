@@ -22,10 +22,16 @@ import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
 import java.util.*
 
+/**
+ *
+ * TODO: this class cant use [[DeviceId]] because [[GlobalDiscoveryHandler.pickAnnounceServers]] uses that field for discovery server URLs.
+ */
 class DeviceAddress private constructor(val deviceId: String, val instanceId: Long?, val address: String, producer: AddressProducer?, score: Int?, lastModified: Date?) {
     val producer: AddressProducer
     val score: Int
     val lastModified: Date
+
+    fun deviceId() = DeviceId(deviceId)
 
     @Throws(UnknownHostException::class)
     private fun getInetAddress(): InetAddress = InetAddress.getByName(address.replaceFirst("^[^:]+://".toRegex(), "").replaceFirst("(:[0-9]+)?(/.*)?$".toRegex(), ""))

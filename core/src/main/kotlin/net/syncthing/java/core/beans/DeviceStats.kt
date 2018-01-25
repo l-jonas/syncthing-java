@@ -15,12 +15,11 @@ package net.syncthing.java.core.beans
 
 import java.util.*
 
-class DeviceStats private constructor(val deviceId: String, name: String, val lastActive: Date, val lastSeen: Date, val status: DeviceStatus) {
+class DeviceStats private constructor(val deviceId: DeviceId, name: String, val lastActive: Date, val lastSeen: Date, val status: DeviceStatus) {
     val name: String
 
     init {
-        assert(!deviceId.isEmpty())
-        this.name = if (name.isBlank()) deviceId.substring(0, 7) else name
+        this.name = if (name.isBlank()) deviceId.deviceId.substring(0, 7) else name
     }
 
     fun copyBuilder(): Builder {
@@ -37,7 +36,7 @@ class DeviceStats private constructor(val deviceId: String, name: String, val la
 
     class Builder {
 
-        private var deviceId: String? = null
+        private var deviceId: DeviceId? = null
         private var name: String? = null
 
         private var lastActive = Date(0)
@@ -47,7 +46,7 @@ class DeviceStats private constructor(val deviceId: String, name: String, val la
 
         internal constructor()
 
-        internal constructor(deviceId: String, name: String, lastActive: Date, lastSeen: Date, status: DeviceStatus) {
+        internal constructor(deviceId: DeviceId, name: String, lastActive: Date, lastSeen: Date, status: DeviceStatus) {
             this.deviceId = deviceId
             this.name = name
             this.lastActive = lastActive
@@ -55,11 +54,11 @@ class DeviceStats private constructor(val deviceId: String, name: String, val la
             this.status = status
         }
 
-        fun getDeviceId(): String? {
+        fun getDeviceId(): DeviceId? {
             return deviceId
         }
 
-        fun setDeviceId(deviceId: String): Builder {
+        fun setDeviceId(deviceId: DeviceId): Builder {
             this.deviceId = deviceId
             return this
         }

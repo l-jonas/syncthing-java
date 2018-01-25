@@ -21,8 +21,8 @@ class TLSSocketFactory
         constructor(keyStore: KeyStore) : SSLSocketFactory() {
 
     companion object {
-        private val KEY_PASSWORD = "password"
-        private val TLS_VERSION = "TLSv1.2"
+        private const val KEY_PASSWORD = "password"
+        private const val TLS_VERSION = "TLSv1.2"
     }
 
     private val internalSSLSocketFactory: SSLSocketFactory

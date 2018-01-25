@@ -13,16 +13,13 @@
  */
 package net.syncthing.java.bep
 
-import com.google.common.eventbus.Subscribe
-import com.google.common.hash.Hashing
-import com.google.common.io.BaseEncoding
 import com.google.protobuf.ByteString
 import net.syncthing.java.bep.BlockExchangeProtos.*
 import net.syncthing.java.bep.BlockExchangeProtos.Vector
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.beans.FileInfo.Version
+import net.syncthing.java.core.beans.IndexInfo
 import net.syncthing.java.core.configuration.ConfigurationService
-import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.BlockUtils
 import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.io.FileUtils
@@ -32,6 +29,7 @@ import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.ByteBuffer
+import java.security.MessageDigest
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
@@ -43,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference
 class BlockPusher internal constructor(private val configuration: ConfigurationService,
                                        private val connectionHandler: BlockExchangeConnectionHandler,
                                        private val indexHandler: IndexHandler) {
+
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun pushDelete(fileInfo: FileInfo, folder: String, path: String): IndexEditObserver {
@@ -79,63 +78,55 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
         assert(fileInfo == null || fileInfo.path == path)
         val monitoringProcessExecutorService = Executors.newCachedThreadPool()
         val fileSize = dataSource.getSize()
-        val sentBlocks: MutableSet<String> = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+        val sentBlocks = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
         val uploadError = AtomicReference<Exception>()
         val isCompleted = AtomicBoolean(false)
         val updateLock = Object()
-        val listener = object : Any() {
-            @Subscribe
-            fun handleRequestMessageReceivedEvent(event: BlockExchangeConnectionHandler.RequestMessageReceivedEvent) {
-                val request = event.message
-                if (request.folder == folder && request.name == path) {
-                    val hash = Hex.toHexString(request.hash.toByteArray())
-                    logger.debug("handling block request = {}:{}-{} ({})", request.name, request.offset, request.size, hash)
-                    val data = dataSource.getBlock(request.offset, request.size, hash)
-                    val future = connectionHandler.sendMessage(Response.newBuilder()
-                            .setCode(BlockExchangeProtos.ErrorCode.NO_ERROR)
-                            .setData(ByteString.copyFrom(data))
-                            .setId(request.id)
-                            .build())
-                    monitoringProcessExecutorService.submit {
-                        try {
-                            future.get()
-                            sentBlocks.add(hash)
-                            synchronized(updateLock) {
-                                updateLock.notifyAll()
-                            }
-                            //TODO retry on error, register error and throw on watcher
-                        } catch (ex: InterruptedException) {
-                            //return and do nothing
-                        } catch (ex: ExecutionException) {
-                            uploadError.set(ex)
-                            synchronized(updateLock) {
-                                updateLock.notifyAll()
-                            }
+        val listener = {request: Request ->
+            if (request.folder == folder && request.name == path) {
+                val hash = Hex.toHexString(request.hash.toByteArray())
+                logger.debug("handling block request = {}:{}-{} ({})", request.name, request.offset, request.size, hash)
+                val data = dataSource.getBlock(request.offset, request.size, hash)
+                val future = connectionHandler.sendMessage(Response.newBuilder()
+                        .setCode(BlockExchangeProtos.ErrorCode.NO_ERROR)
+                        .setData(ByteString.copyFrom(data))
+                        .setId(request.id)
+                        .build())
+                monitoringProcessExecutorService.submit {
+                    try {
+                        future.get()
+                        sentBlocks.add(hash)
+                        synchronized(updateLock) {
+                            updateLock.notifyAll()
+                        }
+                        //TODO retry on error, register error and throw on watcher
+                    } catch (ex: InterruptedException) {
+                        //return and do nothing
+                    } catch (ex: ExecutionException) {
+                        uploadError.set(ex)
+                        synchronized(updateLock) {
+                            updateLock.notifyAll()
                         }
                     }
                 }
             }
         }
-        connectionHandler.eventBus.register(listener)
+        connectionHandler.registerOnRequestMessageReceivedListeners(listener)
         logger.debug("send index update for file = {}", path)
-        val indexListener = object : Any() {
-
-            @Subscribe
-            fun handleIndexRecordAquiredEvent(event: IndexHandler.IndexRecordAquiredEvent) {
-                if (event.folder() == folder) {
-                    for (fileInfo2 in event.newRecords()) {
-                        if (fileInfo2.path == path && fileInfo2.hash == dataSource.getHash()) { //TODO check not invalid
-                            //                                sentBlocks.addAll(dataSource.getHashes());
-                            isCompleted.set(true)
-                            synchronized(updateLock) {
-                                updateLock.notifyAll()
-                            }
+        val indexListener = { folderId: String, newRecords: List<FileInfo>, indexInfo: IndexInfo ->
+            if (folderId == folder) {
+                for (fileInfo2 in newRecords) {
+                    if (fileInfo2.path == path && fileInfo2.hash == dataSource.getHash()) { //TODO check not invalid
+                        //                                sentBlocks.addAll(dataSource.getHashes());
+                        isCompleted.set(true)
+                        synchronized(updateLock) {
+                            updateLock.notifyAll()
                         }
                     }
                 }
             }
         }
-        indexHandler.eventBus.register(indexListener)
+        indexHandler.registerOnIndexRecordAcquiredListener(indexListener)
         val indexUpdate = sendIndexUpdate(folder, BlockExchangeProtos.FileInfo.newBuilder()
                 .setName(path)
                 .setSize(fileSize)
@@ -154,9 +145,9 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
 
             override fun close() {
                 logger.debug("closing upload process")
-                connectionHandler.eventBus.unregister(listener)
                 monitoringProcessExecutorService.shutdown()
-                indexHandler.eventBus.unregister(indexListener)
+                indexHandler.unregisterOnIndexRecordAcquiredListener(indexListener)
+                connectionHandler.unregisterOnRequestMessageReceivedListeners(listener)
                 val fileInfo1 = indexHandler.pushRecord(indexUpdate.folder, indexUpdate.filesList.single())
                 logger.info("sent file info record = {}", fileInfo1)
             }
@@ -180,7 +171,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
             val nextSequence = indexHandler.sequencer().nextSequence()
             val list = oldVersions ?: emptyList()
             logger.debug("version list = {}", list)
-            val id = ByteBuffer.wrap(KeystoreHandler.deviceIdStringToHashData(configuration.deviceId!!)).long
+            val id = ByteBuffer.wrap(configuration.deviceId!!.toHashData()).long
             val version = Counter.newBuilder()
                     .setId(id)
                     .setValue(nextSequence)
@@ -313,7 +304,8 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
                         if (blockSize < block.size) {
                             block = Arrays.copyOf(block, blockSize)
                         }
-                        val hash = Hashing.sha256().hashBytes(block).asBytes()
+
+                        val hash = MessageDigest.getInstance("SHA-256").digest(block)
                         list.add(BlockInfo.newBuilder()
                                 .setHash(ByteString.copyFrom(hash))
                                 .setOffset(offset)
@@ -350,7 +342,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
                 inputStream.use { it ->
                     IOUtils.skipFully(it, offset)
                     IOUtils.readFully(it, buffer)
-                    NetworkUtils.assertProtocol(BaseEncoding.base16().encode(Hashing.sha256().hashBytes(buffer).asBytes()) == hash, {"block hash mismatch!"})
+                    NetworkUtils.assertProtocol(Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(buffer)) == hash, {"block hash mismatch!"})
                     return buffer
                 }
             } catch (ex: IOException) {
@@ -362,7 +354,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
 
         fun getHashes(): Set<String> {
             return hashes ?: let {
-                val hashes2 = getBlocks()!!.map { input -> BaseEncoding.base16().encode(input.hash.toByteArray()) }.toSet()
+                val hashes2 = getBlocks()!!.map { input -> Hex.toHexString(input.hash.toByteArray()) }.toSet()
                 hashes = hashes2
                 return hashes2
             }
@@ -371,7 +363,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
         fun getHash(): String {
             return hash ?: let {
                 val blockInfo = getBlocks()!!.map { input ->
-                    net.syncthing.java.core.beans.BlockInfo(input.offset, input.size, BaseEncoding.base16().encode(input.hash.toByteArray()))
+                    net.syncthing.java.core.beans.BlockInfo(input.offset, input.size, Hex.toHexString(input.hash.toByteArray()))
                 }
                 val hash2 = BlockUtils.hashBlocks(blockInfo)
                 hash = hash2

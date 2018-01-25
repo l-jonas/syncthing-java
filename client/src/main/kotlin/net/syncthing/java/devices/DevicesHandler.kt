@@ -13,15 +13,13 @@
  */
 package net.syncthing.java.devices
 
-import com.google.common.eventbus.EventBus
-import com.google.common.eventbus.Subscribe
+import net.syncthing.java.core.beans.DeviceAddress
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceStats
 import net.syncthing.java.core.beans.DeviceStats.DeviceStatus
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.events.DeviceAddressActiveEvent
-import net.syncthing.java.core.events.DeviceAddressReceivedEvent
 import net.syncthing.java.core.utils.ExecutorUtils
-import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.util.*
 import java.util.concurrent.Executors
@@ -29,16 +27,13 @@ import java.util.concurrent.TimeUnit
 
 class DevicesHandler(private val configuration: ConfigurationService) : Closeable {
 
-    private val logger = LoggerFactory.getLogger(DevicesHandler::class.java)
-    private val deviceStatsMap = Collections.synchronizedMap(mutableMapOf<String, DeviceStats>())
+    private val deviceStatsMap = Collections.synchronizedMap(mutableMapOf<DeviceId, DeviceStats>())
     private val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
-    val eventBus = EventBus()
 
-    val deviceStatsList: Collection<DeviceStats>
-        get() {
-            loadDevicesFromConfiguration()
-            return Collections.unmodifiableCollection(deviceStatsMap.values)
-        }
+    fun getDeviceStatsList(): Collection<DeviceStats> {
+        loadDevicesFromConfiguration()
+        return Collections.unmodifiableCollection(deviceStatsMap.values)
+    }
 
     init {
         loadDevicesFromConfiguration()
@@ -53,27 +48,23 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
         }, 5, 5, TimeUnit.SECONDS)
     }
 
-    @Subscribe
-    fun handleDeviceAddressActiveEvent(event: DeviceAddressActiveEvent) {
-        pushDeviceStats(getDeviceStats(event.getDeviceAddress().deviceId)
+    fun handleDeviceAddressActiveEvent(deviceId: DeviceId) {
+        pushDeviceStats(getDeviceStats(deviceId)
                 .copyBuilder()
                 .setLastActive(Date())
                 .setStatus(DeviceStats.DeviceStatus.ONLINE_ACTIVE)
                 .build())
     }
 
-    @Subscribe
-    fun handleDeviceAddressReceivedEvent(event: DeviceAddressReceivedEvent) {
-        for (deviceAddress in event.getDeviceAddresses()) {
-            if (deviceAddress.isWorking()) {
-                val deviceStats = getDeviceStats(deviceAddress.deviceId)
-                val newStatus: DeviceStatus
-                when (deviceStats.status) {
-                    DeviceStats.DeviceStatus.OFFLINE -> newStatus = DeviceStatus.ONLINE_INACTIVE
-                    else -> newStatus = deviceStats.status
-                }
-                pushDeviceStats(deviceStats.copyBuilder().setStatus(newStatus).setLastSeen(Date()).build())
+    fun handleDeviceAddressReceivedEvent(deviceAddress: DeviceAddress) {
+        if (deviceAddress.isWorking()) {
+            val deviceStats = getDeviceStats(deviceAddress.deviceId())
+            val newStatus: DeviceStatus
+            when (deviceStats.status) {
+                DeviceStats.DeviceStatus.OFFLINE -> newStatus = DeviceStatus.ONLINE_INACTIVE
+                else -> newStatus = deviceStats.status
             }
+            pushDeviceStats(deviceStats.copyBuilder().setStatus(newStatus).setLastSeen(Date()).build())
         }
     }
 
@@ -89,7 +80,7 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
         }
     }
 
-    fun getDeviceStats(deviceId: String): DeviceStats {
+    fun getDeviceStats(deviceId: DeviceId): DeviceStats {
         loadDevicesFromConfiguration()
         if (deviceStatsMap.containsKey(deviceId)) {
             return deviceStatsMap[deviceId]!!
@@ -101,15 +92,7 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
     }
 
     private fun pushDeviceStats(deviceStats: DeviceStats) {
-        deviceStatsMap.put(deviceStats.deviceId, deviceStats)
-        val event: DeviceStatsUpdateEvent = object : DeviceStatsUpdateEvent {
-            override fun changedDeviceStats() = Collections.singletonList(deviceStats)
-        }
-        eventBus.post(event)
-    }
-
-    interface DeviceStatsUpdateEvent {
-        fun changedDeviceStats(): List<DeviceStats>
+        deviceStatsMap[deviceStats.deviceId] = deviceStats
     }
 
     override fun close() {

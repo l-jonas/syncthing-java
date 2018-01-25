@@ -13,18 +13,18 @@
  */
 package net.syncthing.java.core.security
 
-import com.google.common.cache.CacheBuilder
-import com.google.common.hash.Hashing
-import com.google.common.io.BaseEncoding
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.interfaces.RelayConnection
 import net.syncthing.java.core.utils.NetworkUtils
+import org.apache.commons.codec.binary.Base32
 import org.apache.commons.lang3.tuple.Pair
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v1CertificateBuilder
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.OperatorCreationException
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
+import org.bouncycastle.util.encoders.Base64
 import org.eclipse.jetty.alpn.ALPN
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
@@ -135,7 +135,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     }
 
     @Throws(SSLPeerUnverifiedException::class, CertificateException::class)
-    fun checkSocketCerificate(socket: SSLSocket, deviceId: String) {
+    fun checkSocketCerificate(socket: SSLSocket, deviceId: DeviceId) {
         val session = socket.session
         val certs = Arrays.asList(*session.peerCertificates)
         val certificateFactory = CertificateFactory.getInstance("X.509")
@@ -143,7 +143,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         val certificate = certPath.certificates[0]
         NetworkUtils.assertProtocol(certificate is X509Certificate)
         val derData = certificate.encoded
-        val deviceIdFromCertificate = derDataToDeviceIdString(derData)
+        val deviceIdFromCertificate = derDataToDeviceId(derData)
         logger.trace("remote pem certificate =\n{}", derToPem(derData))
         NetworkUtils.assertProtocol(deviceIdFromCertificate == deviceId, {"device id mismatch! expected = $deviceId, got = $deviceIdFromCertificate"})
         logger.debug("remote ssl certificate match deviceId = {}", deviceId)
@@ -163,7 +163,8 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
                 var isNew = false
                 var keystoreData: ByteArray? = configuration.keystore
                 if (keystoreData != null) {
-                    val keystoreHandlerFromCache = keystoreHandlersCacheByHash.getIfPresent(BaseEncoding.base32().encode(Hashing.sha256().hashBytes(keystoreData).asBytes()))
+                    val hash = MessageDigest.getInstance("SHA-256").digest(keystoreData)
+                    val keystoreHandlerFromCache = keystoreHandlersCacheByHash[Base32().encodeAsString(hash)]
                     if (keystoreHandlerFromCache != null) {
                         return keystoreHandlerFromCache
                     }
@@ -176,7 +177,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
                     configuration.Editor().setKeystoreAlgo(defaultAlgo)
                     defaultAlgo
                 }()
-                var keyStore: Pair<KeyStore, String>? = null
+                var keyStore: Pair<KeyStore, DeviceId>? = null
                 if (keystoreData != null) {
                     try {
                         keyStore = importKeystore(keystoreData, configuration)
@@ -207,14 +208,15 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
                             .setKeystoreAlgo(keystoreAlgo)
                             .persistLater()
                 }
-                keystoreHandlersCacheByHash.put(BaseEncoding.base32().encode(Hashing.sha256().hashBytes(keystoreData!!).asBytes()), keystoreHandler)
+                val hash = MessageDigest.getInstance("SHA-256").digest(keystoreData)
+                keystoreHandlersCacheByHash[Base32().encodeAsString(hash)] = keystoreHandler
                 logger.info("keystore ready, device id = {}", configuration.deviceId)
                 return keystoreHandler
             }
         }
 
         @Throws(CryptoException::class, IOException::class)
-        private fun generateKeystore(configuration: ConfigurationService): Pair<KeyStore, String> {
+        private fun generateKeystore(configuration: ConfigurationService): Pair<KeyStore, DeviceId> {
             try {
                 logger.debug("generating key")
                 val keyPairGenerator = KeyPairGenerator.getInstance(KEY_ALGO)
@@ -232,7 +234,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
 
                 val certificateDerData = certificateHolder.encoded
                 logger.info("generated cert =\n{}", derToPem(certificateDerData))
-                val deviceId = derDataToDeviceIdString(certificateDerData)
+                val deviceId = derDataToDeviceId(certificateDerData)
                 logger.info("device id from cert = {}", deviceId)
 
                 val keyStore = KeyStore.getInstance(configuration.keystoreAlgo)
@@ -254,7 +256,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         }
 
         @Throws(CryptoException::class, IOException::class)
-        private fun importKeystore(keystoreData: ByteArray, configuration: ConfigurationService): Pair<KeyStore, String> {
+        private fun importKeystore(keystoreData: ByteArray, configuration: ConfigurationService): Pair<KeyStore, DeviceId> {
             try {
                 val keystoreAlgo = configuration.keystoreAlgo
                 val keyStore = KeyStore.getInstance(keystoreAlgo)
@@ -263,7 +265,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
                 val certificate = keyStore.getCertificate(alias)
                 NetworkUtils.assertProtocol(certificate is X509Certificate)
                 val derData = certificate.encoded
-                val deviceId = derDataToDeviceIdString(derData)
+                val deviceId = derDataToDeviceId(derData)
                 logger.debug("loaded device id from cert = {}", deviceId)
                 return Pair.of(keyStore, deviceId)
             } catch (e: NoSuchAlgorithmException) {
@@ -277,72 +279,31 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         }
 
         companion object {
-            private val keystoreHandlersCacheByHash = CacheBuilder.newBuilder()
-                    .maximumSize(10)
-                    .build<String, KeystoreHandler>()
+            private val keystoreHandlersCacheByHash = mutableMapOf<String, KeystoreHandler>()
         }
     }
 
     companion object {
 
-        private val JKS_PASSWORD = "password"
-        private val KEY_PASSWORD = "password"
-        private val KEY_ALGO = "RSA"
-        private val SIGNATURE_ALGO = "SHA1withRSA"
-        private val CERTIFICATE_CN = "CN=syncthing"
-        private val BC_PROVIDER = "BC"
-        private val TLS_VERSION = "TLSv1.2"
-        private val KEY_SIZE = 3072
-        private val SOCKET_TIMEOUT = 2000
+        private const val JKS_PASSWORD = "password"
+        private const val KEY_PASSWORD = "password"
+        private const val KEY_ALGO = "RSA"
+        private const val SIGNATURE_ALGO = "SHA1withRSA"
+        private const val CERTIFICATE_CN = "CN=syncthing"
+        private const val BC_PROVIDER = "BC"
+        private const val KEY_SIZE = 3072
+        private const val SOCKET_TIMEOUT = 2000
 
         init {
             Security.addProvider(BouncyCastleProvider())
         }
 
         private fun derToPem(der: ByteArray): String {
-            return "-----BEGIN CERTIFICATE-----\n" + BaseEncoding.base64().withSeparator("\n", 76).encode(der) + "\n-----END CERTIFICATE-----"
+            return "-----BEGIN CERTIFICATE-----\n" + Base64.toBase64String(der).chunked(76).joinToString("\n") + "\n-----END CERTIFICATE-----"
         }
 
-        fun derDataToDeviceIdString(certificateDerData: ByteArray): String {
-            return hashDataToDeviceIdString(Hashing.sha256().hashBytes(certificateDerData).asBytes())
-        }
-
-        fun hashDataToDeviceIdString(hashData: ByteArray): String {
-            NetworkUtils.assertProtocol(hashData.size == Hashing.sha256().bits() / 8)
-            var string = BaseEncoding.base32().encode(hashData).replace("=+$".toRegex(), "")
-            string = string.chunked(13).map { part -> part + generateLuhn32Checksum(part) }.joinToString("")
-            return string.chunked(7).joinToString("-")
-        }
-
-        fun deviceIdStringToHashData(deviceId: String): ByteArray {
-            NetworkUtils.assertProtocol(deviceId.matches("^[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}$".toRegex()), {"device id syntax error for deviceId = $deviceId"})
-            val base32data = deviceId.replaceFirst("(.{7})-(.{6}).-(.{7})-(.{6}).-(.{7})-(.{6}).-(.{7})-(.{6}).".toRegex(), "$1$2$3$4$5$6$7$8") + "==="
-            val binaryData = BaseEncoding.base32().decode(base32data)
-            NetworkUtils.assertProtocol(binaryData.size == Hashing.sha256().bits() / 8)
-            return binaryData
-        }
-
-        fun validateDeviceId(peer: String) {
-            NetworkUtils.assertProtocol(hashDataToDeviceIdString(deviceIdStringToHashData(peer)) == peer)
-        }
-
-        // TODO serialize keystore
-        private fun generateLuhn32Checksum(string: String): Char {
-            val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
-            var factor = 1
-            var sum = 0
-            val n = alphabet.length
-            for (character in string.toCharArray()) {
-                val index = alphabet.indexOf(character)
-                NetworkUtils.assertProtocol(index >= 0)
-                var add = factor * index
-                factor = if (factor == 2) 1 else 2
-                add = add / n + add % n
-                sum += add
-            }
-            val remainder = sum % n
-            val check = (n - remainder) % n
-            return alphabet[check]
+        fun derDataToDeviceId(certificateDerData: ByteArray): DeviceId {
+            return DeviceId.fromHashData(MessageDigest.getInstance("SHA-256").digest(certificateDerData))
         }
 
         val BEP = "bep/1.0"

@@ -13,4 +13,6 @@
  */
 package net.syncthing.java.core.configuration.gsonbeans
 
-data class DeviceConfig(val deviceId: String, val name: String)
+import net.syncthing.java.core.beans.DeviceId
+
+data class DeviceConfig(val deviceId: DeviceId, val name: String)

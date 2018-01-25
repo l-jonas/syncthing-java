@@ -13,15 +13,12 @@
  */
 package net.syncthing.java.bep
 
-import com.google.common.eventbus.EventBus
-import com.google.common.eventbus.Subscribe
 import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.beans.FileInfo.Version
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.interfaces.IndexRepository
 import net.syncthing.java.core.interfaces.Sequencer
 import net.syncthing.java.core.interfaces.TempRepository
-import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.ExecutorUtils
 import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.lang3.tuple.Pair
@@ -36,12 +33,14 @@ import java.util.concurrent.Executors
 class IndexHandler(private val configuration: ConfigurationService, val indexRepository: IndexRepository,
                    private val tempRepository: TempRepository) : Closeable {
     private val logger = LoggerFactory.getLogger(javaClass)
-    val eventBus = EventBus()
     private val folderInfoByFolder = mutableMapOf<String, FolderInfo>()
     private val indexMessageProcessor = IndexMessageProcessor()
     private var lastIndexActivity: Long = 0
     private val writeAccessLock = Object()
     private val indexWaitLock = Object()
+    private val indexBrowsers = mutableSetOf<IndexBrowser>()
+    private val onIndexRecordAcquiredListeners = mutableSetOf<(String, List<FileInfo>, IndexInfo) -> Unit>()
+    private val onFullIndexAcquiredListeners = mutableSetOf<(String) -> Unit>()
 
     private fun lastActive(): Long = System.currentTimeMillis() - lastIndexActivity
 
@@ -53,6 +52,24 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
 
     private fun markActive() {
         lastIndexActivity = System.currentTimeMillis()
+    }
+
+    fun registerOnIndexRecordAcquiredListener(listener: (String, List<FileInfo>, IndexInfo) -> Unit) {
+        onIndexRecordAcquiredListeners.add(listener)
+    }
+
+    fun unregisterOnIndexRecordAcquiredListener(listener: (String, List<FileInfo>, IndexInfo) -> Unit) {
+        assert(onIndexRecordAcquiredListeners.contains(listener))
+        onIndexRecordAcquiredListeners.remove(listener)
+    }
+
+    fun registerOnFullIndexAcquiredListenersListener(listener: (String) -> Unit) {
+        onFullIndexAcquiredListeners.add(listener)
+    }
+
+    fun unregisterOnFullIndexAcquiredListenersListener(listener: (String) -> Unit) {
+        assert(onFullIndexAcquiredListeners.contains(listener))
+        onFullIndexAcquiredListeners.remove(listener)
     }
 
     init {
@@ -76,9 +93,9 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         }
     }
 
-    internal fun isRemoteIndexAquired(clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo, peerDeviceId: String): Boolean {
+    internal fun isRemoteIndexAquired(clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo, peerDeviceId: DeviceId): Boolean {
         var ready = true
-        for (folder in clusterConfigInfo.sharedFolders) {
+        for (folder in clusterConfigInfo.getSharedFolders()) {
             val indexSequenceInfo = indexRepository.findIndexInfoByDeviceAndFolder(peerDeviceId, folder)
             if (indexSequenceInfo == null || indexSequenceInfo.localSequence < indexSequenceInfo.maxSequence) {
                 logger.debug("waiting for index on folder = {} sequenceInfo = {}", folder, indexSequenceInfo)
@@ -89,7 +106,6 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
     }
 
     @Throws(InterruptedException::class)
-    @JvmOverloads
     fun waitForRemoteIndexAquired(connectionHandler: BlockExchangeConnectionHandler, timeoutSecs: Long? = null): IndexHandler {
         val timeoutMillis = (timeoutSecs ?: DEFAULT_INDEX_TIMEOUT) * 1000
         synchronized(indexWaitLock) {
@@ -103,15 +119,14 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         return this
     }
 
-    @Subscribe
-    fun handleClusterConfigMessageProcessedEvent(event: BlockExchangeConnectionHandler.ClusterConfigMessageProcessedEvent) {
+    fun handleClusterConfigMessageProcessedEvent(clusterConfig: BlockExchangeProtos.ClusterConfig) {
         synchronized(writeAccessLock) {
-            for (folderRecord in event.message.foldersList) {
+            for (folderRecord in clusterConfig.foldersList) {
                 val folder = folderRecord.id
                 val folderInfo = updateFolderInfo(folder, folderRecord.label)
                 logger.debug("aquired folder info from cluster config = {}", folderInfo)
                 for (deviceRecord in folderRecord.devicesList) {
-                    val deviceId = KeystoreHandler.hashDataToDeviceIdString(deviceRecord.id.toByteArray())
+                    val deviceId = DeviceId.fromHashData(deviceRecord.id.toByteArray())
                     if (deviceRecord.hasIndexId() && deviceRecord.hasMaxSequence()) {
                         val folderIndexInfo = updateIndexInfo(folder, deviceId, deviceRecord.indexId, deviceRecord.maxSequence, null)
                         logger.debug("aquired folder index info from cluster config = {}", folderIndexInfo)
@@ -121,9 +136,8 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         }
     }
 
-    @Subscribe
-    fun handleIndexMessageReceivedEvent(event: BlockExchangeConnectionHandler.AnyIndexMessageReceivedEvent<*>) {
-        indexMessageProcessor.handleIndexMessageReceivedEvent(event)
+    fun handleIndexMessageReceivedEvent(folderId: String, filesList: List<BlockExchangeProtos.FileInfo>, connectionHandler: BlockExchangeConnectionHandler) {
+        indexMessageProcessor.handleIndexMessageReceivedEvent(folderId, filesList, connectionHandler)
     }
 
     fun pushRecord(folder: String, bepFileInfo: BlockExchangeProtos.FileInfo): FileInfo? {
@@ -153,7 +167,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         return addRecord(builder.build(), fileBlocks)
     }
 
-    private fun updateIndexInfo(folder: String, deviceId: String, indexId: Long?, maxSequence: Long?, localSequence: Long?): IndexInfo {
+    private fun updateIndexInfo(folder: String, deviceId: DeviceId, indexId: Long?, maxSequence: Long?, localSequence: Long?): IndexInfo {
         synchronized(writeAccessLock) {
             var indexSequenceInfo = indexRepository.findIndexInfoByDeviceAndFolder(deviceId, folder)
             var shouldUpdate = false
@@ -163,7 +177,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
                 assert(indexId != null, {"index sequence info not found, and supplied null index id (folder = $folder, device = $deviceId)"})
                 builder = IndexInfo.newBuilder()
                         .setFolder(folder)
-                        .setDeviceId(deviceId)
+                        .setDeviceId(deviceId.deviceId)
                         .setIndexId(indexId!!)
                         .setLocalSequence(0)
                         .setMaxSequence(-1)
@@ -193,20 +207,16 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
     private fun addRecord(record: FileInfo, fileBlocks: FileBlocks?): FileInfo? {
         synchronized(writeAccessLock) {
             val lastModified = indexRepository.findFileInfoLastModified(record.folder, record.path)
-            if (lastModified != null && !record.lastModified.after(lastModified)) {
+            return if (lastModified != null && !record.lastModified.after(lastModified)) {
                 logger.trace("discarding record = {}, modified before local record", record)
-                return null
+                null
             } else {
                 indexRepository.updateFileInfo(record, fileBlocks)
                 logger.trace("loaded new record = {}", record)
-                eventBus.post(object : IndexChangedEvent() {
-                    override val folder: String
-                        get() = record.folder
-
-                    override val newRecords: List<FileInfo>
-                        get() = listOf(record)
-                })
-                return record
+                indexBrowsers.forEach {
+                    it.onIndexChangedevent(record.folder, record)
+                }
+                record
             }
         }
     }
@@ -240,7 +250,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         return folderInfoByFolder[folder]
     }
 
-    fun getIndexInfo(device: String, folder: String): IndexInfo? {
+    fun getIndexInfo(device: DeviceId, folder: String): IndexInfo? {
         return indexRepository.findIndexInfoByDeviceAndFolder(device, folder)
     }
 
@@ -250,49 +260,21 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
 
     fun newIndexBrowser(folder: String, includeParentInList: Boolean = false, allowParentInRoot: Boolean = false,
                         ordering: Comparator<FileInfo>? = null): IndexBrowser {
-        return IndexBrowser(indexRepository, this, folder, includeParentInList, allowParentInRoot, ordering)
+        val indexBrowser = IndexBrowser(indexRepository, this, folder, includeParentInList, allowParentInRoot, ordering)
+        indexBrowsers.add(indexBrowser)
+        return indexBrowser
+    }
+
+    internal fun unregisterIndexBrowser(indexBrowser: IndexBrowser) {
+        assert(indexBrowsers.contains(indexBrowser))
+        indexBrowsers.remove(indexBrowser)
     }
 
     override fun close() {
+        assert(indexBrowsers.isEmpty())
+        assert(onIndexRecordAcquiredListeners.isEmpty())
+        assert(onFullIndexAcquiredListeners.isEmpty())
         indexMessageProcessor.stop()
-    }
-
-    abstract inner class IndexRecordAquiredEvent {
-
-        private var affectedPaths: MutableSet<String>? = null
-
-        abstract fun folder(): String
-
-        abstract fun newRecords(): List<FileInfo>
-
-        abstract fun indexInfo(): IndexInfo
-
-        @Synchronized
-        fun getAffectedPaths(): Set<String> {
-            if (affectedPaths == null) {
-                affectedPaths = mutableSetOf()
-                for (fileInfo in newRecords()) {
-                    affectedPaths!!.add(fileInfo.path)
-                    affectedPaths!!.add(fileInfo.parent)
-                }
-            }
-            return affectedPaths!!
-        }
-
-    }
-
-    abstract inner class IndexChangedEvent {
-
-        abstract val folder: String
-
-        abstract val newRecords: List<FileInfo>
-
-    }
-
-    abstract inner class FullIndexAquiredEvent {
-
-        abstract val folder: String
-
     }
 
     private inner class IndexMessageProcessor {
@@ -307,11 +289,11 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         //        private final int MIN_DELAY = 0, MAX_DELAY = 5000, MAX_RECORD_PER_PROCESS = 16, DELAY_FACTOR = 1;
         private var startTime: Long? = null
 
-        fun handleIndexMessageReceivedEvent(event: BlockExchangeConnectionHandler.AnyIndexMessageReceivedEvent<*>) {
-            logger.info("received index message event, preparing (queued records = {} event record count = {})", queuedRecords, event.filesList.size)
+        fun handleIndexMessageReceivedEvent(folderId: String, filesList: List<BlockExchangeProtos.FileInfo>, connectionHandler: BlockExchangeConnectionHandler) {
+            logger.info("received index message event, preparing (queued records = {} event record count = {})", queuedRecords, filesList.size)
             markActive()
-            val clusterConfigInfo = event.connectionHandler.clusterConfigInfo
-            val peerDeviceId = event.connectionHandler.deviceId()
+            val clusterConfigInfo = connectionHandler.clusterConfigInfo
+            val peerDeviceId = connectionHandler.deviceId()
             //            List<BlockExchangeProtos.FileInfo> fileList = event.getFilesList();
             //            for (int index = 0; index < fileList.size(); index += MAX_RECORD_PER_PROCESS) {
             //                BlockExchangeProtos.IndexUpdate data = BlockExchangeProtos.IndexUpdate.newBuilder()
@@ -325,8 +307,8 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
             //                }
             //            }
             val data = BlockExchangeProtos.IndexUpdate.newBuilder()
-                    .addAllFiles(event.filesList)
-                    .setFolder(event.folder)
+                    .addAllFiles(filesList)
+                    .setFolder(folderId)
                     .build()
             if (queuedMessages > 0) {
                 storeAndProcessBg(data, clusterConfigInfo, peerDeviceId)
@@ -335,7 +317,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
             }
         }
 
-        private fun processBg(data: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: String) {
+        private fun processBg(data: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
             logger.debug("received index message event, queuing for processing")
             queuedMessages++
             queuedRecords += data.filesCount.toLong()
@@ -347,7 +329,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
             })
         }
 
-        private fun storeAndProcessBg(data: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: String) {
+        private fun storeAndProcessBg(data: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
             val key = tempRepository.pushTempData(data.toByteArray())
             logger.debug("received index message event, stored to temp record {}, queuing for processing", key)
             queuedMessages++
@@ -385,7 +367,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
             //            return fileSequence < localSequence;
             //        }
             @Throws(IOException::class)
-            protected fun doHandleIndexMessageReceivedEvent(key: String, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: String) {
+            protected fun doHandleIndexMessageReceivedEvent(key: String, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
                 logger.debug("processing index message event from temp record {}", key)
                 markActive()
                 val data = tempRepository.popTempData(key)
@@ -393,7 +375,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
                 doHandleIndexMessageReceivedEvent(message, clusterConfigInfo, peerDeviceId)
             }
 
-            protected fun doHandleIndexMessageReceivedEvent(message: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: String) {
+            protected fun doHandleIndexMessageReceivedEvent(message: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
                 //            synchronized (writeAccessLock) {
                 //                if (addProcessingDelayForInterface) {
                 //                    delay = Math.min(MAX_DELAY, Math.max(MIN_DELAY, lastRecordProcessingTime * DELAY_FACTOR));
@@ -438,22 +420,12 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
                     }
                 }
                 if (!newRecords.isEmpty()) {
-                    eventBus.post(object : IndexRecordAquiredEvent() {
-                        override fun folder() = folder
-
-                        override fun newRecords() = newRecords
-
-                        override fun indexInfo() = newIndexInfo
-
-                    })
+                    onIndexRecordAcquiredListeners.forEach { it(folder, newRecords, newIndexInfo) }
                 }
                 logger.debug("index info = {}", newIndexInfo)
                 if (isRemoteIndexAquired(clusterConfigInfo!!, peerDeviceId)) {
                     logger.debug("index aquired")
-                    eventBus.post(object : FullIndexAquiredEvent() {
-                        override val folder: String
-                            get() = folder
-                    })
+                    onFullIndexAcquiredListeners.forEach { it(folder)}
                 }
                 //                IndexHandler.this.notifyAll();
                 markActive()
@@ -473,6 +445,6 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
 
     companion object {
 
-        private val DEFAULT_INDEX_TIMEOUT: Long = 30
+        private const val DEFAULT_INDEX_TIMEOUT: Long = 30
     }
 }

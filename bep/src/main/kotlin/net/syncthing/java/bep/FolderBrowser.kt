@@ -13,9 +13,6 @@
  */
 package net.syncthing.java.bep
 
-import com.google.common.cache.CacheBuilder
-import com.google.common.cache.CacheLoader
-import com.google.common.eventbus.Subscribe
 import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.java.core.beans.FolderStats
 import net.syncthing.java.core.interfaces.IndexRepository
@@ -23,27 +20,16 @@ import org.apache.commons.lang3.tuple.Pair
 import java.io.Closeable
 
 class FolderBrowser internal constructor(private val indexHandler: IndexHandler) : Closeable {
-    private val folderStatsCache = CacheBuilder.newBuilder()
-            .build(object : CacheLoader<String, FolderStats>() {
-                @Throws(Exception::class)
-                override fun load(folder: String): FolderStats {
-                    return FolderStats.Builder()
-                            .setFolder(folder)
-                            .build()
-                }
-            })
-    private val indexRepositoryEventListener = object : Any() {
-        @Subscribe
-        fun handleFolderStatsUpdatedEvent(event: IndexRepository.FolderStatsUpdatedEvent) {
-            addFolderStats(event.getFolderStats())
-        }
+    private val folderStatsCache = mutableMapOf<String, FolderStats>()
+    private val indexRepositoryEventListener = { event: IndexRepository.FolderStatsUpdatedEvent ->
+        addFolderStats(event.getFolderStats())
     }
 
     fun folderInfoAndStatsList(): List<Pair<FolderInfo, FolderStats>> =
             (indexHandler.folderInfoList().map { folderInfo -> Pair.of(folderInfo, getFolderStats(folderInfo.folder)) }).toList()
 
     init {
-        indexHandler.indexRepository.getEventBus().register(indexRepositoryEventListener)
+        indexHandler.indexRepository.setOnFolderStatsUpdatedListener(indexRepositoryEventListener)
         addFolderStats(indexHandler.indexRepository.findAllFolderStats())
     }
 
@@ -54,7 +40,11 @@ class FolderBrowser internal constructor(private val indexHandler: IndexHandler)
     }
 
     fun getFolderStats(folder: String): FolderStats {
-        return folderStatsCache.getUnchecked(folder)
+        return folderStatsCache[folder] ?: let {
+            FolderStats.Builder()
+                    .setFolder(folder)
+                    .build()
+        }
     }
 
     fun getFolderInfo(folder: String): FolderInfo? {
@@ -62,6 +52,6 @@ class FolderBrowser internal constructor(private val indexHandler: IndexHandler)
     }
 
     override fun close() {
-        indexHandler.indexRepository.getEventBus().unregister(indexRepositoryEventListener)
+        indexHandler.indexRepository.setOnFolderStatsUpdatedListener(null)
     }
 }

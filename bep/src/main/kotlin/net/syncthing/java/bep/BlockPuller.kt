@@ -13,9 +13,7 @@
  */
 package net.syncthing.java.bep
 
-import com.google.common.eventbus.Subscribe
 import com.google.protobuf.ByteString
-import net.syncthing.java.bep.BlockExchangeConnectionHandler.ResponseMessageReceivedEvent
 import net.syncthing.java.bep.BlockExchangeProtos.ErrorCode
 import net.syncthing.java.bep.BlockExchangeProtos.Request
 import net.syncthing.java.core.beans.FileBlocks
@@ -43,33 +41,12 @@ class BlockPuller internal constructor(configuration: ConfigurationService,
     private val hashList = mutableListOf<String>()
     private val missingHashes: MutableSet<String> = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val requestIds: MutableSet<Int> = Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
+    private val lock = Object()
 
     fun pullBlocks(fileBlocks: FileBlocks): FileDownloadObserver {
         logger.info("pulling file = {}", fileBlocks)
         NetworkUtils.assertProtocol(connectionHandler.hasFolder(fileBlocks.folder), {"supplied connection handler $connectionHandler will not share folder ${fileBlocks.folder}"})
-        val lock = Object()
         val error = AtomicReference<Exception>()
-        val listener = object : Any() {
-            @Subscribe
-            fun handleResponseMessageReceivedEvent(event: ResponseMessageReceivedEvent) {
-                synchronized(lock) {
-                    if (!requestIds.contains(event.message.id)) {
-                        return
-                    }
-                    NetworkUtils.assertProtocol(event.message.code == ErrorCode.NO_ERROR, {"received error response, code = ${event.message.code}"})
-                    val data = event.message.data.toByteArray()
-                    val hash = Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(data))
-                    blockCache.pushBlock(data)
-                    if (missingHashes.remove(hash)) {
-                        blocksByHash.put(hash, data)
-                        logger.debug("aquired block, hash = {}", hash)
-                        lock.notify()
-                    } else {
-                        logger.warn("received not-needed block, hash = {}", hash)
-                    }
-                }
-            }
-        }
         val fileDownloadObserver = object : FileDownloadObserver() {
 
             private fun receivedData() = (blocksByHash.size * BlockPusher.BLOCK_SIZE).toLong()
@@ -111,7 +88,6 @@ class BlockPuller internal constructor(configuration: ConfigurationService,
                 missingHashes.clear()
                 hashList.clear()
                 blocksByHash.clear()
-                connectionHandler.eventBus.unregister(listener)
             }
         }
         synchronized(lock) {
@@ -124,7 +100,6 @@ class BlockPuller internal constructor(configuration: ConfigurationService,
                     missingHashes.remove(hash)
                 }
             }
-            connectionHandler.eventBus.register(listener)
             for (block in fileBlocks.blocks) {
                 if (missingHashes.contains(block.hash)) {
                     val requestId = Math.abs(Random().nextInt())
@@ -141,6 +116,25 @@ class BlockPuller internal constructor(configuration: ConfigurationService,
                 }
             }
             return fileDownloadObserver
+        }
+    }
+
+    fun onResponseMessageReceived(response: BlockExchangeProtos.Response) {
+        synchronized(lock) {
+            if (!requestIds.contains(response.id)) {
+                return
+            }
+            NetworkUtils.assertProtocol(response.code == ErrorCode.NO_ERROR, {"received error response, code = ${response.code}"})
+            val data = response.data.toByteArray()
+            val hash = Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(data))
+            blockCache.pushBlock(data)
+            if (missingHashes.remove(hash)) {
+                blocksByHash.put(hash, data)
+                logger.debug("aquired block, hash = {}", hash)
+                lock.notify()
+            } else {
+                logger.warn("received not-needed block, hash = {}", hash)
+            }
         }
     }
 

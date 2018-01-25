@@ -13,10 +13,6 @@
  */
 package net.syncthing.java.bep
 
-import com.google.common.cache.CacheBuilder
-import com.google.common.cache.CacheLoader
-import com.google.common.collect.ComparisonChain
-import com.google.common.eventbus.Subscribe
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.interfaces.IndexRepository
 import net.syncthing.java.core.utils.ExecutorUtils
@@ -26,7 +22,6 @@ import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.util.*
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 class IndexBrowser internal constructor(private val indexRepository: IndexRepository, private val indexHandler: IndexHandler,
                                        val folder: String, private val includeParentInList: Boolean = false,
@@ -34,69 +29,19 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
 
     private fun isParent(fileInfo: FileInfo) = PathUtils.isParent(fileInfo.path)
 
-    val ALPHA_ASC_DIR_FIRST = Comparator<FileInfo> { a, b ->
-        ComparisonChain.start()
-                .compareTrueFirst(isParent(a), isParent(b))
-                .compare(if (a.isDirectory()) 1 else 2, if (b.isDirectory()) 1 else 2)
-                .compare(a.path, b.path)
-                .result()
-    }
-
-    val LAST_MOD_DESC = Comparator<FileInfo> { a, b ->
-        ComparisonChain.start()
-                .compareTrueFirst(isParent(a), isParent(b))
-                .compare(b.lastModified, a.lastModified)
-                .compare(a.path, b.path)
-                .result()
-    }
+    val ALPHA_ASC_DIR_FIRST: Comparator<FileInfo> =
+            compareBy({isParent(it)}, {!it.isDirectory()}, {it.path})
+    val LAST_MOD_DESC: Comparator<FileInfo> =
+            compareBy({isParent(it)}, {it.lastModified}, {it.path})
 
     private val ordering = ordering ?: ALPHA_ASC_DIR_FIRST
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val listFolderCache = CacheBuilder.newBuilder()
-            .expireAfterWrite(10, TimeUnit.MINUTES)
-            //        .weigher(new Weigher<String, List<FileInfo>>() {
-            //            @Override
-            //            public int weigh(String key, List<FileInfo> list) {
-            //                return list.size();
-            //            }
-            //        })
-            //        .maximumSize(1000)
-            .build(object : CacheLoader<String, List<FileInfo>>() {
-                @Throws(Exception::class)
-                override fun load(path: String): List<FileInfo> {
-                    return doListFiles(path)
-                }
 
-            })
-    private val fileInfoCache = CacheBuilder.newBuilder()
-            .expireAfterWrite(10, TimeUnit.MINUTES)
-            //        .maximumSize(1000)
-            //        .weigher(new Weigher<String, FileInfo>() {
-            //            @Override
-            //            public int weigh(String key, FileInfo fileInfo) {
-            //                return fileInfo.getBlocks().size();
-            //            }
-            //        })
-            .build(object : CacheLoader<String, FileInfo>() {
-                @Throws(Exception::class)
-                override fun load(path: String): FileInfo? {
-                    return doGetFileInfoByAbsolutePath(path)
-                }
-            })
     var currentPath: String = PathUtils.ROOT_PATH
         private set
     private val PARENT_FILE_INFO: FileInfo
     private val ROOT_FILE_INFO: FileInfo
     private val executorService = Executors.newSingleThreadScheduledExecutor()
-    private val indexHandlerEventListener = object : Any() {
-        @Subscribe
-        fun handleIndexChangedEvent(event: IndexHandler.IndexChangedEvent) {
-            if (event.folder == folder) {
-                invalidateCache()
-            }
-        }
-
-    }
     private val preloadJobs = mutableSetOf<String>()
     private val preloadJobsLock = Any()
     private var mOnPathChangedListener: (() -> Unit)? = null
@@ -104,6 +49,12 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
     private fun isCacheReady(): Boolean {
         synchronized(preloadJobsLock) {
             return preloadJobs.isEmpty()
+        }
+    }
+
+    internal fun onIndexChangedevent(folder: String, newRecord: FileInfo) {
+        if (folder == this.folder) {
+            preloadFileInfoForCurrentPath()
         }
     }
 
@@ -115,7 +66,6 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
 
     init {
         assert(folder.isNotEmpty())
-        this.indexHandler.eventBus.register(indexHandlerEventListener)
         PARENT_FILE_INFO = FileInfo.Builder()
                 .setFolder(folder)
                 .setTypeDir()
@@ -126,22 +76,11 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
                 .setTypeDir()
                 .setPath(PathUtils.ROOT_PATH)
                 .build()
-        executorService.scheduleWithFixedDelay({
-            logger.debug("folder cache cleanup")
-            listFolderCache.cleanUp()
-            fileInfoCache.cleanUp()
-        }, 1, 1, TimeUnit.MINUTES)
         navigateToAbsolutePath(PathUtils.ROOT_PATH)
     }
 
     fun setOnFolderChangedListener(onPathChangedListener: (() -> Unit)?) {
         mOnPathChangedListener = onPathChangedListener
-    }
-
-    private fun invalidateCache() {
-        listFolderCache.invalidateAll()
-        fileInfoCache.invalidateAll()
-        preloadFileInfoForCurrentPath()
     }
 
     private fun preloadFileInfoForCurrentPath() {
@@ -157,16 +96,16 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
 
                         override fun run() {
 
-                            var preloadPath: String? = null
-                            synchronized(preloadJobsLock) {
-                                assert(!preloadJobs.isEmpty())
-                                preloadPath = preloadJobs.last() //pop last job
-                            }
+                            val preloadPath =
+                                    synchronized(preloadJobsLock) {
+                                        assert(!preloadJobs.isEmpty())
+                                        preloadJobs.last() //pop last job
+                                    }
 
                             logger.info("folder preload BEGIN for folder = '{}' path = '{}'", folder, preloadPath)
-                            getFileInfoByAbsolutePath(preloadPath!!)
-                            if (!PathUtils.isRoot(preloadPath!!)) {
-                                val parent = PathUtils.getParentPath(preloadPath!!)
+                            getFileInfoByAbsolutePath(preloadPath)
+                            if (!PathUtils.isRoot(preloadPath)) {
+                                val parent = PathUtils.getParentPath(preloadPath)
                                 getFileInfoByAbsolutePath(parent)
                                 listFiles(parent)
                             }
@@ -177,7 +116,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
                             }
                             logger.info("folder preload END for folder = '{}' path = '{}'", folder, preloadPath)
                             synchronized(preloadJobsLock) {
-                                preloadJobs.remove(preloadPath!!)
+                                preloadJobs.remove(preloadPath)
                                 if (isCacheReady()) {
                                     logger.info("cache ready, notify listeners")
                                     mOnPathChangedListener?.invoke()
@@ -193,18 +132,15 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
         }
     }
 
-    fun listFiles(absoluteDirPath: String? = currentPath): List<FileInfo> {
+    fun listFiles(absoluteDirPath: String = currentPath): List<FileInfo> {
         logger.debug("listFiles for path = '{}'", absoluteDirPath)
-        return listFolderCache.getUnchecked(absoluteDirPath!!)
+        return doListFiles(absoluteDirPath)
     }
 
     private fun doListFiles(path: String): List<FileInfo> {
         logger.debug("doListFiles for path = '{}' BEGIN", path)
         val list = indexRepository.findNotDeletedFilesByFolderAndParent(folder, path)
         logger.debug("doListFiles for path = '{}' : {} records loaded)", path, list.size)
-        for (fileInfo in list) {
-            fileInfoCache.put(fileInfo.path, fileInfo)
-        }
         Collections.sort(list, ordering)
         if (includeParentInList && (!PathUtils.isRoot(path) || allowParentInRoot)) {
             list.add(0, PARENT_FILE_INFO)
@@ -213,10 +149,10 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
     }
 
     fun getFileInfoByAbsolutePath(path: String): FileInfo {
-        return if (PathUtils.isRoot(path)) ROOT_FILE_INFO else fileInfoCache.getUnchecked(path)
+        return if (PathUtils.isRoot(path)) ROOT_FILE_INFO else doGetFileInfoByAbsolutePath(path)
     }
 
-    private fun doGetFileInfoByAbsolutePath(path: String): FileInfo? {
+    private fun doGetFileInfoByAbsolutePath(path: String): FileInfo {
         logger.debug("doGetFileInfoByAbsolutePath for path = '{}' BEGIN", path)
         val fileInfo = indexRepository.findNotDeletedFileInfo(folder, path) ?: error("file not found for path = $path")
         logger.debug("doGetFileInfoByAbsolutePath for path = '{}' END", path)
@@ -252,7 +188,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
 
     override fun close() {
         logger.info("closing")
-        this.indexHandler.eventBus.unregister(indexHandlerEventListener)
+        indexHandler.unregisterIndexBrowser(this)
         executorService.shutdown()
         ExecutorUtils.awaitTerminationSafe(executorService)
     }

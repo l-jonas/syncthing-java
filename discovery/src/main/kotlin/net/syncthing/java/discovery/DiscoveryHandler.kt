@@ -13,11 +13,9 @@
  */
 package net.syncthing.java.discovery
 
-import com.google.common.eventbus.EventBus
-import com.google.common.eventbus.Subscribe
 import net.syncthing.java.core.beans.DeviceAddress
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.configuration.ConfigurationService
-import net.syncthing.java.core.events.DeviceAddressReceivedEvent
 import net.syncthing.java.core.interfaces.DeviceAddressRepository
 import net.syncthing.java.core.utils.ExecutorUtils
 import net.syncthing.java.discovery.protocol.GlobalDiscoveryHandler
@@ -30,14 +28,18 @@ import java.util.*
 import java.util.concurrent.Executors
 
 class DiscoveryHandler(private val configuration: ConfigurationService,
-                       private val deviceAddressRepository: DeviceAddressRepository) : Closeable {
+                       private val deviceAddressRepository: DeviceAddressRepository,
+                       private val onDeviceAddressReceivedListener: (DeviceAddress) -> Unit) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private val globalDiscoveryHandler = GlobalDiscoveryHandler(configuration)
-    private val localDiscoveryHandler = LocalDiscoveryHandler(configuration)
-    val eventBus = EventBus()
+    private val localDiscoveryHandler = LocalDiscoveryHandler(configuration, { _, deviceAddresses ->
+        logger.info("received device address list from local discovery")
+        processDeviceAddressBg(deviceAddresses)
+    })
     private val executorService = Executors.newCachedThreadPool()
-    private val deviceAddressMap = Collections.synchronizedMap(hashMapOf<Pair<String, String>, DeviceAddress>())
+    private val deviceAddressMap = Collections.synchronizedMap(hashMapOf<Pair<DeviceId, String>, DeviceAddress>())
+    private val deviceAddressSupplier = DeviceAddressSupplier(this)
     private var isClosed = false
 
     private var shouldLoadFromDb = true
@@ -45,17 +47,6 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
     private var shouldStartLocalDiscovery = true
 
     fun getAllWorkingDeviceAddresses() = deviceAddressMap.values.filter { it.isWorking() }
-
-    init {
-        logger.info("Initializing discovery handler")
-        localDiscoveryHandler.eventBus.register(object : Any() {
-            @Subscribe
-            fun handleMessageReceivedEvent(event: LocalDiscoveryHandler.MessageReceivedEvent) {
-                logger.info("received device address list from local discovery")
-                processDeviceAddressBg(event.getDeviceAddresses())
-            }
-        })
-    }
 
     private fun updateAddressesBg() {
         if (shouldLoadFromDb) {
@@ -91,7 +82,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
                 val peers = configuration.getPeerIds().toSet()
                 //do not process address already processed
                 list.filter { deviceAddress ->
-                    !peers.contains(deviceAddress.deviceId) || deviceAddressMap.containsKey(Pair.of(deviceAddress.deviceId, deviceAddress.address))
+                    !peers.contains(deviceAddress.deviceId()) || deviceAddressMap.containsKey(Pair.of(DeviceId(deviceAddress.deviceId), deviceAddress.address))
                 }
                 AddressRanker.pingAddresses(list)
                         .forEach { putDeviceAddress(it) }
@@ -101,16 +92,13 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
 
     private fun putDeviceAddress(deviceAddress: DeviceAddress) {
         logger.info("acquired device address = {}", deviceAddress)
-        deviceAddressMap.put(Pair.of(deviceAddress.deviceId, deviceAddress.address), deviceAddress)
+        deviceAddressMap[Pair.of(DeviceId(deviceAddress.deviceId), deviceAddress.address)] = deviceAddress
         deviceAddressRepository.updateDeviceAddress(deviceAddress)
-        eventBus.post(object : DeviceAddressUpdateEvent() {
-            override val deviceAddress: DeviceAddress
-                get() = deviceAddress
-        })
+        deviceAddressSupplier.onNewDeviceAddressAcquired(deviceAddress)
+        onDeviceAddressReceivedListener(deviceAddress)
     }
 
     fun newDeviceAddressSupplier(): DeviceAddressSupplier {
-        val deviceAddressSupplier = DeviceAddressSupplier(this)
         updateAddressesBg()
         return deviceAddressSupplier
     }
@@ -124,14 +112,4 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
             ExecutorUtils.awaitTerminationSafe(executorService)
         }
     }
-
-    abstract inner class DeviceAddressUpdateEvent : DeviceAddressReceivedEvent {
-
-        abstract val deviceAddress: DeviceAddress
-
-        override fun getDeviceAddresses(): List<DeviceAddress> {
-            return listOf(deviceAddress)
-        }
-    }
-
 }

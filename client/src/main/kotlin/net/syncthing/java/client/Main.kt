@@ -13,6 +13,7 @@
  */
 package net.syncthing.java.client
 
+import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.configuration.ConfigurationService
@@ -82,13 +83,12 @@ class Main(private val commandLine: CommandLine) {
             "S" -> {
                 val peers = option.value
                         .split(",")
-                        .map { it.trim() }
                         .filterNot { it.isEmpty() }
+                        .map { DeviceId(it.trim()) }
                         .toList()
                 System.out.println("set peers = $peers")
                 configuration.Editor().setPeers(emptyList())
                 for (peer in peers) {
-                    KeystoreHandler.validateDeviceId(peer)
                     configuration.Editor().addPeers(DeviceInfo(peer, null))
                 }
                 configuration.Editor().persistNow()
@@ -215,13 +215,12 @@ class Main(private val commandLine: CommandLine) {
                 System.out.println("folders:\n$folderInfo\n")
             }
             "a" -> {
-                syncthingClient.discoveryHandler.newDeviceAddressSupplier().use { deviceAddressSupplier ->
-                    var deviceAddressesStr = ""
-                    for (deviceAddress in deviceAddressSupplier.toList()) {
-                        deviceAddressesStr += "\n" + deviceAddress?.deviceId + " : " + deviceAddress?.address
-                    }
-                    System.out.println("device addresses:\n$deviceAddressesStr\n")
+                val deviceAddressSupplier = syncthingClient.discoveryHandler.newDeviceAddressSupplier()
+                var deviceAddressesStr = ""
+                for (deviceAddress in deviceAddressSupplier.toList()) {
+                    deviceAddressesStr += "\n" + deviceAddress?.deviceId + " : " + deviceAddress?.address
                 }
+                System.out.println("device addresses:\n$deviceAddressesStr\n")
             }
         }
     }

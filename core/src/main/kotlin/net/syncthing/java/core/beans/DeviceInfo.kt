@@ -13,18 +13,11 @@
  */
 package net.syncthing.java.core.beans
 
-import net.syncthing.java.core.security.KeystoreHandler
+class DeviceInfo(val deviceId: DeviceId, name: String?) {
 
-class DeviceInfo(val deviceId: String, name: String?) {
-    val name: String
-
-    init {
-        KeystoreHandler.validateDeviceId(deviceId)
-        this.name = if (name.isNullOrBlank()) deviceId.substring(0, 7) else name!!
-    }
+    val name: String = if (name.isNullOrBlank()) deviceId.deviceId.substring(0, 7) else name!!
 
     override fun toString(): String {
         return "DeviceInfo{deviceId=$deviceId, name=$name}"
     }
-
 }

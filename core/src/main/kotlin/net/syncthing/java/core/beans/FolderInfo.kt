@@ -13,7 +13,7 @@
  */
 package net.syncthing.java.core.beans
 
-open class FolderInfo @JvmOverloads constructor(val folder: String, label: String? = null) {
+open class FolderInfo constructor(val folder: String, label: String? = null) {
     val label: String
 
     init {
