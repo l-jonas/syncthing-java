@@ -18,6 +18,7 @@ import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.discovery.utils.AddressRanker
+import org.apache.http.HttpResponse
 import org.apache.http.HttpStatus
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory
@@ -67,7 +68,7 @@ internal class GlobalDiscoveryHandler(private val configuration: ConfigurationSe
             val httpClient = HttpClients.custom()
                     .setSSLSocketFactory(SSLConnectionSocketFactory(SSLContextBuilder().loadTrustMaterial(null, TrustSelfSignedStrategy()).build(), SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER))
                     .build()
-            val httpGet = HttpGet("https://$server/v2/?device=$deviceId")
+            val httpGet = HttpGet("https://$server/v2/?device=${deviceId.deviceId}")
             return httpClient.execute<List<DeviceAddress>>(httpGet) { response ->
                 when (response.statusLine.statusCode) {
                     HttpStatus.SC_NOT_FOUND -> {
@@ -81,7 +82,9 @@ internal class GlobalDiscoveryHandler(private val configuration: ConfigurationSe
                         logger.debug("found address list = {}", list)
                         return@execute list
                     }
-                    else -> throw IOException("http error " + response.statusLine)
+                    else -> {
+                        throw IOException("http error ${response.statusLine}, response ${EntityUtils.toString(response.entity)}")
+                    }
                 }
             }
         } catch (e: Exception) {
