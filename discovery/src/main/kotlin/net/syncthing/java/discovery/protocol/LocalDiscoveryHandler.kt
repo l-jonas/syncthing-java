@@ -19,8 +19,8 @@ import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.events.DeviceAddressReceivedEvent
-import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.NetworkUtils
+import net.syncthing.java.core.utils.submitLogging
 import net.syncthing.java.discovery.protocol.LocalDiscoveryProtos.Announce
 import org.apache.commons.io.IOUtils
 import org.slf4j.LoggerFactory
@@ -33,7 +33,6 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.nio.ByteBuffer
-import java.util.*
 import java.util.concurrent.Executors
 
 internal class LocalDiscoveryHandler(private val configuration: ConfigurationService,
@@ -52,7 +51,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
     private var datagramSocket: DatagramSocket? = null
 
     fun sendAnnounceMessage() {
-        processingExecutor.submit {
+        processingExecutor.submitLogging {
             try {
                 val out = ByteArrayOutputStream()
                 DataOutputStream(out).writeInt(MAGIC)
@@ -96,15 +95,15 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
 
         }
 
-        listeningExecutor.submit(object : Runnable {
+        listeningExecutor.submitLogging(object : Runnable {
             override fun run() {
                 try {
                     val datagramPacket = DatagramPacket(ByteArray(INCOMING_BUFFER_SIZE), INCOMING_BUFFER_SIZE)
                     logger.trace("waiting for message on socket addr = {}",
                             datagramSocket!!.localSocketAddress)
                     datagramSocket!!.receive(datagramPacket)
-                    processingExecutor.submit { handleReceivedDatagram(datagramPacket) }
-                    listeningExecutor.submit(this)
+                    processingExecutor.submitLogging { handleReceivedDatagram(datagramPacket) }
+                    listeningExecutor.submitLogging(this)
                 } catch (e: IOException) {
                     if (e.message == "Socket closed") {
                         // Ignore exception on socket close.

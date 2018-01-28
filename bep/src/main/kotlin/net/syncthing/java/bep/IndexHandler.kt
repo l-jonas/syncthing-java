@@ -19,8 +19,9 @@ import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.interfaces.IndexRepository
 import net.syncthing.java.core.interfaces.Sequencer
 import net.syncthing.java.core.interfaces.TempRepository
-import net.syncthing.java.core.utils.ExecutorUtils
 import net.syncthing.java.core.utils.NetworkUtils
+import net.syncthing.java.core.utils.awaitTerminationSafe
+import net.syncthing.java.core.utils.submitLogging
 import org.apache.commons.lang3.tuple.Pair
 import org.apache.http.util.TextUtils
 import org.bouncycastle.util.encoders.Hex
@@ -320,11 +321,10 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
             logger.debug("received index message event, queuing for processing")
             queuedMessages++
             queuedRecords += data.filesCount.toLong()
-            executorService.submit(object : ProcessingRunnable() {
+            executorService.submitLogging(object : ProcessingRunnable() {
                 override fun runProcess() {
                     doHandleIndexMessageReceivedEvent(data, clusterConfigInfo, peerDeviceId)
                 }
-
             })
         }
 
@@ -333,7 +333,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
             logger.debug("received index message event, stored to temp record {}, queuing for processing", key)
             queuedMessages++
             queuedRecords += data.filesCount.toLong()
-            executorService.submit(object : ProcessingRunnable() {
+            executorService.submitLogging(object : ProcessingRunnable() {
                 override fun runProcess() {
                     try {
                         doHandleIndexMessageReceivedEvent(key, clusterConfigInfo, peerDeviceId)
@@ -437,7 +437,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
         fun stop() {
             logger.info("stopping index record processor")
             executorService.shutdown()
-            ExecutorUtils.awaitTerminationSafe(executorService)
+            executorService.awaitTerminationSafe()
         }
 
     }

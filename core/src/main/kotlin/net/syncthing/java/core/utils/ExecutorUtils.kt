@@ -15,18 +15,33 @@ package net.syncthing.java.core.utils
 
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
-object ExecutorUtils {
+private val logger = LoggerFactory.getLogger(ExecutorService::class.java)
 
-    private val logger = LoggerFactory.getLogger(ExecutorUtils::class.java)
-
-    fun awaitTerminationSafe(executorService: ExecutorService) {
-        try {
-            executorService.awaitTermination(2, TimeUnit.SECONDS)
-        } catch (ex: InterruptedException) {
-            logger.warn("", ex)
-        }
-
+fun ExecutorService.awaitTerminationSafe() {
+    try {
+        awaitTermination(2, TimeUnit.SECONDS)
+    } catch (ex: InterruptedException) {
+        logger.warn("", ex)
     }
+}
+
+fun ExecutorService.submitLogging(runnable: Runnable) = submitLogging { runnable.run() }
+
+/**
+ * Wrapper method for [[ExecutorService.submit]], which silently swallows exceptions. If an exception is thrown in
+ * [[runnable]], logs the exception and force crashes
+ */
+fun <T> ExecutorService.submitLogging(runnable: () -> T): Future<T> {
+    return submit<T>({
+        try {
+            runnable()
+        } catch (e: Exception) {
+            logger.error("", e)
+            System.exit(1)
+            null
+        }
+    })
 }

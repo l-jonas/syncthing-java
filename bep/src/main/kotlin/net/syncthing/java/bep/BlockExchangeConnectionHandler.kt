@@ -24,6 +24,7 @@ import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.NetworkUtils
+import net.syncthing.java.core.utils.submitLogging
 import net.syncthing.java.httprelay.HttpRelayClient
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.tuple.Pair
@@ -214,7 +215,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
     }
 
     private fun sendHelloMessage(payload: ByteArray): Future<*> {
-        return outExecutorService.submit {
+        return outExecutorService.submitLogging {
             try {
                 logger.trace("sending message")
                 val header = ByteBuffer.allocate(6)
@@ -226,7 +227,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                 logger.trace("sent message")
             } catch (ex: IOException) {
                 if (outExecutorService.isShutdown) {
-                    return@submit
+                    return@submitLogging
                 }
                 logger.error("error writing to output stream", ex)
                 closeBg()
@@ -276,7 +277,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
         } catch (e: Exception) {
             when (e) {
                 is IllegalAccessException, is IllegalArgumentException, is InvocationTargetException, is NoSuchMethodException, is SecurityException ->
-                    throw RuntimeException(e)
+                    throw IOException(e)
                 else -> throw e
             }
         }
@@ -363,13 +364,13 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
     }
 
     private fun startMessageListenerService() {
-        inExecutorService.submit {
+        inExecutorService.submitLogging {
             try {
                 while (!Thread.interrupted()) {
                     val message = receiveMessage()
                     logger.debug("received message type = {} {}", message.left, getIdForMessage(message.right))
                     logger.trace("received message = {}", message.right)
-                    messageProcessingService.submit {
+                    messageProcessingService.submitLogging {
                         logger.debug("processing message type = {} {}", message.left, getIdForMessage(message.right))
                         when (message.left) {
                             BlockExchangeProtos.MessageType.INDEX -> {
@@ -436,7 +437,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                 }
             } catch (ex: IOException) {
                 if (inExecutorService.isShutdown) {
-                    return@submit
+                    return@submitLogging
                 }
                 logger.error("error receiving message", ex)
                 closeBg()

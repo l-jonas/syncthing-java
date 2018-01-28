@@ -16,6 +16,7 @@ package net.syncthing.java.httprelay
 import com.google.protobuf.ByteString
 import net.syncthing.java.core.interfaces.RelayConnection
 import net.syncthing.java.core.utils.NetworkUtils
+import net.syncthing.java.core.utils.submitLogging
 import org.apache.http.HttpStatus
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.entity.ByteArrayEntity
@@ -126,11 +127,17 @@ class HttpRelayConnection internal constructor(private val httpRelayServerUrl: S
             }
 
         }
-        incomingExecutorService.submit {
+        incomingExecutorService.submitLogging {
             while (!isClosed) {
-                val serverMessage1 = sendMessage(HttpRelayProtos.HttpRelayPeerMessage.newBuilder().setMessageType(HttpRelayProtos.HttpRelayPeerMessageType.WAIT_FOR_DATA))
+                val serverMessage1 =
+                    try {
+                        sendMessage(HttpRelayProtos.HttpRelayPeerMessage.newBuilder().setMessageType(HttpRelayProtos.HttpRelayPeerMessageType.WAIT_FOR_DATA))
+                    } catch (e: IOException) {
+                        logger.warn("Failed to send relay message", e)
+                        return@submitLogging
+                    }
                 if (isClosed) {
-                    return@submit
+                    return@submitLogging
                 }
                 NetworkUtils.assertProtocol(serverMessage1.messageType == HttpRelayProtos.HttpRelayServerMessageType.RELAY_TO_PEER)
                 NetworkUtils.assertProtocol(serverMessage1.sequence == relayToPeerSequence + 1)
@@ -233,28 +240,24 @@ class HttpRelayConnection internal constructor(private val httpRelayServerUrl: S
         Thread { close() }.start()
     }
 
+    @Throws(IOException::class)
     private fun sendMessage(peerMessageBuilder: HttpRelayProtos.HttpRelayPeerMessage.Builder): HttpRelayProtos.HttpRelayServerMessage {
-        try {
-            if (!sessionId.isEmpty()) {
-                peerMessageBuilder.sessionId = sessionId
-            }
-            logger.debug("send http relay peer message = {} session id = {} sequence = {}", peerMessageBuilder.messageType, peerMessageBuilder.sessionId, peerMessageBuilder.sequence)
-            val httpClient = HttpClients.custom()
-                    //                .setSSLSocketFactory(new SSLConnectionSocketFactory(new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy()).build(), SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER))
-                    .build()
-            val httpPost = HttpPost(httpRelayServerUrl)
-            httpPost.entity = ByteArrayEntity(peerMessageBuilder.build().toByteArray())
-            val serverMessage = httpClient.execute(httpPost) { response ->
-                NetworkUtils.assertProtocol(response.statusLine.statusCode == HttpStatus.SC_OK, {"http error ${response.statusLine}"})
-                HttpRelayProtos.HttpRelayServerMessage.parseFrom(EntityUtils.toByteArray(response.entity))
-            }
-            logger.debug("received http relay server message = {}", serverMessage.messageType)
-            NetworkUtils.assertProtocol(serverMessage.messageType != HttpRelayProtos.HttpRelayServerMessageType.ERROR, {"server error : ${serverMessage.data.toStringUtf8()}"})
-            return serverMessage
-        } catch (ex: IOException) {
-            throw RuntimeException(ex)
+        if (!sessionId.isEmpty()) {
+            peerMessageBuilder.sessionId = sessionId
         }
-
+        logger.debug("send http relay peer message = {} session id = {} sequence = {}", peerMessageBuilder.messageType, peerMessageBuilder.sessionId, peerMessageBuilder.sequence)
+        val httpClient = HttpClients.custom()
+                //                .setSSLSocketFactory(new SSLConnectionSocketFactory(new SSLContextBuilder().loadTrustMaterial(null, new TrustSelfSignedStrategy()).build(), SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER))
+                .build()
+        val httpPost = HttpPost(httpRelayServerUrl)
+        httpPost.entity = ByteArrayEntity(peerMessageBuilder.build().toByteArray())
+        val serverMessage = httpClient.execute(httpPost) { response ->
+            NetworkUtils.assertProtocol(response.statusLine.statusCode == HttpStatus.SC_OK, {"http error ${response.statusLine}"})
+            HttpRelayProtos.HttpRelayServerMessage.parseFrom(EntityUtils.toByteArray(response.entity))
+        }
+        logger.debug("received http relay server message = {}", serverMessage.messageType)
+        NetworkUtils.assertProtocol(serverMessage.messageType != HttpRelayProtos.HttpRelayServerMessageType.ERROR, {"server error : ${serverMessage.data.toStringUtf8()}"})
+        return serverMessage
     }
 
     override fun close() {

@@ -18,8 +18,7 @@ import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceStats
 import net.syncthing.java.core.beans.DeviceStats.DeviceStatus
 import net.syncthing.java.core.configuration.ConfigurationService
-import net.syncthing.java.core.events.DeviceAddressActiveEvent
-import net.syncthing.java.core.utils.ExecutorUtils
+import net.syncthing.java.core.utils.awaitTerminationSafe
 import java.io.Closeable
 import java.util.*
 import java.util.concurrent.Executors
@@ -97,6 +96,6 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
 
     override fun close() {
         scheduledExecutorService.shutdown()
-        ExecutorUtils.awaitTerminationSafe(scheduledExecutorService)
+        scheduledExecutorService.awaitTerminationSafe()
     }
 }

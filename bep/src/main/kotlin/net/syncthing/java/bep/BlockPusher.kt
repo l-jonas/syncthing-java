@@ -22,6 +22,7 @@ import net.syncthing.java.core.beans.IndexInfo
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.utils.BlockUtils
 import net.syncthing.java.core.utils.NetworkUtils
+import net.syncthing.java.core.utils.submitLogging
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.tuple.Pair
@@ -90,7 +91,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
                         .setData(ByteString.copyFrom(data))
                         .setId(request.id)
                         .build())
-                monitoringProcessExecutorService.submit {
+                monitoringProcessExecutorService.submitLogging {
                     try {
                         future.get()
                         sentBlocks.add(hash)
@@ -146,13 +147,13 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
                 logger.info("sent file info record = {}", fileInfo1)
             }
 
-            @Throws(InterruptedException::class)
+            @Throws(InterruptedException::class, IOException::class)
             override fun waitForProgressUpdate(): Int {
                 synchronized(updateLock) {
                     updateLock.wait()
                 }
                 if (uploadError.get() != null) {
-                    throw RuntimeException(uploadError.get())
+                    throw IOException(uploadError.get())
                 }
                 return progressPercentage()
             }
@@ -210,15 +211,10 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
     inner class IndexEditObserver(private val future: Future<*>, val indexUpdate: IndexUpdate) : Closeable {
 
         //throw exception if job has errors
+        @Throws(InterruptedException::class, ExecutionException::class)
         fun isCompleted(): Boolean {
             return if (future.isDone) {
-                try {
-                    future.get()
-                } catch (ex: InterruptedException) {
-                    throw RuntimeException(ex)
-                } catch (ex: ExecutionException) {
-                    throw RuntimeException(ex)
-                }
+                future.get()
                 true
             } else {
                 false
@@ -227,14 +223,9 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
 
         constructor(pair: Pair<Future<*>, IndexUpdate>) : this(pair.left, pair.right)
 
-        @Throws(InterruptedException::class)
+        @Throws(InterruptedException::class, ExecutionException::class)
         fun waitForComplete() {
-            try {
-                future.get()
-            } catch (ex: ExecutionException) {
-                throw RuntimeException(ex)
-            }
-
+            future.get()
         }
 
         @Throws(IOException::class)
@@ -266,36 +257,32 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
 
         @Transient private var hash: String? = null
 
+        @Throws(IOException::class)
         private fun processStream() {
-            try {
-                inputStream.use { it ->
-                    val list = mutableListOf<BlockInfo>()
-                    var offset: Long = 0
-                    while (true) {
-                        var block = ByteArray(BLOCK_SIZE)
-                        val blockSize = it.read(block)
-                        if (blockSize <= 0) {
-                            break
-                        }
-                        if (blockSize < block.size) {
-                            block = Arrays.copyOf(block, blockSize)
-                        }
-
-                        val hash = MessageDigest.getInstance("SHA-256").digest(block)
-                        list.add(BlockInfo.newBuilder()
-                                .setHash(ByteString.copyFrom(hash))
-                                .setOffset(offset)
-                                .setSize(blockSize)
-                                .build())
-                        offset += blockSize.toLong()
+            inputStream.use { it ->
+                val list = mutableListOf<BlockInfo>()
+                var offset: Long = 0
+                while (true) {
+                    var block = ByteArray(BLOCK_SIZE)
+                    val blockSize = it.read(block)
+                    if (blockSize <= 0) {
+                        break
                     }
-                    size = offset
-                    blocks = list
-                }
-            } catch (ex: IOException) {
-                throw RuntimeException(ex)
-            }
+                    if (blockSize < block.size) {
+                        block = Arrays.copyOf(block, blockSize)
+                    }
 
+                    val hash = MessageDigest.getInstance("SHA-256").digest(block)
+                    list.add(BlockInfo.newBuilder()
+                            .setHash(ByteString.copyFrom(hash))
+                            .setOffset(offset)
+                            .setSize(blockSize)
+                            .build())
+                    offset += blockSize.toLong()
+                }
+                size = offset
+                blocks = list
+            }
         }
 
         open fun getSize(): Long {
@@ -312,19 +299,15 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
             return blocks
         }
 
+        @Throws(IOException::class)
         fun getBlock(offset: Long, size: Int, hash: String): ByteArray {
             val buffer = ByteArray(size)
-            try {
-                inputStream.use { it ->
-                    IOUtils.skipFully(it, offset)
-                    IOUtils.readFully(it, buffer)
-                    NetworkUtils.assertProtocol(Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(buffer)) == hash, {"block hash mismatch!"})
-                    return buffer
-                }
-            } catch (ex: IOException) {
-                throw RuntimeException(ex)
+            inputStream.use { it ->
+                IOUtils.skipFully(it, offset)
+                IOUtils.readFully(it, buffer)
+                NetworkUtils.assertProtocol(Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(buffer)) == hash, {"block hash mismatch!"})
+                return buffer
             }
-
         }
 
 
@@ -350,7 +333,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
 
     companion object {
 
-        val BLOCK_SIZE = 128 * 1024
+        const val BLOCK_SIZE = 128 * 1024
     }
 
 }

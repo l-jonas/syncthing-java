@@ -21,7 +21,8 @@ import net.syncthing.java.core.configuration.gsonbeans.DeviceConfig
 import net.syncthing.java.core.configuration.gsonbeans.DeviceConfigList
 import net.syncthing.java.core.configuration.gsonbeans.FolderConfig
 import net.syncthing.java.core.configuration.gsonbeans.FolderConfigList
-import net.syncthing.java.core.utils.ExecutorUtils
+import net.syncthing.java.core.utils.awaitTerminationSafe
+import net.syncthing.java.core.utils.submitLogging
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang3.StringUtils.isBlank
 import org.bouncycastle.util.encoders.Base64
@@ -179,7 +180,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
 
     override fun close() {
         executorService.shutdown()
-        ExecutorUtils.awaitTerminationSafe(executorService)
+        executorService.awaitTerminationSafe()
     }
 
     inner class StorageInfo {
@@ -268,7 +269,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
 
         fun persistLater() {
             isDirty = true
-            executorService.submit { storeConfiguration() }
+            executorService.submitLogging { storeConfiguration() }
         }
 
         private fun storeConfiguration() {
@@ -306,13 +307,10 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
             return this
         }
 
+        @Throws(IOException::class)
         fun loadFrom(file: File?): ConfigurationService {
             val properties = Properties()
-            try {
-                properties.load(InputStreamReader(javaClass.getResourceAsStream("/default.properties")))
-            } catch (ex: IOException) {
-                throw RuntimeException(ex)
-            }
+            properties.load(InputStreamReader(javaClass.getResourceAsStream("/default.properties")))
 
             if (file != null) {
                 if (file.isFile && file.canRead()) {
@@ -352,8 +350,8 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
 
         }
 
+        @Throws(IOException::class)
         fun dumpToString(): String {
-            try {
                 val properties = export()
                 properties.setProperty("volatile_instanceid", instanceId.toString())
                 properties.setProperty("volatile_clientname", getClientName())
@@ -361,12 +359,7 @@ class ConfigurationService private constructor(properties: Properties) : Closeab
                 val stringWriter = StringWriter()
                 properties.store(stringWriter, null)
                 return stringWriter.toString()
-            } catch (ex: IOException) {
-                throw RuntimeException(ex)
-            }
-
         }
-
     }
 
     companion object {

@@ -51,18 +51,15 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
 
     private val socketFactory = TLSSocketFactory(keyStore)
 
+    @Throws(CryptoException::class, IOException::class)
     private fun exportKeystoreToData(): ByteArray {
         val out = ByteArrayOutputStream()
         try {
             keyStore.store(out, JKS_PASSWORD.toCharArray())
-        } catch (ex: KeyStoreException) {
-            throw RuntimeException(ex)
-        } catch (ex: IOException) {
-            throw RuntimeException(ex)
         } catch (ex: NoSuchAlgorithmException) {
-            throw RuntimeException(ex)
+            throw CryptoException(ex)
         } catch (ex: CertificateException) {
-            throw RuntimeException(ex)
+            throw CryptoException(ex)
         }
         return out.toByteArray()
     }
@@ -158,9 +155,9 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
 
         private val logger = LoggerFactory.getLogger(javaClass)
 
+        @Throws(CryptoException::class, IOException::class)
         fun loadAndStore(configuration: ConfigurationService): KeystoreHandler {
             synchronized(keystoreHandlersCacheByHash) {
-                var isNew = false
                 var keystoreData: ByteArray? = configuration.keystore
                 if (keystoreData != null) {
                     val hash = MessageDigest.getInstance("SHA-256").digest(keystoreData)
@@ -177,37 +174,30 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
                     configuration.Editor().setKeystoreAlgo(defaultAlgo)
                     defaultAlgo
                 }()
-                var keyStore: Pair<KeyStore, DeviceId>? = null
+                var keystore: Pair<KeyStore, DeviceId>? = null
                 if (keystoreData != null) {
-                    try {
-                        keyStore = importKeystore(keystoreData, configuration)
-                    } catch (ex: CryptoException) {
-                        logger.error("error importing keystore", ex)
-                    } catch (ex: IOException) {
-                        logger.error("error importing keystore", ex)
+                    keystore = importKeystore(keystoreData, configuration)
+                }
+                val keystoreHandler =
+                    if (keystore != null) {
+                        KeystoreHandler(keystore.left)
+                    } else {
+                        try {
+                            keystore = generateKeystore(configuration)
+                            val handler = KeystoreHandler(keystore.left)
+                            keystoreData = handler.exportKeystoreToData()
+                            configuration.Editor()
+                                    .setDeviceId(keystore.right)
+                                    .setKeystore(keystoreData)
+                                    .setKeystoreAlgo(keystoreAlgo)
+                                    .persistLater()
+                            handler
+                        } catch (ex: CryptoException) {
+                            throw RuntimeException("error generating keystore", ex)
+                        } catch (ex: IOException) {
+                            throw RuntimeException("error generating keystore", ex)
+                        }
                     }
-
-                }
-                if (keyStore == null) {
-                    try {
-                        keyStore = generateKeystore(configuration)
-                        isNew = true
-                    } catch (ex: CryptoException) {
-                        throw RuntimeException("error generating keystore", ex)
-                    } catch (ex: IOException) {
-                        throw RuntimeException("error generating keystore", ex)
-                    }
-
-                }
-                val keystoreHandler = KeystoreHandler(keyStore.left)
-                if (isNew) {
-                    keystoreData = keystoreHandler.exportKeystoreToData()
-                    configuration.Editor()
-                            .setDeviceId(keyStore.right)
-                            .setKeystore(keystoreData)
-                            .setKeystoreAlgo(keystoreAlgo)
-                            .persistLater()
-                }
                 val hash = MessageDigest.getInstance("SHA-256").digest(keystoreData)
                 keystoreHandlersCacheByHash[Base32().encodeAsString(hash)] = keystoreHandler
                 logger.info("keystore ready, device id = {}", configuration.deviceId)
@@ -306,8 +296,8 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
             return DeviceId.fromHashData(MessageDigest.getInstance("SHA-256").digest(certificateDerData))
         }
 
-        val BEP = "bep/1.0"
-        val RELAY = "bep-relay"
+        const val BEP = "bep/1.0"
+        const val RELAY = "bep-relay"
     }
 
 }

@@ -15,6 +15,7 @@ package net.syncthing.java.discovery.utils
 
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceAddress.AddressType
+import net.syncthing.java.core.utils.submitLogging
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.IOException
@@ -58,7 +59,7 @@ internal class AddressRanker private constructor(private val sourceAddresses: Li
     private fun testAndRankAndWait(): List<DeviceAddress> {
         return addHttpRelays(sourceAddresses)
                 .filter { ACCEPTED_ADDRESS_TYPES.contains(it.getType()) }
-                .map { executorService.submit<DeviceAddress> { pingAddresses(it) } }
+                .map { executorService.submitLogging<DeviceAddress?> { pingAddresses(it) } }
                 .mapNotNull { future ->
                     try {
                         future.get((TCP_CONNECTION_TIMEOUT * 2).toLong(), TimeUnit.MILLISECONDS)

@@ -23,10 +23,7 @@ import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.io.FileUtils
 import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayInputStream
-import java.io.Closeable
-import java.io.InputStream
-import java.io.SequenceInputStream
+import java.io.*
 import java.security.MessageDigest
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -68,7 +65,7 @@ class BlockPuller internal constructor(configuration: ConfigurationService,
 
             override fun checkError() {
                 if (error.get() != null) {
-                    throw RuntimeException(error.get())
+                    throw IOException(error.get())
                 }
             }
 

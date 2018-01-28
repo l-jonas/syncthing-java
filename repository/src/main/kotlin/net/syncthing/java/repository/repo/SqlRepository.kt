@@ -66,7 +66,7 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         dataSource = newDataSource
         checkDb()
         recreateTemporaryTables()
-        //        scheduledExecutorService.submit(new Runnable() {
+        //        scheduledExecutorService.submitLogging(new Runnable() {
         //            @Override
         //            public void run() {
         //                Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
@@ -104,95 +104,86 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
             logger.warn("invalid database, resetting db", ex)
             initDb()
         }
-
     }
 
+    @Throws(SQLException::class)
     private fun initDb() {
         logger.info("init db")
-        try {
-            getConnection().use { connection -> connection.prepareStatement("DROP ALL OBJECTS").use { prepareStatement -> prepareStatement.execute() } }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
-        }
+        getConnection().use { connection -> connection.prepareStatement("DROP ALL OBJECTS").use { prepareStatement -> prepareStatement.execute() } }
 
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("CREATE TABLE index_sequence (index_id BIGINT NOT NULL PRIMARY KEY, current_sequence BIGINT NOT NULL)").use { prepareStatement -> prepareStatement.execute() }
-                connection.prepareStatement("CREATE TABLE folder_index_info (folder VARCHAR NOT NULL,"
-                        + "device_id VARCHAR NOT NULL,"
-                        + "index_id BIGINT NOT NULL,"
-                        + "local_sequence BIGINT NOT NULL,"
-                        + "max_sequence BIGINT NOT NULL,"
-                        + "PRIMARY KEY (folder, device_id))").use { prepareStatement -> prepareStatement.execute() }
-                connection.prepareStatement("CREATE TABLE folder_stats (folder VARCHAR NOT NULL PRIMARY KEY,"
-                        + "file_count BIGINT NOT NULL,"
-                        + "dir_count BIGINT NOT NULL,"
-                        + "last_update BIGINT NOT NULL,"
-                        + "size BIGINT NOT NULL)").use { prepareStatement -> prepareStatement.execute() }
-                connection.prepareStatement("CREATE TABLE file_info (folder VARCHAR NOT NULL,"
-                        + "path VARCHAR NOT NULL,"
-                        + "file_name VARCHAR NOT NULL,"
-                        + "parent VARCHAR NOT NULL,"
-                        + "size BIGINT,"
-                        + "hash VARCHAR,"
-                        + "last_modified BIGINT NOT NULL,"
-                        + "file_type VARCHAR NOT NULL,"
-                        + "version_id BIGINT NOT NULL,"
-                        + "version_value BIGINT NOT NULL,"
-                        + "is_deleted BOOLEAN NOT NULL,"
-                        + "PRIMARY KEY (folder, path))").use { prepareStatement -> prepareStatement.execute() }
-                connection.prepareStatement("CREATE TABLE file_blocks (folder VARCHAR NOT NULL,"
-                        + "path VARCHAR NOT NULL,"
-                        + "hash VARCHAR NOT NULL,"
-                        + "size BIGINT NOT NULL,"
-                        + "blocks BINARY NOT NULL,"
-                        + "PRIMARY KEY (folder, path))").use { prepareStatement -> prepareStatement.execute() }
-                connection.prepareStatement("CREATE TABLE device_address (device_id VARCHAR NOT NULL,"
-                        + "instance_id BIGINT,"
-                        + "address_url VARCHAR NOT NULL,"
-                        + "address_producer VARCHAR NOT NULL,"
-                        + "address_type VARCHAR NOT NULL,"
-                        + "address_score INT NOT NULL,"
-                        + "is_working BOOLEAN NOT NULL,"
-                        + "last_modified BIGINT NOT NULL,"
-                        + "PRIMARY KEY (device_id, address_url))").use { prepareStatement -> prepareStatement.execute() }
-                connection.prepareStatement("CREATE INDEX file_info_folder ON file_info (folder)").use { prepareStatement -> prepareStatement.execute() }
-                connection.prepareStatement("CREATE INDEX file_info_folder_path ON file_info (folder, path)").use { prepareStatement -> prepareStatement.execute() }
-                connection.prepareStatement("CREATE INDEX file_info_folder_parent ON file_info (folder, parent)").use { prepareStatement -> prepareStatement.execute() }
-                connection.prepareStatement("CREATE TABLE version (version_number INT NOT NULL)").use { prepareStatement -> prepareStatement.execute() }
-                connection.prepareStatement("INSERT INTO index_sequence VALUES (?,?)").use { prepareStatement ->
-                    val newIndexId = Math.abs(Random().nextLong()) + 1
-                    val newStartingSequence = Math.abs(Random().nextLong()) + 1
-                    prepareStatement.setLong(1, newIndexId)
-                    prepareStatement.setLong(2, newStartingSequence)
-                    assert(prepareStatement.executeUpdate() == 1)
-                }
-                connection.prepareStatement("INSERT INTO version (version_number) VALUES (?)").use { prepareStatement ->
-                    prepareStatement.setInt(1, VERSION)
-                    assert(prepareStatement.executeUpdate() == 1)
-                }
+        getConnection().use { connection ->
+            connection.prepareStatement("CREATE TABLE index_sequence (index_id BIGINT NOT NULL PRIMARY KEY, current_sequence BIGINT NOT NULL)").use { prepareStatement -> prepareStatement.execute() }
+            connection.prepareStatement("CREATE TABLE folder_index_info (folder VARCHAR NOT NULL,"
+                    + "device_id VARCHAR NOT NULL,"
+                    + "index_id BIGINT NOT NULL,"
+                    + "local_sequence BIGINT NOT NULL,"
+                    + "max_sequence BIGINT NOT NULL,"
+                    + "PRIMARY KEY (folder, device_id))").use { prepareStatement -> prepareStatement.execute() }
+            connection.prepareStatement("CREATE TABLE folder_stats (folder VARCHAR NOT NULL PRIMARY KEY,"
+                    + "file_count BIGINT NOT NULL,"
+                    + "dir_count BIGINT NOT NULL,"
+                    + "last_update BIGINT NOT NULL,"
+                    + "size BIGINT NOT NULL)").use { prepareStatement -> prepareStatement.execute() }
+            connection.prepareStatement("CREATE TABLE file_info (folder VARCHAR NOT NULL,"
+                    + "path VARCHAR NOT NULL,"
+                    + "file_name VARCHAR NOT NULL,"
+                    + "parent VARCHAR NOT NULL,"
+                    + "size BIGINT,"
+                    + "hash VARCHAR,"
+                    + "last_modified BIGINT NOT NULL,"
+                    + "file_type VARCHAR NOT NULL,"
+                    + "version_id BIGINT NOT NULL,"
+                    + "version_value BIGINT NOT NULL,"
+                    + "is_deleted BOOLEAN NOT NULL,"
+                    + "PRIMARY KEY (folder, path))").use { prepareStatement -> prepareStatement.execute() }
+            connection.prepareStatement("CREATE TABLE file_blocks (folder VARCHAR NOT NULL,"
+                    + "path VARCHAR NOT NULL,"
+                    + "hash VARCHAR NOT NULL,"
+                    + "size BIGINT NOT NULL,"
+                    + "blocks BINARY NOT NULL,"
+                    + "PRIMARY KEY (folder, path))").use { prepareStatement -> prepareStatement.execute() }
+            connection.prepareStatement("CREATE TABLE device_address (device_id VARCHAR NOT NULL,"
+                    + "instance_id BIGINT,"
+                    + "address_url VARCHAR NOT NULL,"
+                    + "address_producer VARCHAR NOT NULL,"
+                    + "address_type VARCHAR NOT NULL,"
+                    + "address_score INT NOT NULL,"
+                    + "is_working BOOLEAN NOT NULL,"
+                    + "last_modified BIGINT NOT NULL,"
+                    + "PRIMARY KEY (device_id, address_url))").use { prepareStatement -> prepareStatement.execute() }
+            connection.prepareStatement("CREATE INDEX file_info_folder ON file_info (folder)").use { prepareStatement -> prepareStatement.execute() }
+            connection.prepareStatement("CREATE INDEX file_info_folder_path ON file_info (folder, path)").use { prepareStatement -> prepareStatement.execute() }
+            connection.prepareStatement("CREATE INDEX file_info_folder_parent ON file_info (folder, parent)").use { prepareStatement -> prepareStatement.execute() }
+            connection.prepareStatement("CREATE TABLE version (version_number INT NOT NULL)").use { prepareStatement -> prepareStatement.execute() }
+            connection.prepareStatement("INSERT INTO index_sequence VALUES (?,?)").use { prepareStatement ->
+                val newIndexId = Math.abs(Random().nextLong()) + 1
+                val newStartingSequence = Math.abs(Random().nextLong()) + 1
+                prepareStatement.setLong(1, newIndexId)
+                prepareStatement.setLong(2, newStartingSequence)
+                assert(prepareStatement.executeUpdate() == 1)
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
+            connection.prepareStatement("INSERT INTO version (version_number) VALUES (?)").use { prepareStatement ->
+                prepareStatement.setInt(1, VERSION)
+                assert(prepareStatement.executeUpdate() == 1)
+            }
         }
 
         logger.info("database initialized")
     }
 
+    @Throws(SQLException::class)
     private fun recreateTemporaryTables() {
         logger.info("recreateTemporaryTables BEGIN")
-        try {
-            getConnection().use { connection -> connection.prepareStatement("CREATE CACHED TEMPORARY TABLE IF NOT EXISTS temporary_data (record_key VARCHAR NOT NULL PRIMARY KEY," + "record_data BINARY NOT NULL)").use { prepareStatement -> prepareStatement.execute() } }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
-        }
-
+            getConnection().use { connection ->
+                connection
+                        .prepareStatement("CREATE CACHED TEMPORARY TABLE IF NOT EXISTS temporary_data (record_key VARCHAR NOT NULL PRIMARY KEY," + "record_data BINARY NOT NULL)")
+                        .use { prepareStatement -> prepareStatement.execute() }
+            }
         logger.info("recreateTemporaryTables END")
     }
 
     override fun getSequencer(): Sequencer = sequencer
 
-    //INDEX INFO
     @Throws(SQLException::class)
     private fun readFolderIndexInfo(resultSet: ResultSet): IndexInfo {
         return IndexInfo.newBuilder()
@@ -204,22 +195,19 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                 .build()
     }
 
+    @Throws(SQLException::class)
     override fun updateIndexInfo(indexInfo: IndexInfo) {
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("MERGE INTO folder_index_info"
-                        + " (folder,device_id,index_id,local_sequence,max_sequence)"
-                        + " VALUES (?,?,?,?,?)").use { prepareStatement ->
-                    prepareStatement.setString(1, indexInfo.folder)
-                    prepareStatement.setString(2, indexInfo.deviceId)
-                    prepareStatement.setLong(3, indexInfo.indexId)
-                    prepareStatement.setLong(4, indexInfo.localSequence)
-                    prepareStatement.setLong(5, indexInfo.maxSequence)
-                    prepareStatement.executeUpdate()
-                }
+        getConnection().use { connection ->
+            connection.prepareStatement("MERGE INTO folder_index_info"
+                    + " (folder,device_id,index_id,local_sequence,max_sequence)"
+                    + " VALUES (?,?,?,?,?)").use { prepareStatement ->
+                prepareStatement.setString(1, indexInfo.folder)
+                prepareStatement.setString(2, indexInfo.deviceId)
+                prepareStatement.setLong(3, indexInfo.indexId)
+                prepareStatement.setLong(4, indexInfo.localSequence)
+                prepareStatement.setLong(5, indexInfo.maxSequence)
+                prepareStatement.executeUpdate()
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
     }
 
@@ -228,80 +216,67 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         return doFindIndexInfoByDeviceAndFolder(key.left, key.right)
     }
 
+    @Throws(SQLException::class)
     private fun doFindIndexInfoByDeviceAndFolder(deviceId: DeviceId, folder: String): IndexInfo? {
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("SELECT * FROM folder_index_info WHERE device_id=? AND folder=?").use { prepareStatement ->
-                    prepareStatement.setString(1, deviceId.deviceId)
-                    prepareStatement.setString(2, folder)
-                    val resultSet = prepareStatement.executeQuery()
-                    return if (resultSet.first()) {
-                        readFolderIndexInfo(resultSet)
-                    } else {
-                        null
-                    }
+        getConnection().use { connection ->
+            connection.prepareStatement("SELECT * FROM folder_index_info WHERE device_id=? AND folder=?").use { prepareStatement ->
+                prepareStatement.setString(1, deviceId.deviceId)
+                prepareStatement.setString(2, folder)
+                val resultSet = prepareStatement.executeQuery()
+                return if (resultSet.first()) {
+                    readFolderIndexInfo(resultSet)
+                } else {
+                    null
                 }
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
     }
 
-    // FILE INFO
+    @Throws(SQLException::class)
     override fun findFileInfo(folder: String, path: String): FileInfo? {
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("SELECT * FROM file_info WHERE folder=? AND path=?").use { prepareStatement ->
-                    prepareStatement.setString(1, folder)
-                    prepareStatement.setString(2, path)
-                    val resultSet = prepareStatement.executeQuery()
-                    return if (resultSet.first()) {
-                        readFileInfo(resultSet)
-                    } else {
-                        null
-                    }
+        getConnection().use { connection ->
+            connection.prepareStatement("SELECT * FROM file_info WHERE folder=? AND path=?").use { prepareStatement ->
+                prepareStatement.setString(1, folder)
+                prepareStatement.setString(2, path)
+                val resultSet = prepareStatement.executeQuery()
+                return if (resultSet.first()) {
+                    readFileInfo(resultSet)
+                } else {
+                    null
                 }
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
     }
 
+    @Throws(SQLException::class)
     override fun findFileInfoLastModified(folder: String, path: String): Date? {
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("SELECT last_modified FROM file_info WHERE folder=? AND path=?").use { prepareStatement ->
-                    prepareStatement.setString(1, folder)
-                    prepareStatement.setString(2, path)
-                    val resultSet = prepareStatement.executeQuery()
-                    return if (resultSet.first()) {
-                        Date(resultSet.getLong("last_modified"))
-                    } else {
-                        null
-                    }
+        getConnection().use { connection ->
+            connection.prepareStatement("SELECT last_modified FROM file_info WHERE folder=? AND path=?").use { prepareStatement ->
+                prepareStatement.setString(1, folder)
+                prepareStatement.setString(2, path)
+                val resultSet = prepareStatement.executeQuery()
+                return if (resultSet.first()) {
+                    Date(resultSet.getLong("last_modified"))
+                } else {
+                    null
                 }
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
     }
 
+    @Throws(SQLException::class)
     override fun findNotDeletedFileInfo(folder: String, path: String): FileInfo? {
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("SELECT * FROM file_info WHERE folder=? AND path=? AND is_deleted=FALSE").use { prepareStatement ->
-                    prepareStatement.setString(1, folder)
-                    prepareStatement.setString(2, path)
-                    val resultSet = prepareStatement.executeQuery()
-                    return if (resultSet.first()) {
-                        readFileInfo(resultSet)
-                    } else {
-                        null
-                    }
+        getConnection().use { connection ->
+            connection.prepareStatement("SELECT * FROM file_info WHERE folder=? AND path=? AND is_deleted=FALSE").use { prepareStatement ->
+                prepareStatement.setString(1, folder)
+                prepareStatement.setString(2, path)
+                val resultSet = prepareStatement.executeQuery()
+                return if (resultSet.first()) {
+                    readFileInfo(resultSet)
+                } else {
+                    null
                 }
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
     }
 
@@ -326,24 +301,19 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         }
     }
 
+    @Throws(SQLException::class, InvalidProtocolBufferException::class)
     override fun findFileBlocks(folder: String, path: String): FileBlocks? {
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("SELECT * FROM file_blocks WHERE folder=? AND path=?").use { prepareStatement ->
-                    prepareStatement.setString(1, folder)
-                    prepareStatement.setString(2, path)
-                    val resultSet = prepareStatement.executeQuery()
-                    return if (resultSet.first()) {
-                        readFileBlocks(resultSet)
-                    } else {
-                        null
-                    }
+        getConnection().use { connection ->
+            connection.prepareStatement("SELECT * FROM file_blocks WHERE folder=? AND path=?").use { prepareStatement ->
+                prepareStatement.setString(1, folder)
+                prepareStatement.setString(2, path)
+                val resultSet = prepareStatement.executeQuery()
+                return if (resultSet.first()) {
+                    readFileBlocks(resultSet)
+                } else {
+                    null
                 }
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
-        } catch (ex: InvalidProtocolBufferException) {
-            throw RuntimeException(ex)
         }
     }
 
@@ -356,118 +326,112 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         return FileBlocks(resultSet.getString("folder"), resultSet.getString("path"), blockList)
     }
 
+    @Throws(SQLException::class)
     override fun updateFileInfo(newFileInfo: FileInfo, newFileBlocks: FileBlocks?) {
         val version = newFileInfo.versionList.last()
         //TODO open transsaction, rollback
-        try {
-            getConnection().use { connection ->
-                if (newFileBlocks != null) {
-                    FileInfo.checkBlocks(newFileInfo, newFileBlocks)
-                    connection.prepareStatement("MERGE INTO file_blocks"
-                            + " (folder,path,hash,size,blocks)"
-                            + " VALUES (?,?,?,?,?)").use { prepareStatement ->
-                        prepareStatement.setString(1, newFileBlocks.folder)
-                        prepareStatement.setString(2, newFileBlocks.path)
-                        prepareStatement.setString(3, newFileBlocks.hash)
-                        prepareStatement.setLong(4, newFileBlocks.size)
-                        prepareStatement.setBytes(5, BlockExchangeExtraProtos.Blocks.newBuilder()
-                                .addAllBlocks(newFileBlocks.blocks.map { input ->
-                                    BlockExchangeProtos.BlockInfo.newBuilder()
-                                            .setOffset(input.offset)
-                                            .setSize(input.size)
-                                            .setHash(ByteString.copyFrom(Hex.decode(input.hash)))
-                                            .build()
-                                }).build().toByteArray())
-                        prepareStatement.executeUpdate()
-                    }
-                }
-                val oldFileInfo = findFileInfo(newFileInfo.folder, newFileInfo.path)
-                connection.prepareStatement("MERGE INTO file_info"
-                        + " (folder,path,file_name,parent,size,hash,last_modified,file_type,version_id,version_value,is_deleted)"
-                        + " VALUES (?,?,?,?,?,?,?,?,?,?,?)").use { prepareStatement ->
-                    prepareStatement.setString(1, newFileInfo.folder)
-                    prepareStatement.setString(2, newFileInfo.path)
-                    prepareStatement.setString(3, newFileInfo.fileName)
-                    prepareStatement.setString(4, newFileInfo.parent)
-                    prepareStatement.setLong(7, newFileInfo.lastModified.time)
-                    prepareStatement.setString(8, newFileInfo.type.name)
-                    prepareStatement.setLong(9, version.id)
-                    prepareStatement.setLong(10, version.value)
-                    prepareStatement.setBoolean(11, newFileInfo.isDeleted)
-                    if (newFileInfo.isDirectory()) {
-                        prepareStatement.setNull(5, Types.BIGINT)
-                        prepareStatement.setNull(6, Types.VARCHAR)
-                    } else {
-                        prepareStatement.setLong(5, newFileInfo.size!!)
-                        prepareStatement.setString(6, newFileInfo.hash)
-                    }
+        getConnection().use { connection ->
+            if (newFileBlocks != null) {
+                FileInfo.checkBlocks(newFileInfo, newFileBlocks)
+                connection.prepareStatement("MERGE INTO file_blocks"
+                        + " (folder,path,hash,size,blocks)"
+                        + " VALUES (?,?,?,?,?)").use { prepareStatement ->
+                    prepareStatement.setString(1, newFileBlocks.folder)
+                    prepareStatement.setString(2, newFileBlocks.path)
+                    prepareStatement.setString(3, newFileBlocks.hash)
+                    prepareStatement.setLong(4, newFileBlocks.size)
+                    prepareStatement.setBytes(5, BlockExchangeExtraProtos.Blocks.newBuilder()
+                            .addAllBlocks(newFileBlocks.blocks.map { input ->
+                                BlockExchangeProtos.BlockInfo.newBuilder()
+                                        .setOffset(input.offset)
+                                        .setSize(input.size)
+                                        .setHash(ByteString.copyFrom(Hex.decode(input.hash)))
+                                        .build()
+                            }).build().toByteArray())
                     prepareStatement.executeUpdate()
                 }
-                //update stats
-                var deltaFileCount: Long = 0
-                var deltaDirCount: Long = 0
-                var deltaSize: Long = 0
-                val oldMissing = oldFileInfo == null || oldFileInfo.isDeleted
-                val newMissing = newFileInfo.isDeleted
-                val oldSizeMissing = oldMissing || !oldFileInfo!!.isFile()
-                val newSizeMissing = newMissing || !newFileInfo.isFile()
-                if (!oldSizeMissing) {
-                    deltaSize -= oldFileInfo!!.size!!
-                }
-                if (!newSizeMissing) {
-                    deltaSize += newFileInfo.size!!
-                }
-                if (!oldMissing) {
-                    if (oldFileInfo!!.isFile()) {
-                        deltaFileCount--
-                    } else if (oldFileInfo.isDirectory()) {
-                        deltaDirCount--
-                    }
-                }
-                if (!newMissing) {
-                    if (newFileInfo.isFile()) {
-                        deltaFileCount++
-                    } else if (newFileInfo.isDirectory()) {
-                        deltaDirCount++
-                    }
-                }
-                val folderStats = updateFolderStats(connection, newFileInfo.folder, deltaFileCount, deltaDirCount, deltaSize, newFileInfo.lastModified)
-
-                onFolderStatsUpdatedListener?.invoke(object : IndexRepository.FolderStatsUpdatedEvent() {
-                    override fun getFolderStats(): List<FolderStats> {
-                        return listOf(folderStats)
-                    }
-                })
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
+            val oldFileInfo = findFileInfo(newFileInfo.folder, newFileInfo.path)
+            connection.prepareStatement("MERGE INTO file_info"
+                    + " (folder,path,file_name,parent,size,hash,last_modified,file_type,version_id,version_value,is_deleted)"
+                    + " VALUES (?,?,?,?,?,?,?,?,?,?,?)").use { prepareStatement ->
+                prepareStatement.setString(1, newFileInfo.folder)
+                prepareStatement.setString(2, newFileInfo.path)
+                prepareStatement.setString(3, newFileInfo.fileName)
+                prepareStatement.setString(4, newFileInfo.parent)
+                prepareStatement.setLong(7, newFileInfo.lastModified.time)
+                prepareStatement.setString(8, newFileInfo.type.name)
+                prepareStatement.setLong(9, version.id)
+                prepareStatement.setLong(10, version.value)
+                prepareStatement.setBoolean(11, newFileInfo.isDeleted)
+                if (newFileInfo.isDirectory()) {
+                    prepareStatement.setNull(5, Types.BIGINT)
+                    prepareStatement.setNull(6, Types.VARCHAR)
+                } else {
+                    prepareStatement.setLong(5, newFileInfo.size!!)
+                    prepareStatement.setString(6, newFileInfo.hash)
+                }
+                prepareStatement.executeUpdate()
+            }
+            //update stats
+            var deltaFileCount: Long = 0
+            var deltaDirCount: Long = 0
+            var deltaSize: Long = 0
+            val oldMissing = oldFileInfo == null || oldFileInfo.isDeleted
+            val newMissing = newFileInfo.isDeleted
+            val oldSizeMissing = oldMissing || !oldFileInfo!!.isFile()
+            val newSizeMissing = newMissing || !newFileInfo.isFile()
+            if (!oldSizeMissing) {
+                deltaSize -= oldFileInfo!!.size!!
+            }
+            if (!newSizeMissing) {
+                deltaSize += newFileInfo.size!!
+            }
+            if (!oldMissing) {
+                if (oldFileInfo!!.isFile()) {
+                    deltaFileCount--
+                } else if (oldFileInfo.isDirectory()) {
+                    deltaDirCount--
+                }
+            }
+            if (!newMissing) {
+                if (newFileInfo.isFile()) {
+                    deltaFileCount++
+                } else if (newFileInfo.isDirectory()) {
+                    deltaDirCount++
+                }
+            }
+            val folderStats = updateFolderStats(connection, newFileInfo.folder, deltaFileCount, deltaDirCount, deltaSize, newFileInfo.lastModified)
+
+            onFolderStatsUpdatedListener?.invoke(object : IndexRepository.FolderStatsUpdatedEvent() {
+                override fun getFolderStats(): List<FolderStats> {
+                    return listOf(folderStats)
+                }
+            })
         }
     }
 
+    @Throws(SQLException::class)
     override fun findNotDeletedFilesByFolderAndParent(folder: String, parentPath: String): MutableList<FileInfo> {
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("SELECT * FROM file_info WHERE folder=? AND parent=? AND is_deleted=FALSE").use { prepareStatement ->
-                    prepareStatement.setString(1, folder)
-                    prepareStatement.setString(2, parentPath)
-                    val resultSet = prepareStatement.executeQuery()
-                    val list = mutableListOf<FileInfo>()
-                    while (resultSet.next()) {
-                        list.add(readFileInfo(resultSet))
-                    }
-                    return list
+        getConnection().use { connection ->
+            connection.prepareStatement("SELECT * FROM file_info WHERE folder=? AND parent=? AND is_deleted=FALSE").use { prepareStatement ->
+                prepareStatement.setString(1, folder)
+                prepareStatement.setString(2, parentPath)
+                val resultSet = prepareStatement.executeQuery()
+                val list = mutableListOf<FileInfo>()
+                while (resultSet.next()) {
+                    list.add(readFileInfo(resultSet))
                 }
+                return list
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
     }
 
+    @Throws(SQLException::class)
     override fun findFileInfoBySearchTerm(query: String): List<FileInfo> {
         assert(!isBlank(query))
         //        checkArgument(maxResult > 0);
         //        try (Connection connection = getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("SELECT * FROM file_info WHERE LOWER(file_name) LIKE ? AND is_deleted=FALSE LIMIT ?")) {
-        try {
             getConnection().use { connection ->
                 connection.prepareStatement("SELECT * FROM file_info WHERE LOWER(file_name) REGEXP ? AND is_deleted=FALSE").use { preparedStatement ->
                     //        try (Connection connection = getConnection(); PreparedStatement prepareStatement = connection.prepareStatement("SELECT * FROM file_info LIMIT 10")) {
@@ -482,25 +446,19 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                     return list
                 }
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
-        }
     }
 
+    @Throws(SQLException::class)
     override fun countFileInfoBySearchTerm(query: String): Long {
         assert(!isBlank(query))
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("SELECT COUNT(*) FROM file_info WHERE LOWER(file_name) REGEXP ? AND is_deleted=FALSE").use { preparedStatement ->
-                    //        try (Connection connection = getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("SELECT COUNT(*) FROM file_info")) {
-                    preparedStatement.setString(1, query.trim { it <= ' ' }.toLowerCase())
-                    val resultSet = preparedStatement.executeQuery()
-                    assert(resultSet.first())
-                    return resultSet.getLong(1)
-                }
+        getConnection().use { connection ->
+            connection.prepareStatement("SELECT COUNT(*) FROM file_info WHERE LOWER(file_name) REGEXP ? AND is_deleted=FALSE").use { preparedStatement ->
+                //        try (Connection connection = getConnection(); PreparedStatement preparedStatement = connection.prepareStatement("SELECT COUNT(*) FROM file_info")) {
+                preparedStatement.setString(1, query.trim { it <= ' ' }.toLowerCase())
+                val resultSet = preparedStatement.executeQuery()
+                assert(resultSet.first())
+                return resultSet.getLong(1)
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
     }
 
@@ -526,39 +484,33 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         return doFindFolderStats(folder)
     }
 
+    @Throws(SQLException::class)
     private fun doFindFolderStats(folder: String): FolderStats? {
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("SELECT * FROM folder_stats WHERE folder=?").use { prepareStatement ->
-                    prepareStatement.setString(1, folder)
-                    val resultSet = prepareStatement.executeQuery()
-                    return if (resultSet.first()) {
-                        readFolderStats(resultSet)
-                    } else {
-                        null
-                    }
+        getConnection().use { connection ->
+            connection.prepareStatement("SELECT * FROM folder_stats WHERE folder=?").use { prepareStatement ->
+                prepareStatement.setString(1, folder)
+                val resultSet = prepareStatement.executeQuery()
+                return if (resultSet.first()) {
+                    readFolderStats(resultSet)
+                } else {
+                    null
                 }
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
     }
 
+    @Throws(SQLException::class)
     override fun findAllFolderStats(): List<FolderStats> {
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("SELECT * FROM folder_stats").use { prepareStatement ->
-                    val resultSet = prepareStatement.executeQuery()
-                    val list = mutableListOf<FolderStats>()
-                    while (resultSet.next()) {
-                        val folderStats = readFolderStats(resultSet)
-                        list.add(folderStats)
-                    }
-                    return list
+        getConnection().use { connection ->
+            connection.prepareStatement("SELECT * FROM folder_stats").use { prepareStatement ->
+                val resultSet = prepareStatement.executeQuery()
+                val list = mutableListOf<FolderStats>()
+                while (resultSet.next()) {
+                    val folderStats = readFolderStats(resultSet)
+                    list.add(folderStats)
                 }
+                return list
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
     }
 
@@ -666,44 +618,38 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         //        ExecutorUtils.awaitTerminationSafe(scheduledExecutorService);
     }
 
+    @Throws(SQLException::class)
     override fun pushTempData(data: ByteArray): String {
-        try {
-            getConnection().use { connection ->
-                val key = UUID.randomUUID().toString()
-                connection.prepareStatement("INSERT INTO temporary_data"
-                        + " (record_key,record_data)"
-                        + " VALUES (?,?)").use { prepareStatement ->
-                    prepareStatement.setString(1, key)
-                    prepareStatement.setBytes(2, data)
-                    prepareStatement.executeUpdate()
-                }
-                return key
+        getConnection().use { connection ->
+            val key = UUID.randomUUID().toString()
+            connection.prepareStatement("INSERT INTO temporary_data"
+                    + " (record_key,record_data)"
+                    + " VALUES (?,?)").use { prepareStatement ->
+                prepareStatement.setString(1, key)
+                prepareStatement.setBytes(2, data)
+                prepareStatement.executeUpdate()
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
+            return key
         }
     }
 
+    @Throws(SQLException::class)
     override fun popTempData(key: String): ByteArray {
         assert(!key.isEmpty())
-        try {
-            getConnection().use { connection ->
-                var data: ByteArray? = null
-                connection.prepareStatement("SELECT record_data FROM temporary_data WHERE record_key = ?").use { statement ->
-                    statement.setString(1, key)
-                    val resultSet = statement.executeQuery()
-                    assert(resultSet.first())
-                    data = resultSet.getBytes(1)
-                }
-                connection.prepareStatement("DELETE FROM temporary_data WHERE record_key = ?").use { statement ->
-                    statement.setString(1, key)
-                    val count = statement.executeUpdate()
-                    assert(count == 1)
-                }
-                return data!!
+        getConnection().use { connection ->
+            var data: ByteArray? = null
+            connection.prepareStatement("SELECT record_data FROM temporary_data WHERE record_key = ?").use { statement ->
+                statement.setString(1, key)
+                val resultSet = statement.executeQuery()
+                assert(resultSet.first())
+                data = resultSet.getBytes(1)
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
+            connection.prepareStatement("DELETE FROM temporary_data WHERE record_key = ?").use { statement ->
+                statement.setString(1, key)
+                val count = statement.executeUpdate()
+                assert(count == 1)
+            }
+            return data!!
         }
     }
 
@@ -713,19 +659,16 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
         private var indexId: Long? = null
         private var currentSequence: Long? = null
 
+        @Throws(SQLException::class)
         @Synchronized private fun loadFromDb() {
-            try {
-                getConnection().use { connection ->
-                    connection.prepareStatement("SELECT index_id,current_sequence FROM index_sequence").use { statement ->
-                        val resultSet = statement.executeQuery()
-                        assert(resultSet.first())
-                        indexId = resultSet.getLong("index_id")
-                        currentSequence = resultSet.getLong("current_sequence")
-                        logger.info("loaded index info from db, index_id = {}, current_sequence = {}", indexId, currentSequence)
-                    }
+            getConnection().use { connection ->
+                connection.prepareStatement("SELECT index_id,current_sequence FROM index_sequence").use { statement ->
+                    val resultSet = statement.executeQuery()
+                    assert(resultSet.first())
+                    indexId = resultSet.getLong("index_id")
+                    currentSequence = resultSet.getLong("current_sequence")
+                    logger.info("loaded index info from db, index_id = {}, current_sequence = {}", indexId, currentSequence)
                 }
-            } catch (ex: SQLException) {
-                throw RuntimeException(ex)
             }
         }
 
@@ -736,18 +679,15 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
             return indexId!!
         }
 
+        @Throws(SQLException::class)
         @Synchronized override fun nextSequence(): Long {
             val nextSequence = currentSequence() + 1
-            try {
-                getConnection().use { connection ->
-                    connection.prepareStatement("UPDATE index_sequence SET current_sequence=?").use { statement ->
-                        statement.setLong(1, nextSequence)
-                        assert(statement.executeUpdate() == 1)
-                        logger.debug("update local index sequence to {}", nextSequence)
-                    }
+            getConnection().use { connection ->
+                connection.prepareStatement("UPDATE index_sequence SET current_sequence=?").use { statement ->
+                    statement.setLong(1, nextSequence)
+                    assert(statement.executeUpdate() == 1)
+                    logger.debug("update local index sequence to {}", nextSequence)
                 }
-            } catch (ex: SQLException) {
-                throw RuntimeException(ex)
             }
 
             currentSequence = nextSequence
@@ -775,46 +715,40 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
                 .build()
     }
 
+    @Throws(SQLException::class)
     override fun findAllDeviceAddress(): List<DeviceAddress> {
         val list = mutableListOf<DeviceAddress>()
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("SELECT * FROM device_address ORDER BY last_modified DESC").use { prepareStatement ->
-                    val resultSet = prepareStatement.executeQuery()
-                    while (resultSet.next()) {
-                        list.add(readDeviceAddress(resultSet))
-                    }
+        getConnection().use { connection ->
+            connection.prepareStatement("SELECT * FROM device_address ORDER BY last_modified DESC").use { prepareStatement ->
+                val resultSet = prepareStatement.executeQuery()
+                while (resultSet.next()) {
+                    list.add(readDeviceAddress(resultSet))
                 }
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
         return list
     }
 
+    @Throws(SQLException::class)
     override fun updateDeviceAddress(deviceAddress: DeviceAddress) {
-        try {
-            getConnection().use { connection ->
-                connection.prepareStatement("MERGE INTO device_address"
-                        + " (device_id,instance_id,address_url,address_producer,address_type,address_score,is_working,last_modified)"
-                        + " VALUES (?,?,?,?,?,?,?,?)").use { prepareStatement ->
-                    prepareStatement.setString(1, deviceAddress.deviceId)
-                    if (deviceAddress.instanceId != null) {
-                        prepareStatement.setLong(2, deviceAddress.instanceId!!)
-                    } else {
-                        prepareStatement.setNull(2, Types.BIGINT)
-                    }
-                    prepareStatement.setString(3, deviceAddress.address)
-                    prepareStatement.setString(4, deviceAddress.producer.name)
-                    prepareStatement.setString(5, deviceAddress.getType().name)
-                    prepareStatement.setInt(6, deviceAddress.score)
-                    prepareStatement.setBoolean(7, deviceAddress.isWorking())
-                    prepareStatement.setLong(8, deviceAddress.lastModified.time)
-                    prepareStatement.executeUpdate()
+        getConnection().use { connection ->
+            connection.prepareStatement("MERGE INTO device_address"
+                    + " (device_id,instance_id,address_url,address_producer,address_type,address_score,is_working,last_modified)"
+                    + " VALUES (?,?,?,?,?,?,?,?)").use { prepareStatement ->
+                prepareStatement.setString(1, deviceAddress.deviceId)
+                if (deviceAddress.instanceId != null) {
+                    prepareStatement.setLong(2, deviceAddress.instanceId!!)
+                } else {
+                    prepareStatement.setNull(2, Types.BIGINT)
                 }
+                prepareStatement.setString(3, deviceAddress.address)
+                prepareStatement.setString(4, deviceAddress.producer.name)
+                prepareStatement.setString(5, deviceAddress.getType().name)
+                prepareStatement.setInt(6, deviceAddress.score)
+                prepareStatement.setBoolean(7, deviceAddress.isWorking())
+                prepareStatement.setLong(8, deviceAddress.lastModified.time)
+                prepareStatement.executeUpdate()
             }
-        } catch (ex: SQLException) {
-            throw RuntimeException(ex)
         }
     }
 

@@ -13,6 +13,7 @@
  */
 package net.syncthing.java.core.cache
 
+import net.syncthing.java.core.utils.submitLogging
 import org.apache.commons.io.FileUtils
 import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
@@ -70,7 +71,7 @@ internal class FileBlockCache(private val dir: File) : BlockCache() {
                     val cachedDataCode = Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(data))
                     assert(code == cachedDataCode, {"cached data code $cachedDataCode does not match code $code"})
                 }
-                writerThread.submit {
+                writerThread.submitLogging {
                     try {
                         FileUtils.touch(file)
                     } catch (ex: IOException) {
@@ -99,7 +100,7 @@ internal class FileBlockCache(private val dir: File) : BlockCache() {
     //            }
     //        }
     override fun pushData(code: String, data: ByteArray): Boolean {
-        writerThread.submit {
+        writerThread.submitLogging {
             val file = File(dir, code)
             if (!file.exists()) {
                 try {
@@ -122,7 +123,7 @@ internal class FileBlockCache(private val dir: File) : BlockCache() {
     }
 
     override fun clear() {
-        writerThread.submit {
+        writerThread.submitLogging {
             FileUtils.deleteQuietly(dir)
             dir.mkdirs()
         }

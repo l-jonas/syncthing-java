@@ -17,7 +17,8 @@ import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.interfaces.DeviceAddressRepository
-import net.syncthing.java.core.utils.ExecutorUtils
+import net.syncthing.java.core.utils.awaitTerminationSafe
+import net.syncthing.java.core.utils.submitLogging
 import net.syncthing.java.discovery.protocol.GlobalDiscoveryHandler
 import net.syncthing.java.discovery.protocol.LocalDiscoveryHandler
 import net.syncthing.java.discovery.utils.AddressRanker
@@ -51,7 +52,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
     private fun updateAddressesBg() {
         if (shouldLoadFromDb) {
             shouldLoadFromDb = false
-            executorService.submit {
+            executorService.submitLogging {
                 val list = deviceAddressRepository.findAllDeviceAddress()
                 logger.info("received device address list from database")
                 processDeviceAddressBg(list)
@@ -64,7 +65,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
         }
         if (shouldLoadFromGlobal) {
             shouldLoadFromGlobal = false //TODO timeout for reload
-            executorService.submit {
+            executorService.submitLogging {
                 for (deviceId in configuration.getPeerIds()) {
                     globalDiscoveryHandler.query(deviceId, this::processDeviceAddressBg)
                 }
@@ -76,7 +77,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
         if (isClosed) {
             logger.debug("discarding device addresses, discovery handler already closed")
         } else {
-            executorService.submit {
+            executorService.submitLogging {
                 logger.info("processing device address list")
                 val list = deviceAddresses.toList()
                 val peers = configuration.getPeerIds().toSet()
@@ -109,7 +110,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
             localDiscoveryHandler.close()
             globalDiscoveryHandler.close()
             executorService.shutdown()
-            ExecutorUtils.awaitTerminationSafe(executorService)
+            executorService.awaitTerminationSafe()
         }
     }
 }

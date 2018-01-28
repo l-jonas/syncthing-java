@@ -15,8 +15,9 @@ package net.syncthing.java.bep
 
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.interfaces.IndexRepository
-import net.syncthing.java.core.utils.ExecutorUtils
 import net.syncthing.java.core.utils.PathUtils
+import net.syncthing.java.core.utils.awaitTerminationSafe
+import net.syncthing.java.core.utils.submitLogging
 import org.apache.commons.lang3.StringUtils
 import org.slf4j.LoggerFactory
 import java.io.Closeable
@@ -92,7 +93,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
                     preloadJobs.add(currentPath) ///add last
                 } else {
                     preloadJobs.add(currentPath)
-                    executorService.submit(object : Runnable {
+                    executorService.submitLogging(object : Runnable {
 
                         override fun run() {
 
@@ -122,7 +123,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
                                     mOnPathChangedListener?.invoke()
                                 } else {
                                     logger.info("still {} job[s] left in cache loader", preloadJobs.size)
-                                    executorService.submit(this)
+                                    executorService.submitLogging(this)
                                 }
                             }
                         }
@@ -190,6 +191,6 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
         logger.info("closing")
         indexHandler.unregisterIndexBrowser(this)
         executorService.shutdown()
-        ExecutorUtils.awaitTerminationSafe(executorService)
+        executorService.awaitTerminationSafe()
     }
 }
