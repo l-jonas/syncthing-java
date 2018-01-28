@@ -60,19 +60,17 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
     }
 
     fun pushFile(inputStream: InputStream, fileInfo: FileInfo?, folder: String, path: String): FileUploadObserver {
-        try {
-            val tempFile = createTempFile(configuration)
-            FileUtils.copyInputStreamToFile(inputStream, tempFile)
-            logger.debug("use temp file = {} {}", tempFile, FileUtils.byteCountToDisplaySize(tempFile.length()))
-            return pushFile(FileDataSource(tempFile), fileInfo, folder, path) //TODO temp file cleanup on complete
-            //TODO use mem source on small file
-        } catch (ex: IOException) {
-            throw RuntimeException(ex)
+        // TODO: there is no need for the file copy, as long as we know the file size
+        val tempFile = File(configuration.temp, UUID.randomUUID().toString())
+        tempFile.deleteOnExit()
+        tempFile.outputStream().use { fileOut ->
+            inputStream.copyTo(fileOut)
         }
-
+        logger.debug("use temp file = {} {}", tempFile, FileUtils.byteCountToDisplaySize(tempFile.length()))
+        return pushFile(FileDataSource(tempFile), fileInfo, folder, path)
     }
 
-    fun pushFile(dataSource: DataSource, fileInfo: FileInfo?, folder: String, path: String): FileUploadObserver {
+    private fun pushFile(dataSource: DataSource, fileInfo: FileInfo?, folder: String, path: String): FileUploadObserver {
         NetworkUtils.assertProtocol(connectionHandler.hasFolder(folder), {"supplied connection handler $connectionHandler will not share folder $folder"})
         assert(fileInfo == null || fileInfo.folder == folder)
         assert(fileInfo == null || fileInfo.path == path)
@@ -134,14 +132,10 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
                 .addAllBlocks(dataSource.getBlocks()), fileInfo?.versionList).right
         return object : FileUploadObserver() {
 
-            override fun progress() = if (isCompleted.get()) 1.0 else sentBlocks.size / dataSource.getHashes().size.toDouble()
-
-            override fun progressMessage() = (Math.round(progress() * 1000.0) / 10.0).toString() + "% " + sentBlocks.size + "/" + dataSource.getHashes().size
+            override fun progressPercentage() = if (isCompleted.get()) 100 else (sentBlocks.size.toFloat() / dataSource.getHashes().size).toInt()
 
             // return sentBlocks.size() == dataSource.getHashes().size();
             override fun isCompleted() = isCompleted.get()
-
-            override fun dataSource() = dataSource
 
             override fun close() {
                 logger.debug("closing upload process")
@@ -153,14 +147,14 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
             }
 
             @Throws(InterruptedException::class)
-            override fun waitForProgressUpdate(): Double {
+            override fun waitForProgressUpdate(): Int {
                 synchronized(updateLock) {
                     updateLock.wait()
                 }
                 if (uploadError.get() != null) {
                     throw RuntimeException(uploadError.get())
                 }
-                return progress()
+                return progressPercentage()
             }
 
         }
@@ -195,24 +189,14 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
         return Pair.of(connectionHandler.sendMessage(indexUpdate), indexUpdate)
     }
 
-    fun createTempFile(configuration: ConfigurationService): File {
-        val tempFile = File(configuration.temp, UUID.randomUUID().toString())
-        tempFile.deleteOnExit()
-        return tempFile
-    }
-
     abstract inner class FileUploadObserver : Closeable {
 
-        abstract fun progress(): Double
-
-        abstract fun progressMessage(): String
+        abstract fun progressPercentage(): Int
 
         abstract fun isCompleted(): Boolean
 
-        abstract fun dataSource(): DataSource
-
         @Throws(InterruptedException::class)
-        abstract fun waitForProgressUpdate(): Double
+        abstract fun waitForProgressUpdate(): Int
 
         @Throws(InterruptedException::class)
         fun waitForComplete(): FileUploadObserver {
@@ -260,16 +244,9 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
 
     }
 
-    class FileDataSource(private val file: File) : DataSource() {
+    private class FileDataSource(private val file: File) : DataSource() {
 
-        override val inputStream: InputStream
-            get() {
-                try {
-                    return FileInputStream(file)
-                } catch (ex: FileNotFoundException) {
-                    throw RuntimeException(ex)
-                }
-            }
+        override val inputStream =  FileInputStream(file)
 
         override fun getSize(): Long {
             if (size == null) {
@@ -277,10 +254,9 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
             }
             return size!!
         }
-
     }
 
-    abstract class DataSource {
+    private abstract class DataSource {
 
         var size: Long? = null
         private var blocks: List<BlockInfo>? = null

@@ -140,7 +140,7 @@ class Main(private val commandLine: CommandLine) {
                             logger.warn("", e)
                         }
 
-                        System.out.println("upload progress ${fileUploadObserver.progressMessage()}")
+                        System.out.println("upload progress ${fileUploadObserver.progressPercentage()}%")
                     }
                     latch.countDown()
                 }) { logger.warn("Failed to upload file") }

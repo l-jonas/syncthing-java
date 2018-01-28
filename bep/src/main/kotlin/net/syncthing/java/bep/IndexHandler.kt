@@ -279,7 +279,6 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
 
     private inner class IndexMessageProcessor {
 
-        private val logger = LoggerFactory.getLogger(javaClass)
         private val executorService = Executors.newSingleThreadExecutor()
         private var queuedMessages = 0
         private var queuedRecords: Long = 0
