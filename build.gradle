@@ -26,6 +26,23 @@ subprojects {
     targetCompatibility = 1.8
     compileKotlin.kotlinOptions.jvmTarget = "1.6"
 
+    task sourceJar(type: Jar) {
+        group 'Build'
+        description 'An archive of the source code'
+        classifier 'sources'
+        from sourceSets.main.allSource
+    }
+
+    task javadocJar(type: Jar, dependsOn: javadoc) {
+        classifier = 'javadoc'
+        from javadoc.destinationDir
+    }
+
+    artifacts {
+        archives sourceJar
+        archives javadocJar
+    }
+
     protobuf {
         protoc {
             // You still need protoc like in the non-Android case
