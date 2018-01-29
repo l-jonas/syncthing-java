@@ -14,7 +14,7 @@ allprojects {
     apply plugin: 'maven'
     apply plugin: 'com.github.ben-manes.versions'
     group = 'com.github.Nutomic'
-    version = '0.1.4'
+    version = '0.1.5'
 }
 
 
