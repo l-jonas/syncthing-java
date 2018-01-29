@@ -18,7 +18,7 @@ import net.syncthing.java.bep.BlockExchangeProtos.ErrorCode
 import net.syncthing.java.bep.BlockExchangeProtos.Request
 import net.syncthing.java.core.beans.FileBlocks
 import net.syncthing.java.core.cache.BlockCache
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.io.FileUtils
 import org.bouncycastle.util.encoders.Hex
@@ -29,7 +29,7 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-class BlockPuller internal constructor(configuration: ConfigurationService,
+class BlockPuller internal constructor(configuration: Configuration,
                                        private val connectionHandler: BlockExchangeConnectionHandler) {
 
     private val blockCache = BlockCache.getBlockCache(configuration)

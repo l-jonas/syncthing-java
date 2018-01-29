@@ -17,14 +17,14 @@ import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceStats
 import net.syncthing.java.core.beans.DeviceStats.DeviceStatus
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.utils.awaitTerminationSafe
 import java.io.Closeable
 import java.util.*
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-class DevicesHandler(private val configuration: ConfigurationService) : Closeable {
+class DevicesHandler(private val configuration: Configuration) : Closeable {
 
     private val deviceStatsMap = Collections.synchronizedMap(mutableMapOf<DeviceId, DeviceStats>())
     private val scheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
@@ -72,9 +72,9 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
     }
 
     private fun loadDevicesFromConfiguration() {
-        for (deviceInfo in configuration.getPeers()) {
+        for (deviceInfo in configuration.peers) {
             if (!deviceStatsMap.containsKey(deviceInfo.deviceId)) {
-                pushDeviceStats(DeviceStats.newBuilder().setDeviceId(deviceInfo.deviceId).setName(deviceInfo.name).build())
+                pushDeviceStats(DeviceStats.Builder(deviceInfo.deviceId).setName(deviceInfo.name).build())
             }
         }
     }
@@ -84,7 +84,7 @@ class DevicesHandler(private val configuration: ConfigurationService) : Closeabl
         if (deviceStatsMap.containsKey(deviceId)) {
             return deviceStatsMap[deviceId]!!
         } else {
-            val deviceStats = DeviceStats.newBuilder().setDeviceId(deviceId).build()
+            val deviceStats = DeviceStats.Builder(deviceId).build()
             pushDeviceStats(deviceStats)
             return deviceStats
         }

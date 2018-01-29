@@ -15,7 +15,7 @@ package net.syncthing.java.discovery
 
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.interfaces.DeviceAddressRepository
 import net.syncthing.java.core.utils.awaitTerminationSafe
 import net.syncthing.java.core.utils.submitLogging
@@ -28,7 +28,7 @@ import java.io.Closeable
 import java.util.*
 import java.util.concurrent.Executors
 
-class DiscoveryHandler(private val configuration: ConfigurationService,
+class DiscoveryHandler(private val configuration: Configuration,
                        private val deviceAddressRepository: DeviceAddressRepository,
                        private val onDeviceAddressReceivedListener: (DeviceAddress) -> Unit) : Closeable {
 
@@ -66,7 +66,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
         if (shouldLoadFromGlobal) {
             shouldLoadFromGlobal = false //TODO timeout for reload
             executorService.submitLogging {
-                for (deviceId in configuration.getPeerIds()) {
+                for (deviceId in configuration.peerIds) {
                     globalDiscoveryHandler.query(deviceId, this::processDeviceAddressBg)
                 }
             }
@@ -80,7 +80,7 @@ class DiscoveryHandler(private val configuration: ConfigurationService,
             executorService.submitLogging {
                 logger.info("processing device address list")
                 val list = deviceAddresses.toList()
-                val peers = configuration.getPeerIds().toSet()
+                val peers = configuration.peerIds
                 //do not process address already processed
                 list.filter { deviceAddress ->
                     !peers.contains(deviceAddress.deviceId()) || deviceAddressMap.containsKey(Pair.of(DeviceId(deviceAddress.deviceId), deviceAddress.address))

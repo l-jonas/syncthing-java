@@ -13,7 +13,7 @@
  */
 package net.syncthing.java.core.cache
 
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 
 abstract class BlockCache {
 
@@ -36,8 +36,8 @@ abstract class BlockCache {
 
     companion object {
 
-        fun getBlockCache(configuration: ConfigurationService): BlockCache {
-            return FileBlockCache(configuration.cache)
+        fun getBlockCache(configuration: Configuration): BlockCache {
+            return FileBlockCache(configuration.cacheFolder)
         }
     }
 

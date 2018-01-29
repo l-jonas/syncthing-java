@@ -19,7 +19,7 @@ import net.syncthing.java.bep.BlockExchangeProtos.Vector
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.beans.FileInfo.Version
 import net.syncthing.java.core.beans.IndexInfo
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.utils.BlockUtils
 import net.syncthing.java.core.utils.NetworkUtils
 import net.syncthing.java.core.utils.submitLogging
@@ -39,7 +39,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-class BlockPusher internal constructor(private val configuration: ConfigurationService,
+class BlockPusher internal constructor(private val configuration: Configuration,
                                        private val connectionHandler: BlockExchangeConnectionHandler,
                                        private val indexHandler: IndexHandler) {
 
@@ -62,7 +62,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
 
     fun pushFile(inputStream: InputStream, fileInfo: FileInfo?, folder: String, path: String): FileUploadObserver {
         // TODO: there is no need for the file copy, as long as we know the file size
-        val tempFile = File(configuration.temp, UUID.randomUUID().toString())
+        val tempFile = File(configuration.cacheFolder, UUID.randomUUID().toString() + ".tmp")
         tempFile.deleteOnExit()
         tempFile.outputStream().use { fileOut ->
             inputStream.copyTo(fileOut)
@@ -166,7 +166,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
             val nextSequence = indexHandler.sequencer().nextSequence()
             val list = oldVersions ?: emptyList()
             logger.debug("version list = {}", list)
-            val id = ByteBuffer.wrap(configuration.deviceId!!.toHashData()).long
+            val id = ByteBuffer.wrap(configuration.localDeviceId.toHashData()).long
             val version = Counter.newBuilder()
                     .setId(id)
                     .setValue(nextSequence)
@@ -208,7 +208,7 @@ class BlockPusher internal constructor(private val configuration: ConfigurationS
         }
     }
 
-    inner class IndexEditObserver(private val future: Future<*>, val indexUpdate: IndexUpdate) : Closeable {
+    inner class IndexEditObserver(private val future: Future<*>, private val indexUpdate: IndexUpdate) : Closeable {
 
         //throw exception if job has errors
         @Throws(InterruptedException::class, ExecutionException::class)

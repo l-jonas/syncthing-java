@@ -22,7 +22,7 @@ import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.cache.BlockCache
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.devices.DevicesHandler
 import net.syncthing.java.discovery.DiscoveryHandler
@@ -35,11 +35,11 @@ import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.collections.ArrayList
 
-class SyncthingClient(private val configuration: ConfigurationService) : Closeable {
+class SyncthingClient(private val configuration: Configuration) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     val discoveryHandler: DiscoveryHandler
-    private val sqlRepository = SqlRepository(configuration)
+    private val sqlRepository = SqlRepository(configuration.databaseFolder)
     val indexHandler: IndexHandler
     private val connections = Collections.synchronizedList(mutableListOf<BlockExchangeConnectionHandler>())
     val devicesHandler: DevicesHandler
@@ -53,7 +53,8 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
     fun clearCacheAndIndex() {
         logger.info("clear cache")
         indexHandler.clearIndex()
-        configuration.Editor().setFolders(emptyList()).persistLater()
+        configuration.folders = emptySet()
+        configuration.persistLater()
         BlockCache.getBlockCache(configuration).clear()
     }
 
@@ -139,7 +140,7 @@ class SyncthingClient(private val configuration: ConfigurationService) : Closeab
                 logger.warn("exception while waiting for index", ex)
             }
         }, {
-            val indexUpdateFailed = configuration.getPeerIds() - indexUpdateComplete
+            val indexUpdateFailed = configuration.peerIds - indexUpdateComplete
             listener(indexUpdateComplete, indexUpdateFailed)
         })
     }

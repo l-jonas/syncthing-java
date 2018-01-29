@@ -17,7 +17,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.InvalidProtocolBufferException
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.events.DeviceAddressReceivedEvent
 import net.syncthing.java.core.utils.NetworkUtils
 import net.syncthing.java.core.utils.submitLogging
@@ -35,7 +35,7 @@ import java.net.NetworkInterface
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 
-internal class LocalDiscoveryHandler(private val configuration: ConfigurationService,
+internal class LocalDiscoveryHandler(private val configuration: Configuration,
                                      private val onMessageReceivedListener: (DeviceId, List<DeviceAddress>) -> Unit) : Closeable {
 
     companion object {
@@ -56,7 +56,7 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
                 val out = ByteArrayOutputStream()
                 DataOutputStream(out).writeInt(MAGIC)
                 Announce.newBuilder()
-                        .setId(ByteString.copyFrom(configuration.deviceId!!.toHashData()))
+                        .setId(ByteString.copyFrom(configuration.localDeviceId.toHashData()))
                         .setInstanceId(configuration.instanceId)
                         .build().writeTo(out)
                 val data = out.toByteArray()
@@ -128,10 +128,10 @@ internal class LocalDiscoveryHandler(private val configuration: ConfigurationSer
             val deviceId = DeviceId.fromHashData(announce.id.toByteArray())
 
             // Ignore announcement received from ourselves.
-            if (deviceId == configuration.deviceId)
+            if (deviceId == configuration.localDeviceId)
                 return
 
-            if (!configuration.getPeerIds().contains(deviceId)) {
+            if (!configuration.peerIds.contains(deviceId)) {
                 logger.trace("Received local announce from $deviceId which is not a peer, ignoring")
                 return
             }

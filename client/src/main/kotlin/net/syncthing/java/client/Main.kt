@@ -16,7 +16,7 @@ package net.syncthing.java.client
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FileInfo
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.security.KeystoreHandler
 import org.apache.commons.cli.*
 import org.apache.commons.io.FileUtils
@@ -39,19 +39,12 @@ class Main(private val commandLine: CommandLine) {
                 formatter.printHelp("s-client", options)
                 return
             }
-            val configFile = if (cmd.hasOption("C")) File(cmd.getOptionValue("C"))
-            else                                     File(System.getProperty("user.home"), ".s-client.properties")
+            val configuration = if (cmd.hasOption("C")) Configuration(File(cmd.getOptionValue("C")))
+            else                                        Configuration()
 
-            ConfigurationService.Loader().loadFrom(configFile).use { configuration ->
-                SyncthingClient(configuration).use { syncthingClient ->
-                    System.out.println("using config file = $configFile")
-                    FileUtils.cleanDirectory(configuration.temp)
-                    KeystoreHandler.Loader().loadAndStore(configuration)
-                    System.out.println("configuration =\n${configuration.Writer().dumpToString()}")
-                    System.out.println(configuration.getStorageInfo().dumpAvailableSpace())
-                    val main = Main(cmd)
-                    cmd.options.forEach { main.handleOption(it, configuration, syncthingClient) }
-                }
+            SyncthingClient(configuration).use { syncthingClient ->
+                val main = Main(cmd)
+                cmd.options.forEach { main.handleOption(it, configuration, syncthingClient) }
             }
         }
 
@@ -78,7 +71,7 @@ class Main(private val commandLine: CommandLine) {
 
     private val logger = LoggerFactory.getLogger(Main::class.java)
 
-    private fun handleOption(option: Option, configuration: ConfigurationService, syncthingClient: SyncthingClient) {
+    private fun handleOption(option: Option, configuration: Configuration, syncthingClient: SyncthingClient) {
         when (option.opt) {
             "S" -> {
                 val peers = option.value
@@ -87,11 +80,8 @@ class Main(private val commandLine: CommandLine) {
                         .map { DeviceId(it.trim()) }
                         .toList()
                 System.out.println("set peers = $peers")
-                configuration.Editor().setPeers(emptyList())
-                for (peer in peers) {
-                    configuration.Editor().addPeers(DeviceInfo(peer, null))
-                }
-                configuration.Editor().persistNow()
+                configuration.peers = peers.map { DeviceInfo(it, null) }.toSet()
+                configuration.persistNow()
             }
             "p" -> {
                 val folderAndPath = option.value

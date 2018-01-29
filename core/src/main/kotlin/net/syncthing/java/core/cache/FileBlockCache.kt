@@ -28,10 +28,6 @@ internal class FileBlockCache(private val dir: File) : BlockCache() {
     private var size: Long = 0
 
     init {
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
-        assert(dir.isDirectory && dir.canWrite())
         size = FileUtils.sizeOfDirectory(dir)
         runCleanup()
     }
@@ -62,7 +58,6 @@ internal class FileBlockCache(private val dir: File) : BlockCache() {
     }
 
     private fun pullFile(code: String, shouldCheck: Boolean): ByteArray? {
-
         val file = File(dir, code)
         if (file.exists()) {
             try {
@@ -85,7 +80,6 @@ internal class FileBlockCache(private val dir: File) : BlockCache() {
                 logger.warn("error reading block from cache", ex)
                 FileUtils.deleteQuietly(file)
             }
-
         }
         return null
     }

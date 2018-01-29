@@ -16,9 +16,8 @@ package net.syncthing.java.discovery.protocol
 import com.google.gson.Gson
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.discovery.utils.AddressRanker
-import org.apache.http.HttpResponse
 import org.apache.http.HttpStatus
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.conn.ssl.SSLConnectionSocketFactory
@@ -33,10 +32,9 @@ import java.security.KeyManagementException
 import java.security.KeyStoreException
 import java.security.NoSuchAlgorithmException
 
-internal class GlobalDiscoveryHandler(private val configuration: ConfigurationService) : Closeable {
+internal class GlobalDiscoveryHandler(private val configuration: Configuration) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val gson = Gson()
 
     fun query(deviceId: DeviceId, callback: (List<DeviceAddress>) -> Unit) {
         val addresses = pickAnnounceServers()
@@ -58,7 +56,7 @@ internal class GlobalDiscoveryHandler(private val configuration: ConfigurationSe
         val list = AddressRanker
                 .pingAddresses(configuration.discoveryServers.map { DeviceAddress(it, "tcp://$it:443") })
         logger.info("discovery server addresses = {}", list.map { it.address })
-        return list.mapNotNull { it.deviceId }
+        return list.map { it.deviceId }
     }
 
     @Throws(IOException::class)
@@ -76,8 +74,8 @@ internal class GlobalDiscoveryHandler(private val configuration: ConfigurationSe
                         return@execute emptyList()
                     }
                     HttpStatus.SC_OK -> {
-                        val announcementMessageBean = gson.fromJson(EntityUtils.toString(response.entity), AnnouncementMessageBean::class.java)
-                        val list = (announcementMessageBean.addresses ?: emptyList())
+                        val announcementMessage = Gson().fromJson(EntityUtils.toString(response.entity), AnnouncementMessage::class.java)
+                        val list = (announcementMessage?.addresses ?: emptyList())
                                 .map { DeviceAddress(deviceId.deviceId, it) }
                         logger.debug("found address list = {}", list)
                         return@execute list
@@ -98,7 +96,5 @@ internal class GlobalDiscoveryHandler(private val configuration: ConfigurationSe
 
     override fun close() {}
 
-    class AnnouncementMessageBean {
-        var addresses: List<String>? = null
-    }
+    private data class AnnouncementMessage(val addresses: List<String>)
 }

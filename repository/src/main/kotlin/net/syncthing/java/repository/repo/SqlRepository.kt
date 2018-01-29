@@ -22,7 +22,6 @@ import net.syncthing.java.bep.BlockExchangeProtos
 import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.beans.FileInfo.FileType
 import net.syncthing.java.core.beans.FileInfo.Version
-import net.syncthing.java.core.configuration.ConfigurationService
 import net.syncthing.java.core.interfaces.DeviceAddressRepository
 import net.syncthing.java.core.interfaces.IndexRepository
 import net.syncthing.java.core.interfaces.Sequencer
@@ -39,7 +38,7 @@ import java.sql.SQLException
 import java.sql.Types
 import java.util.*
 
-class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepository, DeviceAddressRepository, TempRepository {
+class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, DeviceAddressRepository, TempRepository {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private var sequencer: Sequencer = IndexRepoSequencer()
@@ -52,10 +51,10 @@ class SqlRepository(configuration: ConfigurationService) : Closeable, IndexRepos
 
     init {
         logger.info("starting sql database")
-        val dbDir = File(configuration.database, "h2_index_database")
+        val dbDir = File(databaseFolder, "h2_index_database")
         dbDir.mkdirs()
         assert(dbDir.isDirectory && dbDir.canWrite())
-        val jdbcUrl = "jdbc:h2:file:" + File(dbDir, "index").absolutePath + (configuration.repositoryH2Config ?: "")
+        val jdbcUrl = "jdbc:h2:file:" + File(dbDir, "index").absolutePath + ";TRACE_LEVEL_FILE=0;TRACE_LEVEL_SYSTEM_OUT=0;FILE_LOCK=FS;PAGE_SIZE=1024;CACHE_SIZE=8192;"
         logger.debug("jdbc url = {}", jdbcUrl)
         val hikariConfig = HikariConfig()
         hikariConfig.driverClassName = "org.h2.Driver"

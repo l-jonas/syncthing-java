@@ -14,7 +14,7 @@
 package net.syncthing.java.core.security
 
 import net.syncthing.java.core.beans.DeviceId
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.interfaces.RelayConnection
 import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.codec.binary.Base32
@@ -155,65 +155,51 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
 
         private val logger = LoggerFactory.getLogger(javaClass)
 
-        @Throws(CryptoException::class, IOException::class)
-        fun loadAndStore(configuration: ConfigurationService): KeystoreHandler {
-            synchronized(keystoreHandlersCacheByHash) {
-                var keystoreData: ByteArray? = configuration.keystore
-                if (keystoreData != null) {
-                    val hash = MessageDigest.getInstance("SHA-256").digest(keystoreData)
-                    val keystoreHandlerFromCache = keystoreHandlersCacheByHash[Base32().encodeAsString(hash)]
-                    if (keystoreHandlerFromCache != null) {
-                        return keystoreHandlerFromCache
-                    }
-                }
-                val keystoreAlgo = configuration.keystoreAlgo?.let { algo ->
-                    if (!algo.isBlank()) algo else null
-                } ?: {
-                    val defaultAlgo = KeyStore.getDefaultType()!!
-                    logger.debug("keystore algo set to {}", defaultAlgo)
-                    configuration.Editor().setKeystoreAlgo(defaultAlgo)
-                    defaultAlgo
-                }()
-                var keystore: Pair<KeyStore, DeviceId>? = null
-                if (keystoreData != null) {
-                    keystore = importKeystore(keystoreData, configuration)
-                }
-                val keystoreHandler =
-                    if (keystore != null) {
-                        KeystoreHandler(keystore.left)
-                    } else {
-                        try {
-                            keystore = generateKeystore(configuration)
-                            val handler = KeystoreHandler(keystore.left)
-                            keystoreData = handler.exportKeystoreToData()
-                            configuration.Editor()
-                                    .setDeviceId(keystore.right)
-                                    .setKeystore(keystoreData)
-                                    .setKeystoreAlgo(keystoreAlgo)
-                                    .persistLater()
-                            handler
-                        } catch (ex: CryptoException) {
-                            throw RuntimeException("error generating keystore", ex)
-                        } catch (ex: IOException) {
-                            throw RuntimeException("error generating keystore", ex)
-                        }
-                    }
-                val hash = MessageDigest.getInstance("SHA-256").digest(keystoreData)
-                keystoreHandlersCacheByHash[Base32().encodeAsString(hash)] = keystoreHandler
-                logger.info("keystore ready, device id = {}", configuration.deviceId)
-                return keystoreHandler
-            }
+        private fun getKeystoreAlgorithm(keystoreAlgorithm: String?): String {
+            return keystoreAlgorithm?.let { algo ->
+                if (!algo.isBlank()) algo else null
+            } ?: {
+                val defaultAlgo = KeyStore.getDefaultType()!!
+                logger.debug("keystore algo set to {}", defaultAlgo)
+                defaultAlgo
+            }()
         }
 
         @Throws(CryptoException::class, IOException::class)
-        private fun generateKeystore(configuration: ConfigurationService): Pair<KeyStore, DeviceId> {
+        fun generateKeystore(): Triple<DeviceId, ByteArray, String> {
+            val keystoreAlgorithm = getKeystoreAlgorithm(null)
+            val keystore = generateKeystore(keystoreAlgorithm)
+            val keystoreHandler = KeystoreHandler(keystore.left)
+            val keystoreData = keystoreHandler.exportKeystoreToData()
+            val hash = MessageDigest.getInstance("SHA-256").digest(keystoreData)
+            keystoreHandlersCacheByHash[Base32().encodeAsString(hash)] = keystoreHandler
+            logger.info("keystore ready, device id = {}", keystore.right)
+            return Triple(keystore.right, keystoreData, keystoreAlgorithm)
+        }
+
+        fun loadKeystore(configuration: Configuration): KeystoreHandler {
+            val hash = MessageDigest.getInstance("SHA-256").digest(configuration.keystoreData)
+            val keystoreHandlerFromCache = keystoreHandlersCacheByHash[Base32().encodeAsString(hash)]
+            if (keystoreHandlerFromCache != null) {
+                return keystoreHandlerFromCache
+            }
+            val keystoreAlgo = getKeystoreAlgorithm(configuration.keystoreAlgorithm)
+            val keystore = importKeystore(configuration.keystoreData, keystoreAlgo)
+            val keystoreHandler = KeystoreHandler(keystore.left)
+            keystoreHandlersCacheByHash[Base32().encodeAsString(hash)] = keystoreHandler
+            logger.info("keystore ready, device id = {}", keystore.right)
+            return keystoreHandler
+        }
+
+        @Throws(CryptoException::class, IOException::class)
+        private fun generateKeystore(keystoreAlgorithm: String): Pair<KeyStore, DeviceId> {
             try {
                 logger.debug("generating key")
                 val keyPairGenerator = KeyPairGenerator.getInstance(KEY_ALGO)
                 keyPairGenerator.initialize(KEY_SIZE)
                 val keyPair = keyPairGenerator.genKeyPair()
 
-                val contentSigner = JcaContentSignerBuilder(SIGNATURE_ALGO).setProvider(BC_PROVIDER).build(keyPair.private)
+                val contentSigner = JcaContentSignerBuilder(SIGNATURE_ALGO).build(keyPair.private)
 
                 val startDate = Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000)
                 val endDate = Date(System.currentTimeMillis() + 10 * 365 * 24 * 60 * 60 * 1000)
@@ -227,10 +213,10 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
                 val deviceId = derDataToDeviceId(certificateDerData)
                 logger.info("device id from cert = {}", deviceId)
 
-                val keyStore = KeyStore.getInstance(configuration.keystoreAlgo)
+                val keyStore = KeyStore.getInstance(keystoreAlgorithm)
                 keyStore.load(null, null)
                 val certChain = arrayOfNulls<Certificate>(1)
-                certChain[0] = JcaX509CertificateConverter().setProvider(BC_PROVIDER).getCertificate(certificateHolder)
+                certChain[0] = JcaX509CertificateConverter().getCertificate(certificateHolder)
                 keyStore.setKeyEntry("key", keyPair.private, KEY_PASSWORD.toCharArray(), certChain)
                 return Pair.of(keyStore, deviceId)
             } catch (e: OperatorCreationException) {
@@ -246,10 +232,9 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         }
 
         @Throws(CryptoException::class, IOException::class)
-        private fun importKeystore(keystoreData: ByteArray, configuration: ConfigurationService): Pair<KeyStore, DeviceId> {
+        private fun importKeystore(keystoreData: ByteArray, keystoreAlgorithm: String): Pair<KeyStore, DeviceId> {
             try {
-                val keystoreAlgo = configuration.keystoreAlgo
-                val keyStore = KeyStore.getInstance(keystoreAlgo)
+                val keyStore = KeyStore.getInstance(keystoreAlgorithm)
                 keyStore.load(ByteArrayInputStream(keystoreData), JKS_PASSWORD.toCharArray())
                 val alias = keyStore.aliases().nextElement()
                 val certificate = keyStore.getCertificate(alias)

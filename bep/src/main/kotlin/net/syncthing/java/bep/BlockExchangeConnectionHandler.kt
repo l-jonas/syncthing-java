@@ -21,7 +21,7 @@ import net.syncthing.java.client.protocol.rp.RelayClient
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.FolderInfo
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.NetworkUtils
 import net.syncthing.java.core.utils.submitLogging
@@ -43,7 +43,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLSocket
 
-class BlockExchangeConnectionHandler(private val configuration: ConfigurationService, val address: DeviceAddress,
+class BlockExchangeConnectionHandler(private val configuration: Configuration, val address: DeviceAddress,
                                      private val indexHandler: IndexHandler,
                                      private val onDeviceAddressActiveListener: (DeviceId) -> Unit,
                                      private val onNewFolderSharedListener: (FolderInfo) -> Unit,
@@ -64,10 +64,8 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
     private val blockPuller = BlockPuller(configuration, this)
     private val blockPusher = BlockPusher(configuration, this, indexHandler)
     private val onRequestMessageReceivedListeners = mutableSetOf<(Request) -> Unit>()
-    var isClosed = false
-        private set
-    var isConnected = false
-        private set
+    private var isClosed = false
+    private var isConnected = false
 
     fun deviceId(): DeviceId = address.deviceId()
 
@@ -90,7 +88,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
         assert(socket == null && !isConnected, {"already connected!"})
         logger.info("connecting to {}", address.address)
 
-        val keystoreHandler = KeystoreHandler.Loader().loadAndStore(configuration)
+        val keystoreHandler = KeystoreHandler.Loader().loadKeystore(configuration)
 
         socket = when (address.getType()) {
             DeviceAddress.AddressType.TCP -> {
@@ -111,9 +109,9 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
         outputStream = DataOutputStream(socket!!.getOutputStream())
 
         sendHelloMessage(BlockExchangeProtos.Hello.newBuilder()
-                .setClientName(configuration.getClientName())
+                .setClientName(configuration.clientName)
                 .setClientVersion(configuration.clientVersion)
-                .setDeviceName(configuration.deviceName)
+                .setDeviceName(configuration.localDeviceName)
                 .build().toByteArray())
         markActivityOnSocket()
 
@@ -127,12 +125,12 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
 
         run {
             val clusterConfigBuilder = ClusterConfig.newBuilder()
-            for (folder in configuration.getFolderNames()) {
+            for (folder in configuration.folderNames) {
                 val folderBuilder = Folder.newBuilder().setId(folder)
                 run {
                     //our device
                     val deviceBuilder = Device.newBuilder()
-                            .setId(ByteString.copyFrom(configuration.deviceId!!.toHashData()))
+                            .setId(ByteString.copyFrom(configuration.localDeviceId.toHashData()))
                             .setIndexId(indexHandler.sequencer().indexId())
                             .setMaxSequence(indexHandler.sequencer().currentSequence())
                     folderBuilder.addDevices(deviceBuilder)
@@ -173,7 +171,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                 throw IOException("unable to retrieve cluster config from peer!")
             }
         }
-        for (folder in configuration.getFolderNames()) {
+        for (folder in configuration.folderNames) {
             if (hasFolder(folder)) {
                 sendIndexMessage(folder)
             }
@@ -407,16 +405,16 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                                                 DeviceId.fromHashData(input.id!!.toByteArray())
                                             }
                                     val otherDevice = devicesById[address.deviceId()]
-                                    val ourDevice = devicesById[configuration.deviceId]
+                                    val ourDevice = devicesById[configuration.localDeviceId]
                                     if (otherDevice != null) {
                                         folderInfo.isAnnounced = true
                                     }
                                     if (ourDevice != null) {
                                         folderInfo.isShared = true
                                         logger.info("folder shared from device = {} folder = {}", address.deviceId, folderInfo)
-                                        if (!configuration.getFolderNames().contains(folderInfo.folder)) {
+                                        if (!configuration.folderNames.contains(folderInfo.folder)) {
                                             val fi = FolderInfo(folderInfo.folder, folderInfo.label)
-                                            configuration.Editor().addFolders(setOf(fi))
+                                            configuration.folders = configuration.folders + fi
                                             onNewFolderSharedListener(fi)
                                             logger.info("new folder shared = {}", folderInfo)
                                         }
@@ -425,7 +423,7 @@ class BlockExchangeConnectionHandler(private val configuration: ConfigurationSer
                                     }
                                     clusterConfigInfo!!.putFolderInfo(folderInfo)
                                 }
-                                configuration.Editor().persistLater()
+                                configuration.persistLater()
                                 indexHandler.handleClusterConfigMessageProcessedEvent(clusterConfig)
                                 onDeviceAddressActive()
                                 synchronized(clusterConfigWaitingLock) {

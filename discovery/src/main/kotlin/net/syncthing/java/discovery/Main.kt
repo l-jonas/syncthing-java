@@ -15,7 +15,7 @@ package net.syncthing.java.discovery
 
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.discovery.protocol.GlobalDiscoveryHandler
 import net.syncthing.java.discovery.protocol.LocalDiscoveryHandler
@@ -43,18 +43,11 @@ class Main {
                 formatter.printHelp("s-client", options)
                 return
             }
-            val configFile = if (cmd.hasOption("C")) File(cmd.getOptionValue("C"))
-            else                                     File(System.getProperty("user.home"), ".s-client.properties")
+            val configuration = if (cmd.hasOption("C")) Configuration(File(cmd.getOptionValue("C")))
+            else                                     Configuration()
 
-            ConfigurationService.Loader().loadFrom(configFile).use { configuration ->
-                System.out.println("using config file = $configFile")
-                FileUtils.cleanDirectory(configuration.temp)
-                KeystoreHandler.Loader().loadAndStore(configuration)
-                System.out.println("configuration =\n${configuration.Writer().dumpToString()}")
-                System.out.println(configuration.getStorageInfo().dumpAvailableSpace())
-                val main = Main()
-                cmd.options.forEach { main.handleOption(it, configuration) }
-            }
+            val main = Main()
+            cmd.options.forEach { main.handleOption(it, configuration) }
         }
 
         private fun generateOptions(): Options {
@@ -67,7 +60,7 @@ class Main {
         }
     }
 
-    private fun handleOption(option: Option, configuration: ConfigurationService) {
+    private fun handleOption(option: Option, configuration: Configuration) {
         when (option.opt) {
             "q" -> {
                 val deviceId = DeviceId(option.value)
@@ -89,7 +82,7 @@ class Main {
         }
     }
 
-    private fun queryLocalDiscovery(configuration: ConfigurationService, deviceId: DeviceId): Collection<DeviceAddress> {
+    private fun queryLocalDiscovery(configuration: Configuration, deviceId: DeviceId): Collection<DeviceAddress> {
         val lock = Object()
         val discoveredAddresses = mutableListOf<DeviceAddress>()
         val handler = LocalDiscoveryHandler(configuration, { discoveredDeviceId, deviceAddresses ->

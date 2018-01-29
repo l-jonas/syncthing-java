@@ -15,7 +15,7 @@ package net.syncthing.java.bep
 
 import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.beans.FileInfo.Version
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.interfaces.IndexRepository
 import net.syncthing.java.core.interfaces.Sequencer
 import net.syncthing.java.core.interfaces.TempRepository
@@ -31,7 +31,7 @@ import java.io.IOException
 import java.util.*
 import java.util.concurrent.Executors
 
-class IndexHandler(private val configuration: ConfigurationService, val indexRepository: IndexRepository,
+class IndexHandler(private val configuration: Configuration, val indexRepository: IndexRepository,
                    private val tempRepository: TempRepository) : Closeable {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val folderInfoByFolder = mutableMapOf<String, FolderInfo>()
@@ -79,7 +79,7 @@ class IndexHandler(private val configuration: ConfigurationService, val indexRep
 
     private fun loadFolderInfoFromConfig() {
         synchronized(writeAccessLock) {
-            for (folderInfo in configuration.getFolders()) {
+            for (folderInfo in configuration.folders) {
                 folderInfoByFolder.put(folderInfo.folder, folderInfo) //TODO reference 'folder info' repository
             }
         }

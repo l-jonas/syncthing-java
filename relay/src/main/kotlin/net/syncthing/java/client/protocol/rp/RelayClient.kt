@@ -17,7 +17,7 @@ import net.syncthing.java.client.protocol.rp.beans.SessionInvitation
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceAddress.AddressType
 import net.syncthing.java.core.beans.DeviceId
-import net.syncthing.java.core.configuration.ConfigurationService
+import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.interfaces.RelayConnection
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.NetworkUtils
@@ -30,9 +30,9 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
 
-class RelayClient(configuration: ConfigurationService) {
+class RelayClient(configuration: Configuration) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val keystoreHandler: KeystoreHandler = KeystoreHandler.Loader().loadAndStore(configuration)
+    private val keystoreHandler: KeystoreHandler = KeystoreHandler.Loader().loadKeystore(configuration)
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
     fun openRelayConnection(address: DeviceAddress): RelayConnection {

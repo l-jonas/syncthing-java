@@ -34,9 +34,8 @@ class DeviceStats private constructor(val deviceId: DeviceId, name: String, val 
         OFFLINE, ONLINE_ACTIVE, ONLINE_INACTIVE
     }
 
-    class Builder {
+    class Builder(private val deviceId: DeviceId) {
 
-        private var deviceId: DeviceId? = null
         private var name: String? = null
 
         private var lastActive = Date(0)
@@ -44,23 +43,11 @@ class DeviceStats private constructor(val deviceId: DeviceId, name: String, val 
 
         private var status = DeviceStatus.OFFLINE
 
-        internal constructor()
-
-        internal constructor(deviceId: DeviceId, name: String, lastActive: Date, lastSeen: Date, status: DeviceStatus) {
-            this.deviceId = deviceId
+        internal constructor(deviceId: DeviceId, name: String, lastActive: Date, lastSeen: Date, status: DeviceStatus) : this(deviceId) {
             this.name = name
             this.lastActive = lastActive
             this.lastSeen = lastSeen
             this.status = status
-        }
-
-        fun getDeviceId(): DeviceId? {
-            return deviceId
-        }
-
-        fun setDeviceId(deviceId: DeviceId): Builder {
-            this.deviceId = deviceId
-            return this
         }
 
         fun getName(): String? {
@@ -100,15 +87,8 @@ class DeviceStats private constructor(val deviceId: DeviceId, name: String, val 
         }
 
         fun build(): DeviceStats {
-            return DeviceStats(deviceId!!, name!!, lastActive, lastSeen, status)
+            return DeviceStats(deviceId, name ?: deviceId.deviceId.take(7), lastActive, lastSeen, status)
         }
 
-    }
-
-    companion object {
-
-        fun newBuilder(): Builder {
-            return Builder()
-        }
     }
 }
