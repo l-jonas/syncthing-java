@@ -14,8 +14,8 @@
 package net.syncthing.java.bep
 
 import com.google.protobuf.ByteString
-import net.syncthing.java.bep.BlockExchangeProtos.*
 import net.syncthing.java.bep.BlockExchangeProtos.Vector
+import net.syncthing.java.core.beans.BlockInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.beans.FileInfo.Version
 import net.syncthing.java.core.beans.IndexInfo
@@ -23,12 +23,13 @@ import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.utils.BlockUtils
 import net.syncthing.java.core.utils.NetworkUtils
 import net.syncthing.java.core.utils.submitLogging
-import org.apache.commons.io.FileUtils
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.tuple.Pair
 import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
-import java.io.*
+import java.io.Closeable
+import java.io.IOException
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 import java.util.*
@@ -49,7 +50,7 @@ class BlockPusher internal constructor(private val configuration: Configuration,
         NetworkUtils.assertProtocol(connectionHandler.hasFolder(fileInfo.folder), {"supplied connection handler $connectionHandler will not share folder ${fileInfo.folder}"})
         return IndexEditObserver(sendIndexUpdate(folder, BlockExchangeProtos.FileInfo.newBuilder()
                 .setName(path)
-                .setType(FileInfoType.valueOf(fileInfo.type.name))
+                .setType(BlockExchangeProtos.FileInfoType.valueOf(fileInfo.type.name))
                 .setDeleted(true), fileInfo.versionList))
     }
 
@@ -61,32 +62,22 @@ class BlockPusher internal constructor(private val configuration: Configuration,
     }
 
     fun pushFile(inputStream: InputStream, fileInfo: FileInfo?, folder: String, path: String): FileUploadObserver {
-        // TODO: there is no need for the file copy, as long as we know the file size
-        val tempFile = File(configuration.cacheFolder, UUID.randomUUID().toString() + ".tmp")
-        tempFile.deleteOnExit()
-        tempFile.outputStream().use { fileOut ->
-            inputStream.copyTo(fileOut)
-        }
-        logger.debug("use temp file = {} {}", tempFile, FileUtils.byteCountToDisplaySize(tempFile.length()))
-        return pushFile(FileDataSource(tempFile), fileInfo, folder, path)
-    }
-
-    private fun pushFile(dataSource: DataSource, fileInfo: FileInfo?, folder: String, path: String): FileUploadObserver {
         NetworkUtils.assertProtocol(connectionHandler.hasFolder(folder), {"supplied connection handler $connectionHandler will not share folder $folder"})
         assert(fileInfo == null || fileInfo.folder == folder)
         assert(fileInfo == null || fileInfo.path == path)
         val monitoringProcessExecutorService = Executors.newCachedThreadPool()
-        val fileSize = dataSource.getSize()
+        val dataSource = DataSource(inputStream)
+        val fileSize = dataSource.size
         val sentBlocks = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
         val uploadError = AtomicReference<Exception>()
         val isCompleted = AtomicBoolean(false)
         val updateLock = Object()
-        val listener = {request: Request ->
+        val listener = {request: BlockExchangeProtos.Request ->
             if (request.folder == folder && request.name == path) {
                 val hash = Hex.toHexString(request.hash.toByteArray())
                 logger.debug("handling block request = {}:{}-{} ({})", request.name, request.offset, request.size, hash)
                 val data = dataSource.getBlock(request.offset, request.size, hash)
-                val future = connectionHandler.sendMessage(Response.newBuilder()
+                val future = connectionHandler.sendMessage(BlockExchangeProtos.Response.newBuilder()
                         .setCode(BlockExchangeProtos.ErrorCode.NO_ERROR)
                         .setData(ByteString.copyFrom(data))
                         .setId(request.id)
@@ -130,7 +121,7 @@ class BlockPusher internal constructor(private val configuration: Configuration,
                 .setName(path)
                 .setSize(fileSize)
                 .setType(BlockExchangeProtos.FileInfoType.FILE)
-                .addAllBlocks(dataSource.getBlocks()), fileInfo?.versionList).right
+                .addAllBlocks(dataSource.blocks), fileInfo?.versionList).right
         return object : FileUploadObserver() {
 
             override fun progressPercentage() = if (isCompleted.get()) 100 else (sentBlocks.size.toFloat() / dataSource.getHashes().size).toInt()
@@ -161,20 +152,24 @@ class BlockPusher internal constructor(private val configuration: Configuration,
         }
     }
 
-    private fun sendIndexUpdate(folder: String, fileInfoBuilder: BlockExchangeProtos.FileInfo.Builder, oldVersions: Iterable<Version>?): Pair<Future<*>, IndexUpdate> {
+    private fun sendIndexUpdate(folder: String, fileInfoBuilder: BlockExchangeProtos.FileInfo.Builder,
+                                oldVersions: Iterable<Version>?): Pair<Future<*>, BlockExchangeProtos.IndexUpdate> {
         run {
             val nextSequence = indexHandler.sequencer().nextSequence()
             val list = oldVersions ?: emptyList()
             logger.debug("version list = {}", list)
             val id = ByteBuffer.wrap(configuration.localDeviceId.toHashData()).long
-            val version = Counter.newBuilder()
+            val version = BlockExchangeProtos.Counter.newBuilder()
                     .setId(id)
                     .setValue(nextSequence)
                     .build()
             logger.debug("append new version = {}", version)
             fileInfoBuilder
                     .setSequence(nextSequence)
-                    .setVersion(Vector.newBuilder().addAllCounters(list.map { record -> Counter.newBuilder().setId(record.id).setValue(record.value).build() }).addCounters(version))
+                    .setVersion(Vector.newBuilder().addAllCounters(list.map { record ->
+                        BlockExchangeProtos.Counter.newBuilder().setId(record.id).setValue(record.value).build()
+                    })
+                            .addCounters(version))
         }
         val lastModified = Date()
         val fileInfo = fileInfoBuilder
@@ -182,7 +177,7 @@ class BlockPusher internal constructor(private val configuration: Configuration,
                 .setModifiedNs((lastModified.time % 1000 * 1000000).toInt())
                 .setNoPermissions(true)
                 .build()
-        val indexUpdate = IndexUpdate.newBuilder()
+        val indexUpdate = BlockExchangeProtos.IndexUpdate.newBuilder()
                 .setFolder(folder)
                 .addFiles(fileInfo)
                 .build()
@@ -208,7 +203,7 @@ class BlockPusher internal constructor(private val configuration: Configuration,
         }
     }
 
-    inner class IndexEditObserver(private val future: Future<*>, private val indexUpdate: IndexUpdate) : Closeable {
+    inner class IndexEditObserver(private val future: Future<*>, private val indexUpdate: BlockExchangeProtos.IndexUpdate) : Closeable {
 
         //throw exception if job has errors
         @Throws(InterruptedException::class, ExecutionException::class)
@@ -221,7 +216,7 @@ class BlockPusher internal constructor(private val configuration: Configuration,
             }
         }
 
-        constructor(pair: Pair<Future<*>, IndexUpdate>) : this(pair.left, pair.right)
+        constructor(pair: Pair<Future<*>, BlockExchangeProtos.IndexUpdate>) : this(pair.left, pair.right)
 
         @Throws(InterruptedException::class, ExecutionException::class)
         fun waitForComplete() {
@@ -235,32 +230,19 @@ class BlockPusher internal constructor(private val configuration: Configuration,
 
     }
 
-    private class FileDataSource(private val file: File) : DataSource() {
+    private class DataSource @Throws(IOException::class) constructor(private val inputStream: InputStream) {
 
-        override val inputStream =  FileInputStream(file)
-
-        override fun getSize(): Long {
-            if (size == null) {
-                size = file.length()
-            }
-            return size!!
-        }
-    }
-
-    private abstract class DataSource {
-
-        var size: Long? = null
-        private var blocks: List<BlockInfo>? = null
+        var size: Long = 0
+            private set
+        lateinit var blocks: List<BlockExchangeProtos.BlockInfo>
+            private set
         private var hashes: Set<String>? = null
 
-        abstract val inputStream: InputStream
+        private var hash: String? = null
 
-        @Transient private var hash: String? = null
-
-        @Throws(IOException::class)
-        private fun processStream() {
+        init {
             inputStream.use { it ->
-                val list = mutableListOf<BlockInfo>()
+                val list = mutableListOf<BlockExchangeProtos.BlockInfo>()
                 var offset: Long = 0
                 while (true) {
                     var block = ByteArray(BLOCK_SIZE)
@@ -273,7 +255,7 @@ class BlockPusher internal constructor(private val configuration: Configuration,
                     }
 
                     val hash = MessageDigest.getInstance("SHA-256").digest(block)
-                    list.add(BlockInfo.newBuilder()
+                    list.add(BlockExchangeProtos.BlockInfo.newBuilder()
                             .setHash(ByteString.copyFrom(hash))
                             .setOffset(offset)
                             .setSize(blockSize)
@@ -283,20 +265,6 @@ class BlockPusher internal constructor(private val configuration: Configuration,
                 size = offset
                 blocks = list
             }
-        }
-
-        open fun getSize(): Long {
-            if (size == null) {
-                processStream()
-            }
-            return size!!
-        }
-
-        fun getBlocks(): List<BlockInfo>? {
-            if (blocks == null) {
-                processStream()
-            }
-            return blocks
         }
 
         @Throws(IOException::class)
@@ -313,7 +281,7 @@ class BlockPusher internal constructor(private val configuration: Configuration,
 
         fun getHashes(): Set<String> {
             return hashes ?: let {
-                val hashes2 = getBlocks()!!.map { input -> Hex.toHexString(input.hash.toByteArray()) }.toSet()
+                val hashes2 = blocks.map { input -> Hex.toHexString(input.hash.toByteArray()) }.toSet()
                 hashes = hashes2
                 return hashes2
             }
@@ -321,8 +289,8 @@ class BlockPusher internal constructor(private val configuration: Configuration,
 
         fun getHash(): String {
             return hash ?: let {
-                val blockInfo = getBlocks()!!.map { input ->
-                    net.syncthing.java.core.beans.BlockInfo(input.offset, input.size, Hex.toHexString(input.hash.toByteArray()))
+                val blockInfo = blocks.map { input ->
+                    BlockInfo(input.offset, input.size, Hex.toHexString(input.hash.toByteArray()))
                 }
                 val hash2 = BlockUtils.hashBlocks(blockInfo)
                 hash = hash2
