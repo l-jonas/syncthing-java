@@ -13,13 +13,10 @@
  */
 package net.syncthing.java.core.beans
 
-import org.apache.http.client.utils.URLEncodedUtils
 import org.slf4j.LoggerFactory
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.URI
 import java.net.UnknownHostException
-import java.nio.charset.StandardCharsets
 import java.util.*
 
 /**
@@ -56,12 +53,6 @@ class DeviceAddress private constructor(val deviceId: String, val instanceId: Lo
 
     fun isWorking(): Boolean = score < Integer.MAX_VALUE
 
-    //} catch (Exception ex) {
-    //    logger.warn("processing invalid url = {}, ex = {}; stripping params", getAddress(), ex.toString());
-    //    return URI.create(getAddress().replaceFirst("^([^/]+://[^/]+)(/.*)?$", "$1"));
-    //}
-    private fun getUriSafe(): URI = URI.create(address)
-
     init {
         this.producer = producer ?: AddressProducer.UNKNOWN
         this.score = score ?: Integer.MAX_VALUE
@@ -70,19 +61,25 @@ class DeviceAddress private constructor(val deviceId: String, val instanceId: Lo
 
     constructor(deviceId: String, address: String) : this(deviceId, null, address, null, null, null)
 
-    fun containsUriParam(key: String): Boolean {
-        return getUriParam(key) != null
-    }
-
     fun containsUriParamValue(key: String): Boolean {
         return !getUriParam(key).isNullOrEmpty()
     }
 
+    /**
+     * Returns value for the specified URL parameter key.
+     *
+     * We need to parse the URL manually, as it is not URL encoded and may contain invalid key/values
+     * like "key=a b" (with an unencoded space).
+     */
     fun getUriParam(key: String): String? {
         assert(!key.isEmpty())
-        return URLEncodedUtils.parse(getUriSafe(), StandardCharsets.UTF_8.name())
-                .find { it.name == key }
-                ?.value
+        return address
+                .split("?", limit = 2).first()
+                .splitToSequence("&")
+                .map { it.split("=", limit = 2) }
+                .map { it[0] to (it.getOrNull(1) ?: "") }
+                .find { it.first == key }
+                ?.second
     }
 
     enum class AddressType {
