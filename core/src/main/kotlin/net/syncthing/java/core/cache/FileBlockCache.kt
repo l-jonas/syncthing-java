@@ -13,6 +13,7 @@
  */
 package net.syncthing.java.core.cache
 
+import net.syncthing.java.core.utils.PathUtils
 import net.syncthing.java.core.utils.submitLogging
 import org.apache.commons.io.FileUtils
 import org.bouncycastle.util.encoders.Hex
@@ -28,8 +29,28 @@ internal class FileBlockCache(private val dir: File) : BlockCache() {
     private var size: Long = 0
 
     init {
-        size = FileUtils.sizeOfDirectory(dir)
+        size = sizeOfDirectory(dir)
         runCleanup()
+    }
+
+    /**
+     * Replacement for [[FileUtils.sizeOfDirectory]], which throws exceptions on Android.
+     */
+    private fun sizeOfDirectory(dir: File): Long {
+        if (!dir.exists())
+            return 0
+
+        return dir.listFiles()?.toList()
+                ?.map { // Recursive call if it's a directory
+                    if (it.isDirectory) {
+                        sizeOfDirectory(it)
+                    } else {
+                        // Sum the file size in bytes
+                        it.length()
+                    }
+                }
+                ?.sum()
+                ?: 0
     }
 
     override fun pushBlock(data: ByteArray): String? {
@@ -48,7 +69,7 @@ internal class FileBlockCache(private val dir: File) : BlockCache() {
                 logger.debug("delete file {}", file)
                 FileUtils.deleteQuietly(file)
             }
-            size = FileUtils.sizeOfDirectory(dir)
+            size = sizeOfDirectory(dir)
             logger.info("cleanup of cache directory completed, final size = {}", FileUtils.byteCountToDisplaySize(size))
         }
     }

@@ -89,10 +89,7 @@ class Main(private val commandLine: CommandLine) {
                 val folder = folderAndPath.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
                 val path = folderAndPath.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
                 val latch = CountDownLatch(1)
-                val fileInfo = FileInfo.Builder()
-                        .setFolder(folder)
-                        .setPath(path)
-                        .build()
+                val fileInfo = FileInfo(folder = folder, path = path, type = FileInfo.FileType.FILE)
                 syncthingClient.pullFile(fileInfo, { observer ->
                     try {
                         val inputStream = observer.waitForComplete().inputStream()

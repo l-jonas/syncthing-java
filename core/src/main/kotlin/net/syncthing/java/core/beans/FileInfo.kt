@@ -17,7 +17,9 @@ import net.syncthing.java.core.utils.PathUtils
 import org.apache.commons.io.FileUtils
 import java.util.*
 
-class FileInfo private constructor(val folder: String, val type: FileType, val path: String, size: Long?, lastModified: Date?, hash: String?, versionList: List<Version>?, val isDeleted: Boolean) {
+class FileInfo(val folder: String, val type: FileType, val path: String, size: Long? = null,
+               lastModified: Date? = Date(0), hash: String? = null, versionList: List<Version>? = null,
+               val isDeleted: Boolean = false) {
     val fileName: String
     val parent: String
     val hash: String?

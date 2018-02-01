@@ -16,7 +16,6 @@ package net.syncthing.java.bep
 import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.java.core.beans.FolderStats
 import net.syncthing.java.core.interfaces.IndexRepository
-import org.apache.commons.lang3.tuple.Pair
 import java.io.Closeable
 
 class FolderBrowser internal constructor(private val indexHandler: IndexHandler) : Closeable {
@@ -26,7 +25,9 @@ class FolderBrowser internal constructor(private val indexHandler: IndexHandler)
     }
 
     fun folderInfoAndStatsList(): List<Pair<FolderInfo, FolderStats>> =
-            (indexHandler.folderInfoList().map { folderInfo -> Pair.of(folderInfo, getFolderStats(folderInfo.folder)) }).toList()
+            indexHandler.folderInfoList()
+                    .map { folderInfo -> Pair(folderInfo, getFolderStats(folderInfo.folder)) }
+                    .sortedBy { it.first.label }
 
     init {
         indexHandler.indexRepository.setOnFolderStatsUpdatedListener(indexRepositoryEventListener)

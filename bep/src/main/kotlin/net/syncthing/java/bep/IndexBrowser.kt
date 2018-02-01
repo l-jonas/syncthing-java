@@ -31,9 +31,9 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
     private fun isParent(fileInfo: FileInfo) = PathUtils.isParent(fileInfo.path)
 
     val ALPHA_ASC_DIR_FIRST: Comparator<FileInfo> =
-            compareBy({isParent(it)}, {!it.isDirectory()}, {it.path})
+            compareBy({isParent(it)}, {!it.isDirectory()}, {it.path.toLowerCase()})
     val LAST_MOD_DESC: Comparator<FileInfo> =
-            compareBy({isParent(it)}, {it.lastModified}, {it.path})
+            compareBy({isParent(it)}, {it.lastModified}, {it.path.toLowerCase()})
 
     private val ordering = ordering ?: ALPHA_ASC_DIR_FIRST
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -67,16 +67,8 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
 
     init {
         assert(folder.isNotEmpty())
-        PARENT_FILE_INFO = FileInfo.Builder()
-                .setFolder(folder)
-                .setTypeDir()
-                .setPath(PathUtils.PARENT_PATH)
-                .build()
-        ROOT_FILE_INFO = FileInfo.Builder()
-                .setFolder(folder)
-                .setTypeDir()
-                .setPath(PathUtils.ROOT_PATH)
-                .build()
+        PARENT_FILE_INFO = FileInfo(folder = folder, type = FileInfo.FileType.DIRECTORY, path = PathUtils.PARENT_PATH)
+        ROOT_FILE_INFO = FileInfo(folder = folder, type = FileInfo.FileType.DIRECTORY, path = PathUtils.ROOT_PATH)
         navigateToAbsolutePath(PathUtils.ROOT_PATH)
     }
 
@@ -133,12 +125,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
         }
     }
 
-    fun listFiles(absoluteDirPath: String = currentPath): List<FileInfo> {
-        logger.debug("listFiles for path = '{}'", absoluteDirPath)
-        return doListFiles(absoluteDirPath)
-    }
-
-    private fun doListFiles(path: String): List<FileInfo> {
+    fun listFiles(path: String = currentPath): List<FileInfo> {
         logger.debug("doListFiles for path = '{}' BEGIN", path)
         val list = indexRepository.findNotDeletedFilesByFolderAndParent(folder, path)
         logger.debug("doListFiles for path = '{}' : {} records loaded)", path, list.size)
@@ -150,14 +137,14 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
     }
 
     fun getFileInfoByAbsolutePath(path: String): FileInfo {
-        return if (PathUtils.isRoot(path)) ROOT_FILE_INFO else doGetFileInfoByAbsolutePath(path)
-    }
-
-    private fun doGetFileInfoByAbsolutePath(path: String): FileInfo {
-        logger.debug("doGetFileInfoByAbsolutePath for path = '{}' BEGIN", path)
-        val fileInfo = indexRepository.findNotDeletedFileInfo(folder, path) ?: error("file not found for path = $path")
-        logger.debug("doGetFileInfoByAbsolutePath for path = '{}' END", path)
-        return fileInfo
+        return if (PathUtils.isRoot(path)) {
+            ROOT_FILE_INFO
+        } else {
+            logger.debug("doGetFileInfoByAbsolutePath for path = '{}' BEGIN", path)
+            val fileInfo = indexRepository.findNotDeletedFileInfo(folder, path) ?: error("file not found for path = $path")
+            logger.debug("doGetFileInfoByAbsolutePath for path = '{}' END", path)
+            fileInfo
+        }
     }
 
     fun navigateTo(fileInfo: FileInfo) {
