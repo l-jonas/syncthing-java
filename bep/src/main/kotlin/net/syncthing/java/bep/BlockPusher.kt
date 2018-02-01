@@ -18,6 +18,7 @@ import net.syncthing.java.bep.BlockExchangeProtos.Vector
 import net.syncthing.java.core.beans.BlockInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.beans.FileInfo.Version
+import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.java.core.beans.IndexInfo
 import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.utils.BlockUtils
@@ -61,9 +62,9 @@ class BlockPusher internal constructor(private val configuration: Configuration,
                 .setType(BlockExchangeProtos.FileInfoType.DIRECTORY), null))
     }
 
-    fun pushFile(inputStream: InputStream, fileInfo: FileInfo?, folder: String, path: String): FileUploadObserver {
-        NetworkUtils.assertProtocol(connectionHandler.hasFolder(folder), {"supplied connection handler $connectionHandler will not share folder $folder"})
-        assert(fileInfo == null || fileInfo.folder == folder)
+    fun pushFile(inputStream: InputStream, fileInfo: FileInfo?, folderId: String, path: String): FileUploadObserver {
+        NetworkUtils.assertProtocol(connectionHandler.hasFolder(folderId), {"supplied connection handler $connectionHandler will not share folder $folderId"})
+        assert(fileInfo == null || fileInfo.folder == folderId)
         assert(fileInfo == null || fileInfo.path == path)
         val monitoringProcessExecutorService = Executors.newCachedThreadPool()
         val dataSource = DataSource(inputStream)
@@ -73,7 +74,7 @@ class BlockPusher internal constructor(private val configuration: Configuration,
         val isCompleted = AtomicBoolean(false)
         val updateLock = Object()
         val listener = {request: BlockExchangeProtos.Request ->
-            if (request.folder == folder && request.name == path) {
+            if (request.folder == folderId && request.name == path) {
                 val hash = Hex.toHexString(request.hash.toByteArray())
                 logger.debug("handling block request = {}:{}-{} ({})", request.name, request.offset, request.size, hash)
                 val data = dataSource.getBlock(request.offset, request.size, hash)
@@ -103,8 +104,8 @@ class BlockPusher internal constructor(private val configuration: Configuration,
         }
         connectionHandler.registerOnRequestMessageReceivedListeners(listener)
         logger.debug("send index update for file = {}", path)
-        val indexListener = { folderId: String, newRecords: List<FileInfo>, indexInfo: IndexInfo ->
-            if (folderId == folder) {
+        val indexListener = { folderInfo: FolderInfo, newRecords: List<FileInfo>, indexInfo: IndexInfo ->
+            if (folderInfo.folderId == folderId) {
                 for (fileInfo2 in newRecords) {
                     if (fileInfo2.path == path && fileInfo2.hash == dataSource.getHash()) { //TODO check not invalid
                         //                                sentBlocks.addAll(dataSource.getHashes());
@@ -117,7 +118,7 @@ class BlockPusher internal constructor(private val configuration: Configuration,
             }
         }
         indexHandler.registerOnIndexRecordAcquiredListener(indexListener)
-        val indexUpdate = sendIndexUpdate(folder, BlockExchangeProtos.FileInfo.newBuilder()
+        val indexUpdate = sendIndexUpdate(folderId, BlockExchangeProtos.FileInfo.newBuilder()
                 .setName(path)
                 .setSize(fileSize)
                 .setType(BlockExchangeProtos.FileInfoType.FILE)

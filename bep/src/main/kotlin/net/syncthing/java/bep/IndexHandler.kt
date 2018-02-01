@@ -40,8 +40,8 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
     private val writeAccessLock = Object()
     private val indexWaitLock = Object()
     private val indexBrowsers = mutableSetOf<IndexBrowser>()
-    private val onIndexRecordAcquiredListeners = mutableSetOf<(String, List<FileInfo>, IndexInfo) -> Unit>()
-    private val onFullIndexAcquiredListeners = mutableSetOf<(String) -> Unit>()
+    private val onIndexRecordAcquiredListeners = mutableSetOf<(FolderInfo, List<FileInfo>, IndexInfo) -> Unit>()
+    private val onFullIndexAcquiredListeners = mutableSetOf<(FolderInfo) -> Unit>()
 
     private fun lastActive(): Long = System.currentTimeMillis() - lastIndexActivity
 
@@ -55,20 +55,20 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
         lastIndexActivity = System.currentTimeMillis()
     }
 
-    fun registerOnIndexRecordAcquiredListener(listener: (String, List<FileInfo>, IndexInfo) -> Unit) {
+    fun registerOnIndexRecordAcquiredListener(listener: (FolderInfo, List<FileInfo>, IndexInfo) -> Unit) {
         onIndexRecordAcquiredListeners.add(listener)
     }
 
-    fun unregisterOnIndexRecordAcquiredListener(listener: (String, List<FileInfo>, IndexInfo) -> Unit) {
+    fun unregisterOnIndexRecordAcquiredListener(listener: (FolderInfo, List<FileInfo>, IndexInfo) -> Unit) {
         assert(onIndexRecordAcquiredListeners.contains(listener))
         onIndexRecordAcquiredListeners.remove(listener)
     }
 
-    fun registerOnFullIndexAcquiredListenersListener(listener: (String) -> Unit) {
+    fun registerOnFullIndexAcquiredListenersListener(listener: (FolderInfo) -> Unit) {
         onFullIndexAcquiredListeners.add(listener)
     }
 
-    fun unregisterOnFullIndexAcquiredListenersListener(listener: (String) -> Unit) {
+    fun unregisterOnFullIndexAcquiredListenersListener(listener: (FolderInfo) -> Unit) {
         assert(onFullIndexAcquiredListeners.contains(listener))
         onFullIndexAcquiredListeners.remove(listener)
     }
@@ -389,18 +389,18 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
                 //                }
                 logger.info("processing index message with {} records (queue size: messages = {} records = {})", message.filesCount, queuedMessages, queuedRecords)
                 //            String deviceId = connectionHandler.getDeviceId();
-                val folder = message.folder
+                val folderId = message.folder
                 var sequence: Long = -1
                 val newRecords = mutableListOf<FileInfo>()
                 //                IndexInfo oldIndexInfo = indexRepository.findIndexInfoByDeviceAndFolder(deviceId, folder);
                 //            Stopwatch stopwatch = Stopwatch.createStarted();
-                logger.debug("processing {} index records for folder {}", message.filesList.size, folder)
+                logger.debug("processing {} index records for folder {}", message.filesList.size, folderId)
                 for (fileInfo in message.filesList) {
                     markActive()
                     //                    if (oldIndexInfo != null && isVersionOlderThanSequence(fileInfo, oldIndexInfo.getLocalSequence())) {
                     //                        logger.trace("skipping file {}, version older than sequence {}", fileInfo, oldIndexInfo.getLocalSequence());
                     //                    } else {
-                    val newRecord = pushRecord(folder, fileInfo)
+                    val newRecord = pushRecord(folderId, fileInfo)
                     if (newRecord != null) {
                         newRecords.add(newRecord)
                     }
@@ -408,7 +408,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
                     markActive()
                     //                    }
                 }
-                val newIndexInfo = updateIndexInfo(folder, peerDeviceId, null, null, sequence)
+                val newIndexInfo = updateIndexInfo(folderId, peerDeviceId, null, null, sequence)
                 val elap = System.currentTimeMillis() - startTime!!
                 queuedRecords -= message.filesCount.toLong()
                 logger.info("processed {} index records, aquired {} ({} secs, {} record/sec)", message.filesCount, newRecords.size, elap / 1000.0, Math.round(message.filesCount / (elap / 1000.0) * 100) / 100.0)
@@ -418,13 +418,14 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
                         logger.info("aquired record = {}", fileInfo)
                     }
                 }
+                val folderInfo = folderInfoByFolder[folderId]
                 if (!newRecords.isEmpty()) {
-                    onIndexRecordAcquiredListeners.forEach { it(folder, newRecords, newIndexInfo) }
+                    onIndexRecordAcquiredListeners.forEach { it(folderInfo!!, newRecords, newIndexInfo) }
                 }
                 logger.debug("index info = {}", newIndexInfo)
                 if (isRemoteIndexAquired(clusterConfigInfo!!, peerDeviceId)) {
                     logger.debug("index aquired")
-                    onFullIndexAcquiredListeners.forEach { it(folder)}
+                    onFullIndexAcquiredListeners.forEach { it(folderInfo!!)}
                 }
                 //                IndexHandler.this.notifyAll();
                 markActive()
