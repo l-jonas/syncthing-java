@@ -13,11 +13,8 @@
  */
 package net.syncthing.java.core.beans
 
-class DeviceInfo(val deviceId: DeviceId, name: String?) {
+data class DeviceInfo(val deviceId: DeviceId, val name: String, val isConnected: Boolean? = null) {
 
-    val name: String = if (name.isNullOrBlank()) deviceId.deviceId.substring(0, 7) else name!!
-
-    override fun toString(): String {
-        return "DeviceInfo{deviceId=$deviceId, name=$name}"
-    }
+    constructor(deviceId: DeviceId, name: String?) :
+            this(deviceId, if (name != null && !name.isBlank()) name else deviceId.deviceId.substring(0, 7), null)
 }

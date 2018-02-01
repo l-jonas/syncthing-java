@@ -29,8 +29,7 @@ import java.util.*
 import java.util.concurrent.Executors
 
 class DiscoveryHandler(private val configuration: Configuration,
-                       private val deviceAddressRepository: DeviceAddressRepository,
-                       private val onDeviceAddressReceivedListener: (DeviceAddress) -> Unit) : Closeable {
+                       private val deviceAddressRepository: DeviceAddressRepository) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private val globalDiscoveryHandler = GlobalDiscoveryHandler(configuration)
@@ -96,7 +95,6 @@ class DiscoveryHandler(private val configuration: Configuration,
         deviceAddressMap[Pair.of(DeviceId(deviceAddress.deviceId), deviceAddress.address)] = deviceAddress
         deviceAddressRepository.updateDeviceAddress(deviceAddress)
         deviceAddressSupplier.onNewDeviceAddressAcquired(deviceAddress)
-        onDeviceAddressReceivedListener(deviceAddress)
     }
 
     fun newDeviceAddressSupplier(): DeviceAddressSupplier {

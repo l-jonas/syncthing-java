@@ -45,7 +45,6 @@ import javax.net.ssl.SSLSocket
 
 class ConnectionHandler(private val configuration: Configuration, val address: DeviceAddress,
                         private val indexHandler: IndexHandler,
-                        private val onDeviceAddressActiveListener: (DeviceId) -> Unit,
                         private val onNewFolderSharedListener: (FolderInfo) -> Unit,
                         private val onConnectionClosedListener: (ConnectionHandler) -> Unit) : Closeable {
 
@@ -370,20 +369,16 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                             BlockExchangeProtos.MessageType.INDEX -> {
                                 val index = message.value as Index
                                 indexHandler.handleIndexMessageReceivedEvent(index.folder, index.filesList, this)
-                                onDeviceAddressActive()
                             }
                             BlockExchangeProtos.MessageType.INDEX_UPDATE -> {
                                 val update = message.value as IndexUpdate
                                 indexHandler.handleIndexMessageReceivedEvent(update.folder, update.filesList, this)
-                                onDeviceAddressActive()
                             }
                             BlockExchangeProtos.MessageType.REQUEST -> {
                                 onRequestMessageReceivedListeners.forEach { it(message.value as Request) }
-                                onDeviceAddressActive()
                             }
                             BlockExchangeProtos.MessageType.RESPONSE -> {
                                 blockPuller.onResponseMessageReceived(message.value as Response)
-                                onDeviceAddressActive()
                             }
                             BlockExchangeProtos.MessageType.PING -> logger.debug("ping message received")
                             BlockExchangeProtos.MessageType.CLOSE -> {
@@ -423,7 +418,6 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                                 }
                                 configuration.persistLater()
                                 indexHandler.handleClusterConfigMessageProcessedEvent(clusterConfig)
-                                onDeviceAddressActive()
                                 synchronized(clusterConfigWaitingLock) {
                                     clusterConfigWaitingLock.notifyAll()
                                 }
@@ -439,14 +433,6 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                 closeBg()
             }
         }
-    }
-
-    private fun onDeviceAddressActive() {
-        onDeviceAddressActiveListener(deviceId())
-    }
-
-    enum class ConnectionClosedEvent {
-        INSTANCE
     }
 
     override fun toString(): String {

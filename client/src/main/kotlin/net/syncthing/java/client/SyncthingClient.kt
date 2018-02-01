@@ -20,11 +20,11 @@ import net.syncthing.java.bep.BlockPusher.FileUploadObserver
 import net.syncthing.java.bep.IndexHandler
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
+import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.cache.BlockCache
 import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.security.KeystoreHandler
-import net.syncthing.java.devices.DevicesHandler
 import net.syncthing.java.discovery.DiscoveryHandler
 import net.syncthing.java.repository.repo.SqlRepository
 import org.slf4j.LoggerFactory
@@ -42,12 +42,10 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     private val sqlRepository = SqlRepository(configuration.databaseFolder)
     val indexHandler: IndexHandler
     private val connections = Collections.synchronizedList(mutableListOf<ConnectionHandler>())
-    val devicesHandler: DevicesHandler
 
     init {
         indexHandler = IndexHandler(configuration, sqlRepository, sqlRepository)
-        devicesHandler = DevicesHandler(configuration)
-        discoveryHandler = DiscoveryHandler(configuration, sqlRepository, devicesHandler::handleDeviceAddressReceivedEvent)
+        discoveryHandler = DiscoveryHandler(configuration, sqlRepository)
     }
 
     fun clearCacheAndIndex() {
@@ -62,8 +60,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     private fun openConnection(deviceAddress: DeviceAddress): ConnectionHandler {
         val shouldRestartForNewFolder = AtomicBoolean(false)
         val connectionHandler = ConnectionHandler(
-                configuration, deviceAddress, indexHandler, devicesHandler::handleDeviceAddressActiveEvent,
-                { shouldRestartForNewFolder.set(true) },
+                configuration, deviceAddress, indexHandler, { shouldRestartForNewFolder.set(true) },
                 { connections.remove(it)})
         connectionHandler.connect()
         connections.add(connectionHandler)
@@ -199,8 +196,14 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         }, errorListener)
     }
 
+    fun getPeerStatus(): List<DeviceInfo> {
+        return configuration.peers.map { device ->
+            val isConnected = connections.any { it.deviceId() == device.deviceId }
+            device.copy(isConnected = isConnected)
+        }
+    }
+
     override fun close() {
-        devicesHandler.close()
         discoveryHandler.close()
         // Create copy of list, because it will be modified by handleConnectionClosedEvent(), causing ConcurrentModificationException.
         ArrayList(connections).forEach{it.close()}

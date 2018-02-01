@@ -123,14 +123,7 @@ class Configuration(configFolder: File = DefaultConfigFolder,
             return
 
         config.let {
-            // TODO: There seems to be no other way to pretty print objects
-            // https://github.com/cbeust/klaxon/issues/98
             System.out.println("writing config to $configFile")
-            /*
-            val sb = StringBuilder(Klaxon().toJsonString(config))
-            val jsonString = (Parser().parse(sb) as JsonObject).toJsonString(true)
-            configFile.writeText(jsonString)
-            */
             configFile.writeText(Gson.toJson(config))
             isSaved = true
         }
