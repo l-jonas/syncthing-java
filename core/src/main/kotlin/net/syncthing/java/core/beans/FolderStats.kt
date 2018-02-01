@@ -24,15 +24,15 @@ class FolderStats private constructor(val fileCount: Long, val dirCount: Long, v
     fun describeSize(): String = FileUtils.byteCountToDisplaySize(size)
 
     fun dumpInfo(): String {
-        return ("folder " + label + " (" + folder + ") file count = " + fileCount
+        return ("folder " + label + " (" + folderId + ") file count = " + fileCount
                 + " dir count = " + dirCount + " folder size = " + describeSize() + " last update = " + lastUpdate)
     }
 
     override fun toString(): String {
-        return "FolderStats{folder=$folder, fileCount=$fileCount, dirCount=$dirCount, size=$size, lastUpdate=$lastUpdate}"
+        return "FolderStats{folder=$folderId, fileCount=$fileCount, dirCount=$dirCount, size=$size, lastUpdate=$lastUpdate}"
     }
 
-    fun copyBuilder(): Builder = Builder(fileCount, dirCount, size, folder, label)
+    fun copyBuilder(): Builder = Builder(fileCount, dirCount, size, folderId, label)
 
     class Builder {
 

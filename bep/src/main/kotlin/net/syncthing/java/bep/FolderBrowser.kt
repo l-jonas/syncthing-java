@@ -26,7 +26,7 @@ class FolderBrowser internal constructor(private val indexHandler: IndexHandler)
 
     fun folderInfoAndStatsList(): List<Pair<FolderInfo, FolderStats>> =
             indexHandler.folderInfoList()
-                    .map { folderInfo -> Pair(folderInfo, getFolderStats(folderInfo.folder)) }
+                    .map { folderInfo -> Pair(folderInfo, getFolderStats(folderInfo.folderId)) }
                     .sortedBy { it.first.label }
 
     init {
@@ -36,7 +36,7 @@ class FolderBrowser internal constructor(private val indexHandler: IndexHandler)
 
     private fun addFolderStats(folderStatsList: List<FolderStats>) {
         for (folderStats in folderStatsList) {
-            folderStatsCache.put(folderStats.folder, folderStats)
+            folderStatsCache.put(folderStats.folderId, folderStats)
         }
     }
 

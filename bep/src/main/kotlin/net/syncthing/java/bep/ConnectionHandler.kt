@@ -115,7 +115,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                 .build().toByteArray())
         markActivityOnSocket()
 
-        val hello = receiveHelloMessage()
+        receiveHelloMessage()
         try {
             keystoreHandler.checkSocketCerificate((socket as SSLSocket?)!!, address.deviceId())
         } catch (e: CertificateException) {
@@ -124,8 +124,10 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
         run {
             val clusterConfigBuilder = ClusterConfig.newBuilder()
-            for (folder in configuration.folderNames) {
-                val folderBuilder = Folder.newBuilder().setId(folder)
+            for (folder in configuration.folders) {
+                val folderBuilder = Folder.newBuilder()
+                        .setId(folder.folderId)
+                        .setLabel(folder.label)
                 run {
                     //our device
                     val deviceBuilder = Device.newBuilder()
@@ -138,7 +140,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                     //other device
                     val deviceBuilder = Device.newBuilder()
                             .setId(ByteString.copyFrom(DeviceId(address.deviceId).toHashData()))
-                    val indexSequenceInfo = indexHandler.indexRepository.findIndexInfoByDeviceAndFolder(address.deviceId(), folder)
+                    val indexSequenceInfo = indexHandler.indexRepository.findIndexInfoByDeviceAndFolder(address.deviceId(), folder.folderId)
                     indexSequenceInfo?.let {
                         deviceBuilder
                                 .setIndexId(indexSequenceInfo.indexId)
@@ -170,9 +172,9 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                 throw IOException("unable to retrieve cluster config from peer!")
             }
         }
-        for (folder in configuration.folderNames) {
-            if (hasFolder(folder)) {
-                sendIndexMessage(folder)
+        for (folder in configuration.folders) {
+            if (hasFolder(folder.folderId)) {
+                sendIndexMessage(folder.folderId)
             }
         }
         periodicExecutorService.scheduleWithFixedDelay({ this.sendPing() }, 90, 90, TimeUnit.SECONDS)
@@ -188,9 +190,9 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
         return blockPusher
     }
 
-    private fun sendIndexMessage(folder: String) {
+    private fun sendIndexMessage(folderId: String) {
         sendMessage(Index.newBuilder()
-                .setFolder(folder)
+                .setFolder(folderId)
                 .build())
     }
 
@@ -199,7 +201,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
     }
 
     @Throws(IOException::class)
-    private fun receiveHelloMessage(): BlockExchangeProtos.Hello {
+    private fun receiveHelloMessage() {
         logger.trace("receiving hello message")
         val magic = inputStream!!.readInt()
         NetworkUtils.assertProtocol(magic == MAGIC, {"magic mismatch, expected $MAGIC, got $magic"})
@@ -207,7 +209,8 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
         NetworkUtils.assertProtocol(length > 0, {"invalid lenght, must be >0, got $length"})
         val buffer = ByteArray(length)
         inputStream!!.readFully(buffer)
-        return BlockExchangeProtos.Hello.parseFrom(buffer)
+        val hello = BlockExchangeProtos.Hello.parseFrom(buffer)
+        logger.info("Received hello message, deviceName=${hello.deviceName}, clientName=${hello.clientName}, clientVersion=${hello.clientVersion}")
     }
 
     private fun sendHelloMessage(payload: ByteArray): Future<*> {
@@ -406,8 +409,9 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                                     if (ourDevice != null) {
                                         folderInfo.isShared = true
                                         logger.info("folder shared from device = {} folder = {}", address.deviceId, folderInfo)
-                                        if (!configuration.folderNames.contains(folderInfo.folder)) {
-                                            val fi = FolderInfo(folderInfo.folder, folderInfo.label)
+                                        val folderIds = configuration.folders.map { it.folderId }
+                                        if (!folderIds.contains(folderInfo.folderId)) {
+                                            val fi = FolderInfo(folderInfo.folderId, folderInfo.label)
                                             configuration.folders = configuration.folders + fi
                                             onNewFolderSharedListener(fi)
                                             logger.info("new folder shared = {}", folderInfo)
@@ -453,10 +457,10 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
         private val folderInfoById = ConcurrentHashMap<String, ClusterConfigFolderInfo>()
 
-        fun getSharedFolders(): Set<String> = folderInfoById.values.filter { it.isShared }.map { it.folder }.toSet()
+        fun getSharedFolders(): Set<String> = folderInfoById.values.filter { it.isShared }.map { it.folderId }.toSet()
 
         fun putFolderInfo(folderInfo: ClusterConfigFolderInfo) {
-            folderInfoById[folderInfo.folder] = folderInfo
+            folderInfoById[folderInfo.folderId] = folderInfo
         }
 
     }

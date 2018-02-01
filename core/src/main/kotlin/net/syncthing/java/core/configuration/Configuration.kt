@@ -6,12 +6,15 @@ import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.java.core.security.KeystoreHandler
 import org.bouncycastle.util.encoders.Base64
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.InetAddress
 import java.util.*
 
 class Configuration(configFolder: File = DefaultConfigFolder,
                     val cacheFolder: File = File(System.getProperty("java.io.tmpdir"), "syncthing_lite_cache")) {
+
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     private data class Config(
             val peers: Set<DeviceInfo>,
@@ -52,7 +55,7 @@ class Configuration(configFolder: File = DefaultConfigFolder,
         } else {
             config = Gson.fromJson(configFile.readText(), Config::class.java)
         }
-
+        logger.debug("Loaded config = $config")
     }
 
     companion object {
@@ -82,9 +85,6 @@ class Configuration(configFolder: File = DefaultConfigFolder,
     val clientName = "syncthing-java"
 
     val clientVersion = javaClass.`package`.implementationVersion ?: "0.0.0"
-
-    val folderNames: Set<String>
-        get() = config.folders.map { it.label }.toSet()
 
     val peerIds: Set<DeviceId>
         get() = config.peers.map { it.deviceId }.toSet()

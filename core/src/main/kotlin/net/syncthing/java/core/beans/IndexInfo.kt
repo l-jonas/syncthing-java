@@ -23,11 +23,11 @@ class IndexInfo private constructor(folder: String, val deviceId: String, val in
     }
 
     fun copyBuilder(): Builder {
-        return Builder(folder, indexId, deviceId, localSequence, maxSequence)
+        return Builder(folderId, indexId, deviceId, localSequence, maxSequence)
     }
 
     override fun toString(): String {
-        return "FolderIndexInfo{indexId=$indexId, folder=$folder, deviceId=$deviceId, localSequence=$localSequence, maxSequence=$maxSequence}"
+        return "FolderIndexInfo{indexId=$indexId, folder=$folderId, deviceId=$deviceId, localSequence=$localSequence, maxSequence=$maxSequence}"
     }
 
     class Builder {

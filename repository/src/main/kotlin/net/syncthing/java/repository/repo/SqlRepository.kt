@@ -200,7 +200,7 @@ class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, DeviceAd
             connection.prepareStatement("MERGE INTO folder_index_info"
                     + " (folder,device_id,index_id,local_sequence,max_sequence)"
                     + " VALUES (?,?,?,?,?)").use { prepareStatement ->
-                prepareStatement.setString(1, indexInfo.folder)
+                prepareStatement.setString(1, indexInfo.folderId)
                 prepareStatement.setString(2, indexInfo.deviceId)
                 prepareStatement.setLong(3, indexInfo.indexId)
                 prepareStatement.setLong(4, indexInfo.localSequence)
@@ -599,7 +599,7 @@ class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, DeviceAd
         connection.prepareStatement("MERGE INTO folder_stats"
                 + " (folder,file_count,dir_count,size,last_update)"
                 + " VALUES (?,?,?,?,?)").use { prepareStatement ->
-            prepareStatement.setString(1, folderStats.folder)
+            prepareStatement.setString(1, folderStats.folderId)
             prepareStatement.setLong(2, folderStats.fileCount)
             prepareStatement.setLong(3, folderStats.dirCount)
             prepareStatement.setLong(4, folderStats.size)

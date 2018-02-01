@@ -13,16 +13,16 @@
  */
 package net.syncthing.java.core.beans
 
-open class FolderInfo constructor(val folder: String, label: String? = null) {
+open class FolderInfo(val folderId: String, label: String? = null) {
     val label: String
 
     init {
-        assert(!folder.isEmpty())
-        this.label = if (label != null && !label.isEmpty()) label else folder
+        assert(!folderId.isEmpty())
+        this.label = if (label != null && !label.isEmpty()) label else folderId
     }
 
     override fun toString(): String {
-        return "FolderInfo{folder=$folder, label=$label}"
+        return "FolderInfo(folderId=$folderId, label=$label)"
     }
 
 }

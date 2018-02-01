@@ -80,7 +80,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
     private fun loadFolderInfoFromConfig() {
         synchronized(writeAccessLock) {
             for (folderInfo in configuration.folders) {
-                folderInfoByFolder.put(folderInfo.folder, folderInfo) //TODO reference 'folder info' repository
+                folderInfoByFolder.put(folderInfo.folderId, folderInfo) //TODO reference 'folder info' repository
             }
         }
     }
@@ -242,7 +242,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
         var folderInfo: FolderInfo? = folderInfoByFolder[folder]
         if (folderInfo == null || !TextUtils.isEmpty(label)) {
             folderInfo = FolderInfo(folder, label)
-            folderInfoByFolder.put(folderInfo.folder, folderInfo)
+            folderInfoByFolder.put(folderInfo.folderId, folderInfo)
         }
         return folderInfo
     }

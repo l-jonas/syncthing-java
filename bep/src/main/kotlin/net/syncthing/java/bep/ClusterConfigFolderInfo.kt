@@ -13,11 +13,11 @@
  */
 package net.syncthing.java.bep
 
-internal data class ClusterConfigFolderInfo(val folder: String, var label: String = folder,
+internal data class ClusterConfigFolderInfo(val folderId: String, var label: String = folderId,
                                             var isAnnounced: Boolean = false, var isShared: Boolean = false) {
 
     init {
-        assert(folder.isNotEmpty())
+        assert(folderId.isNotEmpty())
     }
 
 }
