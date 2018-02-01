@@ -13,7 +13,7 @@
  */
 package net.syncthing.java.client
 
-import net.syncthing.java.bep.BlockExchangeConnectionHandler
+import net.syncthing.java.bep.ConnectionHandler
 import net.syncthing.java.bep.BlockPuller.FileDownloadObserver
 import net.syncthing.java.bep.BlockPusher
 import net.syncthing.java.bep.BlockPusher.FileUploadObserver
@@ -41,7 +41,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     val discoveryHandler: DiscoveryHandler
     private val sqlRepository = SqlRepository(configuration.databaseFolder)
     val indexHandler: IndexHandler
-    private val connections = Collections.synchronizedList(mutableListOf<BlockExchangeConnectionHandler>())
+    private val connections = Collections.synchronizedList(mutableListOf<ConnectionHandler>())
     val devicesHandler: DevicesHandler
 
     init {
@@ -59,9 +59,9 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     }
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
-    private fun openConnection(deviceAddress: DeviceAddress): BlockExchangeConnectionHandler {
+    private fun openConnection(deviceAddress: DeviceAddress): ConnectionHandler {
         val shouldRestartForNewFolder = AtomicBoolean(false)
-        val connectionHandler = BlockExchangeConnectionHandler(
+        val connectionHandler = ConnectionHandler(
                 configuration, deviceAddress, indexHandler, devicesHandler::handleDeviceAddressActiveEvent,
                 { shouldRestartForNewFolder.set(true) },
                 { connections.remove(it)})
@@ -77,7 +77,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     }
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
-    private fun getDeviceConnection(address: DeviceAddress): BlockExchangeConnectionHandler {
+    private fun getDeviceConnection(address: DeviceAddress): ConnectionHandler {
         for (c in connections) {
             if (c.address.deviceId == address.deviceId) {
                 return c
@@ -86,7 +86,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         return openConnection(address)
     }
 
-    private fun getConnectionForFolder(folder: String, listener: (connection: BlockExchangeConnectionHandler) -> Unit,
+    private fun getConnectionForFolder(folder: String, listener: (connection: ConnectionHandler) -> Unit,
                                        errorListener: () -> Unit) {
         val isConnected = AtomicBoolean(false)
         getPeerConnections({ connection ->
@@ -104,7 +104,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     }
 
     // TODO: should get rid of this and just have getDeviceConnection() connect to single device
-    private fun getPeerConnections(listener: (connection: BlockExchangeConnectionHandler) -> Unit, completeListener: () -> Unit) {
+    private fun getPeerConnections(listener: (connection: ConnectionHandler) -> Unit, completeListener: () -> Unit) {
         Thread {
             val addressesSupplier = discoveryHandler.newDeviceAddressSupplier()
             val connectedDevices = mutableSetOf<String>()

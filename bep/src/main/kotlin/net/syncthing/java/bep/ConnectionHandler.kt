@@ -43,11 +43,11 @@ import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLSocket
 
-class BlockExchangeConnectionHandler(private val configuration: Configuration, val address: DeviceAddress,
-                                     private val indexHandler: IndexHandler,
-                                     private val onDeviceAddressActiveListener: (DeviceId) -> Unit,
-                                     private val onNewFolderSharedListener: (FolderInfo) -> Unit,
-                                     private val onConnectionClosedListener: (BlockExchangeConnectionHandler) -> Unit) : Closeable {
+class ConnectionHandler(private val configuration: Configuration, val address: DeviceAddress,
+                        private val indexHandler: IndexHandler,
+                        private val onDeviceAddressActiveListener: (DeviceId) -> Unit,
+                        private val onNewFolderSharedListener: (FolderInfo) -> Unit,
+                        private val onConnectionClosedListener: (ConnectionHandler) -> Unit) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -83,7 +83,7 @@ class BlockExchangeConnectionHandler(private val configuration: Configuration, v
     }
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
-    fun connect(): BlockExchangeConnectionHandler {
+    fun connect(): ConnectionHandler {
         checkNotClosed()
         assert(socket == null && !isConnected, {"already connected!"})
         logger.info("connecting to {}", address.address)
@@ -116,7 +116,6 @@ class BlockExchangeConnectionHandler(private val configuration: Configuration, v
         markActivityOnSocket()
 
         val hello = receiveHelloMessage()
-        logger.trace("received hello message = {}", hello)
         try {
             keystoreHandler.checkSocketCerificate((socket as SSLSocket?)!!, address.deviceId())
         } catch (e: CertificateException) {
@@ -208,7 +207,6 @@ class BlockExchangeConnectionHandler(private val configuration: Configuration, v
         NetworkUtils.assertProtocol(length > 0, {"invalid lenght, must be >0, got $length"})
         val buffer = ByteArray(length)
         inputStream!!.readFully(buffer)
-        logger.trace("received hello message")
         return BlockExchangeProtos.Hello.parseFrom(buffer)
     }
 
@@ -222,7 +220,6 @@ class BlockExchangeConnectionHandler(private val configuration: Configuration, v
                 outputStream!!.write(header.array())
                 outputStream!!.write(payload)
                 outputStream!!.flush()
-                logger.trace("sent message")
             } catch (ex: IOException) {
                 if (outExecutorService.isShutdown) {
                     return@submitLogging
@@ -294,7 +291,6 @@ class BlockExchangeConnectionHandler(private val configuration: Configuration, v
         return outExecutorService.submit<Any> {
             try {
                 logger.debug("sending message type = {} {}", header.type, getIdForMessage(message))
-                logger.trace("sending message = {}", message)
                 markActivityOnSocket()
                 outputStream!!.writeShort(headerData.size)
                 outputStream!!.write(headerData)
@@ -302,7 +298,6 @@ class BlockExchangeConnectionHandler(private val configuration: Configuration, v
                 outputStream!!.write(messageData)
                 outputStream!!.flush()
                 markActivityOnSocket()
-                logger.debug("sent message {}", getIdForMessage(message))
             } catch (ex: IOException) {
                 if (!outExecutorService.isShutdown) {
                     logger.error("error writing to output stream", ex)
@@ -366,10 +361,8 @@ class BlockExchangeConnectionHandler(private val configuration: Configuration, v
             try {
                 while (!Thread.interrupted()) {
                     val message = receiveMessage()
-                    logger.debug("received message type = {} {}", message.left, getIdForMessage(message.right))
-                    logger.trace("received message = {}", message.right)
                     messageProcessingService.submitLogging {
-                        logger.debug("processing message type = {} {}", message.left, getIdForMessage(message.right))
+                        logger.debug("received message type = {} {}", message.left, getIdForMessage(message.right))
                         when (message.left) {
                             BlockExchangeProtos.MessageType.INDEX -> {
                                 val index = message.value as Index
@@ -391,7 +384,8 @@ class BlockExchangeConnectionHandler(private val configuration: Configuration, v
                             }
                             BlockExchangeProtos.MessageType.PING -> logger.debug("ping message received")
                             BlockExchangeProtos.MessageType.CLOSE -> {
-                                logger.info("received close message = {}", message.value)
+                                val close = message.value as BlockExchangeProtos.Close
+                                logger.info("received close message, reason=${close.reason}")
                                 closeBg()
                             }
                             BlockExchangeProtos.MessageType.CLUSTER_CONFIG -> {
@@ -452,7 +446,7 @@ class BlockExchangeConnectionHandler(private val configuration: Configuration, v
     }
 
     override fun toString(): String {
-        return "BlockExchangeConnectionHandler{" + "address=" + address + ", lastActive=" + getLastActive() / 1000.0 + "secs ago}"
+        return "ConnectionHandler{" + "address=" + address + ", lastActive=" + getLastActive() / 1000.0 + "secs ago}"
     }
 
     internal inner class ClusterConfigInfo {

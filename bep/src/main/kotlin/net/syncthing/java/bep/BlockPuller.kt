@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 class BlockPuller internal constructor(configuration: Configuration,
-                                       private val connectionHandler: BlockExchangeConnectionHandler) {
+                                       private val connectionHandler: ConnectionHandler) {
 
     private val blockCache = BlockCache.getBlockCache(configuration)
     private val logger = LoggerFactory.getLogger(javaClass)

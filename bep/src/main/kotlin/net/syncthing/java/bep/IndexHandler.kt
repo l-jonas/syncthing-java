@@ -94,7 +94,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
         }
     }
 
-    internal fun isRemoteIndexAquired(clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo, peerDeviceId: DeviceId): Boolean {
+    internal fun isRemoteIndexAquired(clusterConfigInfo: ConnectionHandler.ClusterConfigInfo, peerDeviceId: DeviceId): Boolean {
         var ready = true
         for (folder in clusterConfigInfo.getSharedFolders()) {
             val indexSequenceInfo = indexRepository.findIndexInfoByDeviceAndFolder(peerDeviceId, folder)
@@ -107,7 +107,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
     }
 
     @Throws(InterruptedException::class)
-    fun waitForRemoteIndexAquired(connectionHandler: BlockExchangeConnectionHandler, timeoutSecs: Long? = null): IndexHandler {
+    fun waitForRemoteIndexAquired(connectionHandler: ConnectionHandler, timeoutSecs: Long? = null): IndexHandler {
         val timeoutMillis = (timeoutSecs ?: DEFAULT_INDEX_TIMEOUT) * 1000
         synchronized(indexWaitLock) {
             while (!isRemoteIndexAquired(connectionHandler.clusterConfigInfo!!, connectionHandler.deviceId())) {
@@ -137,7 +137,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
         }
     }
 
-    fun handleIndexMessageReceivedEvent(folderId: String, filesList: List<BlockExchangeProtos.FileInfo>, connectionHandler: BlockExchangeConnectionHandler) {
+    fun handleIndexMessageReceivedEvent(folderId: String, filesList: List<BlockExchangeProtos.FileInfo>, connectionHandler: ConnectionHandler) {
         indexMessageProcessor.handleIndexMessageReceivedEvent(folderId, filesList, connectionHandler)
     }
 
@@ -289,7 +289,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
         //        private final int MIN_DELAY = 0, MAX_DELAY = 5000, MAX_RECORD_PER_PROCESS = 16, DELAY_FACTOR = 1;
         private var startTime: Long? = null
 
-        fun handleIndexMessageReceivedEvent(folderId: String, filesList: List<BlockExchangeProtos.FileInfo>, connectionHandler: BlockExchangeConnectionHandler) {
+        fun handleIndexMessageReceivedEvent(folderId: String, filesList: List<BlockExchangeProtos.FileInfo>, connectionHandler: ConnectionHandler) {
             logger.info("received index message event, preparing (queued records = {} event record count = {})", queuedRecords, filesList.size)
             markActive()
             val clusterConfigInfo = connectionHandler.clusterConfigInfo
@@ -317,7 +317,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
             }
         }
 
-        private fun processBg(data: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
+        private fun processBg(data: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: ConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
             logger.debug("received index message event, queuing for processing")
             queuedMessages++
             queuedRecords += data.filesCount.toLong()
@@ -328,7 +328,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
             })
         }
 
-        private fun storeAndProcessBg(data: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
+        private fun storeAndProcessBg(data: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: ConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
             val key = tempRepository.pushTempData(data.toByteArray())
             logger.debug("received index message event, stored to temp record {}, queuing for processing", key)
             queuedMessages++
@@ -366,7 +366,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
             //            return fileSequence < localSequence;
             //        }
             @Throws(IOException::class)
-            protected fun doHandleIndexMessageReceivedEvent(key: String, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
+            protected fun doHandleIndexMessageReceivedEvent(key: String, clusterConfigInfo: ConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
                 logger.debug("processing index message event from temp record {}", key)
                 markActive()
                 val data = tempRepository.popTempData(key)
@@ -374,7 +374,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
                 doHandleIndexMessageReceivedEvent(message, clusterConfigInfo, peerDeviceId)
             }
 
-            protected fun doHandleIndexMessageReceivedEvent(message: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: BlockExchangeConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
+            protected fun doHandleIndexMessageReceivedEvent(message: BlockExchangeProtos.IndexUpdate, clusterConfigInfo: ConnectionHandler.ClusterConfigInfo?, peerDeviceId: DeviceId) {
                 //            synchronized (writeAccessLock) {
                 //                if (addProcessingDelayForInterface) {
                 //                    delay = Math.min(MAX_DELAY, Math.max(MIN_DELAY, lastRecordProcessingTime * DELAY_FACTOR));

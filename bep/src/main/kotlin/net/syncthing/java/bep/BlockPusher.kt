@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class BlockPusher internal constructor(private val configuration: Configuration,
-                                       private val connectionHandler: BlockExchangeConnectionHandler,
+                                       private val connectionHandler: ConnectionHandler,
                                        private val indexHandler: IndexHandler) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
