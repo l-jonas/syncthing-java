@@ -13,10 +13,10 @@
  */
 package net.syncthing.java.client
 
-import net.syncthing.java.bep.ConnectionHandler
 import net.syncthing.java.bep.BlockPuller.FileDownloadObserver
 import net.syncthing.java.bep.BlockPusher
 import net.syncthing.java.bep.BlockPusher.FileUploadObserver
+import net.syncthing.java.bep.ConnectionHandler
 import net.syncthing.java.bep.IndexHandler
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
@@ -25,6 +25,7 @@ import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.cache.BlockCache
 import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.security.KeystoreHandler
+import net.syncthing.java.core.utils.awaitTerminationSafe
 import net.syncthing.java.discovery.DiscoveryHandler
 import net.syncthing.java.repository.repo.SqlRepository
 import org.slf4j.LoggerFactory
@@ -32,6 +33,9 @@ import java.io.Closeable
 import java.io.IOException
 import java.io.InputStream
 import java.util.Collections
+import java.util.TreeSet
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.collections.ArrayList
 
@@ -40,14 +44,16 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     private val logger = LoggerFactory.getLogger(javaClass)
     val discoveryHandler: DiscoveryHandler
     private val sqlRepository = SqlRepository(configuration.databaseFolder)
+    // TODO: use treeset that puts smallest score first
     val indexHandler: IndexHandler
     private val connections = Collections.synchronizedList(mutableListOf<ConnectionHandler>())
     private val onConnectionChangedListeners = Collections.synchronizedList(mutableListOf<(DeviceId) -> Unit>())
+    private var connectDevicesScheduler = Executors.newSingleThreadScheduledExecutor()
 
     init {
         indexHandler = IndexHandler(configuration, sqlRepository, sqlRepository)
         discoveryHandler = DiscoveryHandler(configuration, sqlRepository)
-        updateIndexFromPeers()
+        connectDevicesScheduler.scheduleAtFixedRate(this::updateIndexFromPeers, 0, 15, TimeUnit.SECONDS)
     }
 
     fun clearCacheAndIndex() {
@@ -73,7 +79,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         val shouldRestartForNewFolder = AtomicBoolean(false)
         val connectionHandler = ConnectionHandler(
                 configuration, deviceAddress, indexHandler, { shouldRestartForNewFolder.set(true) },
-                {connection ->
+                { connection ->
                     connections.remove(connection)
                     onConnectionChangedListeners.forEach { it(connection.deviceId()) }
                 })
@@ -141,6 +147,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         }.start()
     }
 
+    // TODO: need to untangle connection stuff, connections often fail silently
     private fun updateIndexFromPeers() {
         getPeerConnections({ connection ->
             try {
@@ -151,6 +158,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         }, {})
     }
 
+    // TODO: should just have methods getBlockPusher/getBlockPuller(folder)
     fun pullFile(fileInfo: FileInfo, listener: (fileDownloadObserver: FileDownloadObserver) -> Unit,
                  errorListener: () -> Unit) {
         getConnectionForFolder(fileInfo.folder, { connection ->
@@ -213,6 +221,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     }
 
     override fun close() {
+        connectDevicesScheduler.awaitTerminationSafe()
         discoveryHandler.close()
         // Create copy of list, because it will be modified by handleConnectionClosedEvent(), causing ConcurrentModificationException.
         ArrayList(connections).forEach{it.close()}
