@@ -94,7 +94,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
         }
     }
 
-    internal fun isRemoteIndexAquired(clusterConfigInfo: ConnectionHandler.ClusterConfigInfo, peerDeviceId: DeviceId): Boolean {
+    internal fun isRemoteIndexAcquired(clusterConfigInfo: ConnectionHandler.ClusterConfigInfo, peerDeviceId: DeviceId): Boolean {
         var ready = true
         for (folder in clusterConfigInfo.getSharedFolders()) {
             val indexSequenceInfo = indexRepository.findIndexInfoByDeviceAndFolder(peerDeviceId, folder)
@@ -107,10 +107,10 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
     }
 
     @Throws(InterruptedException::class)
-    fun waitForRemoteIndexAquired(connectionHandler: ConnectionHandler, timeoutSecs: Long? = null): IndexHandler {
+    fun waitForRemoteIndexAcquired(connectionHandler: ConnectionHandler, timeoutSecs: Long? = null): IndexHandler {
         val timeoutMillis = (timeoutSecs ?: DEFAULT_INDEX_TIMEOUT) * 1000
         synchronized(indexWaitLock) {
-            while (!isRemoteIndexAquired(connectionHandler.clusterConfigInfo!!, connectionHandler.deviceId())) {
+            while (!isRemoteIndexAcquired(connectionHandler.clusterConfigInfo!!, connectionHandler.deviceId())) {
                 indexWaitLock.wait(timeoutMillis)
                 NetworkUtils.assertProtocol(connectionHandler.getLastActive() < timeoutMillis || lastActive() < timeoutMillis,
                         {"unable to aquire index from connection $connectionHandler, timeout reached!"})
@@ -423,7 +423,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
                     onIndexRecordAcquiredListeners.forEach { it(folderInfo!!, newRecords, newIndexInfo) }
                 }
                 logger.debug("index info = {}", newIndexInfo)
-                if (isRemoteIndexAquired(clusterConfigInfo!!, peerDeviceId)) {
+                if (isRemoteIndexAcquired(clusterConfigInfo!!, peerDeviceId)) {
                     logger.debug("index aquired")
                     onFullIndexAcquiredListeners.forEach { it(folderInfo!!)}
                 }

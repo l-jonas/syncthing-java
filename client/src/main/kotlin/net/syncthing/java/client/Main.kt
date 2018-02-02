@@ -171,7 +171,6 @@ class Main(private val commandLine: CommandLine) {
                 System.out.println("uploaded dir to network")
             }
             "L" -> {
-                updateIndex(syncthingClient)
                 for (folder in syncthingClient.indexHandler.folderList()) {
                     syncthingClient.indexHandler.newIndexBrowser(folder).use { indexBrowser ->
                         System.out.println("list folder = ${indexBrowser.folder}")
@@ -182,7 +181,6 @@ class Main(private val commandLine: CommandLine) {
                 }
             }
             "I" -> {
-                updateIndex(syncthingClient)
                 val folderInfo = StringBuilder()
                 for (folder in syncthingClient.indexHandler.folderList()) {
                     folderInfo.append("\nfolder info: ")
@@ -211,19 +209,4 @@ class Main(private val commandLine: CommandLine) {
             }
         }
     }
-
-    @Throws(InterruptedException::class)
-    private fun updateIndex(client: SyncthingClient) {
-        val latch = CountDownLatch(1)
-        client.updateIndexFromPeers { _, failures ->
-            if (failures.isEmpty()) {
-                System.out.println("Index update successful for all peers")
-            } else {
-                System.out.println("Index update failed for devices: $failures")
-            }
-            latch.countDown()
-        }
-        latch.await()
-    }
-
 }

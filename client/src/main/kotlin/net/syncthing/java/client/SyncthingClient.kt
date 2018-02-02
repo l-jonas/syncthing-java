@@ -42,10 +42,12 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     private val sqlRepository = SqlRepository(configuration.databaseFolder)
     val indexHandler: IndexHandler
     private val connections = Collections.synchronizedList(mutableListOf<ConnectionHandler>())
+    private val onConnectionChangedListeners = Collections.synchronizedList(mutableListOf<(DeviceId) -> Unit>())
 
     init {
         indexHandler = IndexHandler(configuration, sqlRepository, sqlRepository)
         discoveryHandler = DiscoveryHandler(configuration, sqlRepository)
+        updateIndexFromPeers()
     }
 
     fun clearCacheAndIndex() {
@@ -54,6 +56,16 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         configuration.folders = emptySet()
         configuration.persistLater()
         BlockCache.getBlockCache(configuration).clear()
+        updateIndexFromPeers()
+    }
+
+    fun addOnConnectionChangedListener(listener: (DeviceId) -> Unit) {
+        onConnectionChangedListeners.add(listener)
+    }
+
+    fun removeOnConnectionChangedListener(listener: (DeviceId) -> Unit) {
+        assert(onConnectionChangedListeners.contains(listener))
+        onConnectionChangedListeners.remove(listener)
     }
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
@@ -61,7 +73,10 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         val shouldRestartForNewFolder = AtomicBoolean(false)
         val connectionHandler = ConnectionHandler(
                 configuration, deviceAddress, indexHandler, { shouldRestartForNewFolder.set(true) },
-                { connections.remove(it)})
+                {connection ->
+                    connections.remove(connection)
+                    onConnectionChangedListeners.forEach { it(connection.deviceId()) }
+                })
         connectionHandler.connect()
         connections.add(connectionHandler)
         return if (shouldRestartForNewFolder.get()) {
@@ -80,7 +95,9 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
                 return c
             }
         }
-        return openConnection(address)
+        val openedConnection = openConnection(address)
+        onConnectionChangedListeners.forEach { it(openedConnection.deviceId()) }
+        return openedConnection
     }
 
     private fun getConnectionForFolder(folder: String, listener: (connection: ConnectionHandler) -> Unit,
@@ -124,29 +141,21 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         }.start()
     }
 
-    fun updateIndexFromPeers(listener: (successes: Set<DeviceId>, failures: Set<DeviceId>) -> Unit) {
-        // TODO: if there is already an index update in progress, do nothing
-        //       this should probably be handled in IndexHandler
-        //       at the moment, this is handled on the Android side
-        val indexUpdateComplete = mutableSetOf<DeviceId>()
+    private fun updateIndexFromPeers() {
         getPeerConnections({ connection ->
             try {
-                indexHandler.waitForRemoteIndexAquired(connection)
-                indexUpdateComplete.add(connection.deviceId())
+                indexHandler.waitForRemoteIndexAcquired(connection)
             } catch (ex: InterruptedException) {
                 logger.warn("exception while waiting for index", ex)
             }
-        }, {
-            val indexUpdateFailed = configuration.peerIds - indexUpdateComplete
-            listener(indexUpdateComplete, indexUpdateFailed)
-        })
+        }, {})
     }
 
     fun pullFile(fileInfo: FileInfo, listener: (fileDownloadObserver: FileDownloadObserver) -> Unit,
                  errorListener: () -> Unit) {
         getConnectionForFolder(fileInfo.folder, { connection ->
             try {
-                val fileInfoAndBlocks = indexHandler.waitForRemoteIndexAquired(connection).getFileInfoAndBlocksByPath(fileInfo.folder, fileInfo.path)
+                val fileInfoAndBlocks = indexHandler.waitForRemoteIndexAcquired(connection).getFileInfoAndBlocksByPath(fileInfo.folder, fileInfo.path)
                         ?: error("file not found in local index for folder = ${fileInfo.folder} path = ${fileInfo.path}")
                 val observer = connection.getBlockPuller().pullBlocks(fileInfoAndBlocks.value)
                 listener(observer)
@@ -162,7 +171,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         getConnectionForFolder(folder, { connection ->
             try {
                 val pusher = connection.getBlockPusher()
-                val fileInfo = indexHandler.waitForRemoteIndexAquired(connection).getFileInfoByPath(folder, path)
+                val fileInfo = indexHandler.waitForRemoteIndexAcquired(connection).getFileInfoByPath(folder, path)
                 val observer = pusher.pushFile(data, fileInfo, folder, path)
                 listener(observer)
             } catch (e: InterruptedException) {
@@ -186,7 +195,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         getConnectionForFolder(folder, { connection ->
             try {
                 val pusher = connection.getBlockPusher()
-                val fileInfo = indexHandler.waitForRemoteIndexAquired(connection).getFileInfoByPath(folder, path)
+                val fileInfo = indexHandler.waitForRemoteIndexAcquired(connection).getFileInfoByPath(folder, path)
                 val observer = pusher.pushDelete(fileInfo!!, folder, path)
                 listener(observer)
             } catch (e: InterruptedException) {
@@ -209,6 +218,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         ArrayList(connections).forEach{it.close()}
         indexHandler.close()
         sqlRepository.close()
+        assert(onConnectionChangedListeners.isEmpty())
     }
 
 }
