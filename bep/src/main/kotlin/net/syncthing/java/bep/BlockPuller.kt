@@ -16,8 +16,7 @@ package net.syncthing.java.bep
 import com.google.protobuf.ByteString
 import net.syncthing.java.bep.BlockExchangeProtos.ErrorCode
 import net.syncthing.java.bep.BlockExchangeProtos.Request
-import net.syncthing.java.core.beans.FileBlocks
-import net.syncthing.java.core.configuration.Configuration
+import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.io.FileUtils
 import org.bouncycastle.util.encoders.Hex
@@ -28,7 +27,8 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-class BlockPuller internal constructor(private val connectionHandler: ConnectionHandler) {
+class BlockPuller internal constructor(private val connectionHandler: ConnectionHandler,
+                                       private val indexHandler: IndexHandler) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private val blocksByHash = ConcurrentHashMap<String, ByteArray>()
@@ -37,7 +37,11 @@ class BlockPuller internal constructor(private val connectionHandler: Connection
     private val requestIds: MutableSet<Int> = Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
     private val lock = Object()
 
-    fun pullBlocks(fileBlocks: FileBlocks): FileDownloadObserver {
+    fun pullFile(fileInfo: FileInfo): FileDownloadObserver {
+        val fileBlocks = indexHandler.waitForRemoteIndexAcquired(connectionHandler)
+                .getFileInfoAndBlocksByPath(fileInfo.folder, fileInfo.path)
+                ?.value
+                ?: throw IOException("file not found in local index for folder = ${fileInfo.folder} path = ${fileInfo.path}")
         logger.info("pulling file = {}", fileBlocks)
         NetworkUtils.assertProtocol(connectionHandler.hasFolder(fileBlocks.folder), {"supplied connection handler $connectionHandler will not share folder ${fileBlocks.folder}"})
         val error = AtomicReference<Exception>()

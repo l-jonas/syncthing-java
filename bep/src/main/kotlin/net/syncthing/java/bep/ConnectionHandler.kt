@@ -45,7 +45,7 @@ import javax.net.ssl.SSLSocket
 
 class ConnectionHandler(private val configuration: Configuration, val address: DeviceAddress,
                         private val indexHandler: IndexHandler,
-                        private val onNewFolderSharedListener: (FolderInfo) -> Unit,
+                        private val onNewFolderSharedListener: (ConnectionHandler, FolderInfo) -> Unit,
                         private val onConnectionClosedListener: (ConnectionHandler) -> Unit) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -54,13 +54,13 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
     private val inExecutorService = Executors.newSingleThreadExecutor()
     private val messageProcessingService = Executors.newCachedThreadPool()
     private val periodicExecutorService = Executors.newSingleThreadScheduledExecutor()
-    private var socket: Socket? = null
+    private var socket: SSLSocket? = null
     private var inputStream: DataInputStream? = null
     private var outputStream: DataOutputStream? = null
     private var lastActive = Long.MIN_VALUE
     internal var clusterConfigInfo: ClusterConfigInfo? = null
     private val clusterConfigWaitingLock = Object()
-    private val blockPuller = BlockPuller(this)
+    private val blockPuller = BlockPuller(this, indexHandler)
     private val blockPusher = BlockPusher(configuration.localDeviceId, this, indexHandler)
     private val onRequestMessageReceivedListeners = mutableSetOf<(Request) -> Unit>()
     private var isClosed = false
@@ -104,8 +104,8 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
             }
             else -> throw UnsupportedOperationException("unsupported address type = " + address.getType())
         }
-        inputStream = DataInputStream(socket!!.getInputStream())
-        outputStream = DataOutputStream(socket!!.getOutputStream())
+        inputStream = DataInputStream(socket!!.inputStream)
+        outputStream = DataOutputStream(socket!!.outputStream)
 
         sendHelloMessage(BlockExchangeProtos.Hello.newBuilder()
                 .setClientName(configuration.clientName)
@@ -116,7 +116,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
         receiveHelloMessage()
         try {
-            keystoreHandler.checkSocketCerificate((socket as SSLSocket?)!!, address.deviceId())
+            keystoreHandler.checkSocketCertificate(socket!!, address.deviceId())
         } catch (e: CertificateException) {
             throw IOException(e)
         }
@@ -165,7 +165,6 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                 } catch (e: InterruptedException) {
                     throw IOException(e)
                 }
-
             }
             if (clusterConfigInfo == null) {
                 throw IOException("unable to retrieve cluster config from peer!")
@@ -408,7 +407,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                                         if (!folderIds.contains(folderInfo.folderId)) {
                                             val fi = FolderInfo(folderInfo.folderId, folderInfo.label)
                                             configuration.folders = configuration.folders + fi
-                                            onNewFolderSharedListener(fi)
+                                            onNewFolderSharedListener(this, fi)
                                             logger.info("new folder shared = {}", folderInfo)
                                         }
                                     } else {

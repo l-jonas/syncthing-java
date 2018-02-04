@@ -17,7 +17,6 @@ import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.configuration.Configuration
-import net.syncthing.java.core.security.KeystoreHandler
 import org.apache.commons.cli.*
 import org.apache.commons.io.FileUtils
 import org.slf4j.LoggerFactory
@@ -90,17 +89,18 @@ class Main(private val commandLine: CommandLine) {
                 val path = folderAndPath.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
                 val latch = CountDownLatch(1)
                 val fileInfo = FileInfo(folder = folder, path = path, type = FileInfo.FileType.FILE)
-                syncthingClient.pullFile(fileInfo, { observer ->
+                syncthingClient.getBlockPuller(folder, { blockPuller ->
                     try {
+                        val observer = blockPuller.pullFile(fileInfo)
                         val inputStream = observer.waitForComplete().inputStream()
                         val fileName = syncthingClient.indexHandler.getFileInfoByPath(folder, path)!!.fileName
                         val file  =
-                            if (commandLine.hasOption("o")) {
-                                val param = File(commandLine.getOptionValue("o"))
-                                if (param.isDirectory) File(param, fileName) else param
-                            } else {
-                                File(fileName)
-                            }
+                                if (commandLine.hasOption("o")) {
+                                    val param = File(commandLine.getOptionValue("o"))
+                                    if (param.isDirectory) File(param, fileName) else param
+                                } else {
+                                    File(fileName)
+                                }
                         FileUtils.copyInputStreamToFile(inputStream, file)
                         System.out.println("saved file to = $file.absolutePath")
                     } catch (e: InterruptedException) {
@@ -108,7 +108,7 @@ class Main(private val commandLine: CommandLine) {
                     } catch (e: IOException) {
                         logger.warn("", e)
                     }
-                }) { logger.warn("Failed to pull file") }
+                }, { logger.warn("Failed to pull file") })
                 latch.await()
             }
             "P" -> {
@@ -119,18 +119,19 @@ class Main(private val commandLine: CommandLine) {
                 val folder = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
                 path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
                 val latch = CountDownLatch(1)
-                syncthingClient.pushFile(FileInputStream(file), folder, path, { fileUploadObserver ->
-                    while (!fileUploadObserver.isCompleted()) {
+                syncthingClient.getBlockPusher(folder, { blockPusher ->
+                    val observer = blockPusher.pushFile(FileInputStream(file), folder, path)
+                    while (!observer.isCompleted()) {
                         try {
-                            fileUploadObserver.waitForProgressUpdate()
+                            observer.waitForProgressUpdate()
                         } catch (e: InterruptedException) {
                             logger.warn("", e)
                         }
 
-                        System.out.println("upload progress ${fileUploadObserver.progressPercentage()}%")
+                        System.out.println("upload progress ${observer.progressPercentage()}%")
                     }
                     latch.countDown()
-                }) { logger.warn("Failed to upload file") }
+                }, { logger.warn("Failed to upload file") })
                 latch.await()
                 System.out.println("uploaded file to network")
             }
@@ -140,15 +141,15 @@ class Main(private val commandLine: CommandLine) {
                 path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
                 System.out.println("delete path = $path")
                 val latch = CountDownLatch(1)
-                syncthingClient.pushDelete(folder, path, { observer ->
+                syncthingClient.getBlockPusher(folder, { blockPusher ->
                     try {
-                        observer.waitForComplete()
+                        blockPusher.pushDelete(folder, path).waitForComplete()
                     } catch (e: InterruptedException) {
                         logger.warn("", e)
                     }
 
                     latch.countDown()
-                }) { System.out.println("Failed to delete path") }
+                }, { System.out.println("Failed to delete path") })
                 latch.await()
                 System.out.println("deleted path")
             }
@@ -158,19 +159,20 @@ class Main(private val commandLine: CommandLine) {
                 path = path.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
                 System.out.println("dir path = $path")
                 val latch = CountDownLatch(1)
-                syncthingClient.pushDir(folder, path, { observer ->
+                syncthingClient.getBlockPusher(folder, { blockPusher ->
                     try {
-                        observer.waitForComplete()
+                        blockPusher.pushDir(folder, path).waitForComplete()
                     } catch (e: InterruptedException) {
                         logger.warn("", e)
                     }
 
                     latch.countDown()
-                }) { System.out.println("Failed to push directory") }
+                }, { System.out.println("Failed to push directory") })
                 latch.await()
                 System.out.println("uploaded dir to network")
             }
             "L" -> {
+                waitForIndexUpdate(syncthingClient, configuration)
                 for (folder in syncthingClient.indexHandler.folderList()) {
                     syncthingClient.indexHandler.newIndexBrowser(folder).use { indexBrowser ->
                         System.out.println("list folder = ${indexBrowser.folder}")
@@ -181,6 +183,7 @@ class Main(private val commandLine: CommandLine) {
                 }
             }
             "I" -> {
+                waitForIndexUpdate(syncthingClient, configuration)
                 val folderInfo = StringBuilder()
                 for (folder in syncthingClient.indexHandler.folderList()) {
                     folderInfo.append("\nfolder info: ")
@@ -208,5 +211,14 @@ class Main(private val commandLine: CommandLine) {
                 System.out.println("device addresses:\n$deviceAddressesStr\n")
             }
         }
+    }
+
+    @Throws(InterruptedException::class)
+    private fun waitForIndexUpdate(client: SyncthingClient, configuration: Configuration) {
+        val latch = CountDownLatch(configuration.peers.size)
+        client.indexHandler.registerOnFullIndexAcquiredListenersListener {
+            latch.countDown()
+        }
+        latch.await()
     }
 }

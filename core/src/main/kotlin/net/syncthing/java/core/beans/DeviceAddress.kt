@@ -91,7 +91,7 @@ class DeviceAddress private constructor(val deviceId: String, val instanceId: Lo
     }
 
     override fun toString(): String {
-        return "DeviceAddress{deviceId=$deviceId, instanceId=$instanceId, address=$address}"
+        return "DeviceAddress(deviceId=$deviceId, instanceId=$instanceId, address=$address, producer=$producer, score=$score, lastModified=$lastModified)"
     }
 
     override fun hashCode(): Int {

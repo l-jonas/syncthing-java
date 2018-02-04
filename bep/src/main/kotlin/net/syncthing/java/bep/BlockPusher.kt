@@ -44,10 +44,12 @@ class BlockPusher internal constructor(private val localDeviceId: DeviceId,
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    fun pushDelete(fileInfo: FileInfo, folder: String, path: String): IndexEditObserver {
+
+    fun pushDelete(folderId: String, targetPath: String): IndexEditObserver {
+        val fileInfo = indexHandler.waitForRemoteIndexAcquired(connectionHandler).getFileInfoByPath(folderId, targetPath)!!
         NetworkUtils.assertProtocol(connectionHandler.hasFolder(fileInfo.folder), {"supplied connection handler $connectionHandler will not share folder ${fileInfo.folder}"})
-        return IndexEditObserver(sendIndexUpdate(folder, BlockExchangeProtos.FileInfo.newBuilder()
-                .setName(path)
+        return IndexEditObserver(sendIndexUpdate(folderId, BlockExchangeProtos.FileInfo.newBuilder()
+                .setName(targetPath)
                 .setType(BlockExchangeProtos.FileInfoType.valueOf(fileInfo.type.name))
                 .setDeleted(true), fileInfo.versionList))
     }
@@ -59,10 +61,11 @@ class BlockPusher internal constructor(private val localDeviceId: DeviceId,
                 .setType(BlockExchangeProtos.FileInfoType.DIRECTORY), null))
     }
 
-    fun pushFile(inputStream: InputStream, fileInfo: FileInfo?, folderId: String, path: String): FileUploadObserver {
+    fun pushFile(inputStream: InputStream, folderId: String, targetPath: String): FileUploadObserver {
+        val fileInfo = indexHandler.waitForRemoteIndexAcquired(connectionHandler).getFileInfoByPath(folderId, targetPath)
         NetworkUtils.assertProtocol(connectionHandler.hasFolder(folderId), {"supplied connection handler $connectionHandler will not share folder $folderId"})
         assert(fileInfo == null || fileInfo.folder == folderId)
-        assert(fileInfo == null || fileInfo.path == path)
+        assert(fileInfo == null || fileInfo.path == targetPath)
         val monitoringProcessExecutorService = Executors.newCachedThreadPool()
         val dataSource = DataSource(inputStream)
         val fileSize = dataSource.size
@@ -71,7 +74,7 @@ class BlockPusher internal constructor(private val localDeviceId: DeviceId,
         val isCompleted = AtomicBoolean(false)
         val updateLock = Object()
         val listener = {request: BlockExchangeProtos.Request ->
-            if (request.folder == folderId && request.name == path) {
+            if (request.folder == folderId && request.name == targetPath) {
                 val hash = Hex.toHexString(request.hash.toByteArray())
                 logger.debug("handling block request = {}:{}-{} ({})", request.name, request.offset, request.size, hash)
                 val data = dataSource.getBlock(request.offset, request.size, hash)
@@ -100,11 +103,11 @@ class BlockPusher internal constructor(private val localDeviceId: DeviceId,
             }
         }
         connectionHandler.registerOnRequestMessageReceivedListeners(listener)
-        logger.debug("send index update for file = {}", path)
+        logger.debug("send index update for file = {}", targetPath)
         val indexListener = { folderInfo: FolderInfo, newRecords: List<FileInfo>, indexInfo: IndexInfo ->
             if (folderInfo.folderId == folderId) {
                 for (fileInfo2 in newRecords) {
-                    if (fileInfo2.path == path && fileInfo2.hash == dataSource.getHash()) { //TODO check not invalid
+                    if (fileInfo2.path == targetPath && fileInfo2.hash == dataSource.getHash()) { //TODO check not invalid
                         //                                sentBlocks.addAll(dataSource.getHashes());
                         isCompleted.set(true)
                         synchronized(updateLock) {
@@ -116,7 +119,7 @@ class BlockPusher internal constructor(private val localDeviceId: DeviceId,
         }
         indexHandler.registerOnIndexRecordAcquiredListener(indexListener)
         val indexUpdate = sendIndexUpdate(folderId, BlockExchangeProtos.FileInfo.newBuilder()
-                .setName(path)
+                .setName(targetPath)
                 .setSize(fileSize)
                 .setType(BlockExchangeProtos.FileInfoType.FILE)
                 .addAllBlocks(dataSource.blocks), fileInfo?.versionList).right

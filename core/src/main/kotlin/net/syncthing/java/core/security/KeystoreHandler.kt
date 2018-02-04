@@ -65,7 +65,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     }
 
     @Throws(CryptoException::class, IOException::class)
-    private fun wrapSocket(socket: Socket, isServerSocket: Boolean, vararg protocols: String): Socket {
+    private fun wrapSocket(socket: Socket, isServerSocket: Boolean, vararg protocols: String): SSLSocket {
         try {
             logger.debug("wrapping plain socket, server mode = {}", isServerSocket)
             val sslSocket = socketFactory.createSocket(socket, null, socket.port, true) as SSLSocket
@@ -87,7 +87,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     }
 
     @Throws(CryptoException::class, IOException::class)
-    fun createSocket(relaySocketAddress: InetSocketAddress, vararg protocols: String): Socket {
+    fun createSocket(relaySocketAddress: InetSocketAddress, vararg protocols: String): SSLSocket {
         try {
             val socket = socketFactory.createSocket() as SSLSocket
             socket.connect(relaySocketAddress, SOCKET_TIMEOUT)
@@ -102,7 +102,6 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         } catch (e: UnrecoverableKeyException) {
             throw CryptoException(e)
         }
-
     }
 
     private fun enableALPN(socket: SSLSocket, vararg protocols: String) {
@@ -128,13 +127,12 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         } catch (cne: NoClassDefFoundError) {
             logger.warn("ALPN not available, org.eclipse.jetty.alpn.ALPN not found! ( requires java -Xbootclasspath/p:path/to/alpn-boot.jar )")
         }
-
     }
 
     @Throws(SSLPeerUnverifiedException::class, CertificateException::class)
-    fun checkSocketCerificate(socket: SSLSocket, deviceId: DeviceId) {
+    fun checkSocketCertificate(socket: SSLSocket, deviceId: DeviceId) {
         val session = socket.session
-        val certs = Arrays.asList(*session.peerCertificates)
+        val certs = session.peerCertificates.toList()
         val certificateFactory = CertificateFactory.getInstance("X.509")
         val certPath = certificateFactory.generateCertPath(certs)
         val certificate = certPath.certificates[0]
@@ -147,7 +145,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     }
 
     @Throws(CryptoException::class, IOException::class)
-    fun wrapSocket(relayConnection: RelayConnection, vararg protocols: String): Socket {
+    fun wrapSocket(relayConnection: RelayConnection, vararg protocols: String): SSLSocket {
         return wrapSocket(relayConnection.getSocket(), relayConnection.isServerSocket(), *protocols)
     }
 

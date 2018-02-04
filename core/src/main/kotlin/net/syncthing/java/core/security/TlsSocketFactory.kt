@@ -76,7 +76,7 @@ class TLSSocketFactory
     private fun enableTLSOnSocket(socket: Socket): Socket {
         if (socket !is SSLSocket)
             throw InvalidParameterException()
-        socket.enabledProtocols = arrayOf("TLSv1.1", "TLSv1.2")
+        socket.enabledProtocols = arrayOf("TLSv1.2")
         return socket
     }
 }
