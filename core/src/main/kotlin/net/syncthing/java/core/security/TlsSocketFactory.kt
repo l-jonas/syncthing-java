@@ -25,7 +25,7 @@ class TLSSocketFactory
         private const val TLS_VERSION = "TLSv1.2"
     }
 
-    private val internalSSLSocketFactory: SSLSocketFactory
+    val internalSSLSocketFactory: SSLSocketFactory
 
     init {
         val sslContext = SSLContext.getInstance(TLS_VERSION)
