@@ -197,21 +197,23 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
     @Throws(IOException::class)
     private fun receiveHelloMessage() {
-        logger.trace("receiving hello message")
-        val magic = inputStream!!.readInt()
-        NetworkUtils.assertProtocol(magic == MAGIC, {"magic mismatch, expected $MAGIC, got $magic"})
-        val length = inputStream!!.readShort().toInt()
-        NetworkUtils.assertProtocol(length > 0, {"invalid lenght, must be >0, got $length"})
-        val buffer = ByteArray(length)
-        inputStream!!.readFully(buffer)
-        val hello = BlockExchangeProtos.Hello.parseFrom(buffer)
-        logger.info("Received hello message, deviceName=${hello.deviceName}, clientName=${hello.clientName}, clientVersion=${hello.clientVersion}")
+        //inExecutorService.submitLogging {
+            logger.debug("receiving hello message")
+            val magic = inputStream!!.readInt()
+            NetworkUtils.assertProtocol(magic == MAGIC, { "magic mismatch, expected $MAGIC, got $magic" })
+            val length = inputStream!!.readShort().toInt()
+            NetworkUtils.assertProtocol(length > 0, { "invalid lenght, must be >0, got $length" })
+            val buffer = ByteArray(length)
+            inputStream!!.readFully(buffer)
+            val hello = BlockExchangeProtos.Hello.parseFrom(buffer)
+            logger.info("Received hello message, deviceName=${hello.deviceName}, clientName=${hello.clientName}, clientVersion=${hello.clientVersion}")
+        //}
     }
 
     private fun sendHelloMessage(payload: ByteArray): Future<*> {
         return outExecutorService.submitLogging {
             try {
-                logger.trace("sending message")
+                logger.debug("sending hello message")
                 val header = ByteBuffer.allocate(6)
                 header.putInt(MAGIC)
                 header.putShort(payload.size.toShort())
@@ -238,7 +240,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
     @Throws(IOException::class)
     private fun receiveMessage(): Pair<BlockExchangeProtos.MessageType, MessageLite> {
-        logger.trace("receiving message")
+        logger.debug("receiving message, isClosed=${socket?.isClosed}")
         var headerLength = inputStream!!.readShort().toInt()
         while (headerLength == 0) {
             logger.warn("got headerLength == 0, skipping short")
@@ -249,7 +251,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
         val headerBuffer = ByteArray(headerLength)
         inputStream!!.readFully(headerBuffer)
         val header = BlockExchangeProtos.Header.parseFrom(headerBuffer)
-        logger.trace("message type = {} compression = {}", header.type, header.compression)
+        logger.debug("message type = {} compression = {}", header.type, header.compression)
         var messageLength = 0
         while (messageLength == 0) {
             logger.warn("received readInt() == 0, expecting 'bep message header length' (int >0), ignoring (keepalive?)")
@@ -309,6 +311,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
     }
 
     override fun close() {
+        logger.debug("close()", Exception())
         if (!isClosed) {
             isClosed = true
             periodicExecutorService.shutdown()
@@ -421,6 +424,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                         }
                     }
                 }
+                logger.debug("stop listening")
             } catch (ex: IOException) {
                 if (inExecutorService.isShutdown) {
                     return@submitLogging

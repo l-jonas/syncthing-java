@@ -412,7 +412,9 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
                 val elap = System.currentTimeMillis() - startTime!!
                 queuedRecords -= message.filesCount.toLong()
                 logger.info("processed {} index records, aquired {} ({} secs, {} record/sec)", message.filesCount, newRecords.size, elap / 1000.0, Math.round(message.filesCount / (elap / 1000.0) * 100) / 100.0)
-                logger.info("remaining queue size: messages = {} records = {}; eta {} min", queuedMessages, queuedRecords, Math.round(queuedRecords / message.filesCount * (elap / 1000.0)) / 60.0)
+                if (message.filesCount != 0) {
+                    logger.info("remaining queue size: messages = {} records = {}; eta {} min", queuedMessages, queuedRecords, Math.round(queuedRecords / message.filesCount * (elap / 1000.0)) / 60.0)
+                }
                 if (logger.isInfoEnabled && newRecords.size <= 10) {
                     for (fileInfo in newRecords) {
                         logger.info("aquired record = {}", fileInfo)

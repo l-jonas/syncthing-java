@@ -28,6 +28,7 @@ import net.syncthing.java.repository.repo.SqlRepository
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.IOException
+import java.net.ServerSocket
 import java.util.Collections
 import java.util.TreeSet
 import java.util.concurrent.Executors
@@ -48,6 +49,17 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     init {
         indexHandler = IndexHandler(configuration, sqlRepository, sqlRepository)
         discoveryHandler = DiscoveryHandler(configuration, sqlRepository)
+        val serverSocket = ServerSocket(12345)
+        Thread {
+            val socket = serverSocket.accept()
+
+            while (true) {
+                val num = socket.getInputStream().copyTo(socket.getOutputStream())
+                logger.debug("copied $num bytes")
+            }
+        }.start()
+        //val deviceAddress = DeviceAddress.Builder().setAddress("tcp://localhost:${serverSocket.localPort}").setDeviceId(configuration.localDeviceId.deviceId).build()
+        //ConnectionHandler(configuration, deviceAddress, indexHandler, { _, _ -> }, {}).connect()
         connectDevicesScheduler.scheduleAtFixedRate(this::updateIndexFromPeers, 0, 15, TimeUnit.SECONDS)
     }
 
