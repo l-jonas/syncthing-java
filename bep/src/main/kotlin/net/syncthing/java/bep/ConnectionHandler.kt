@@ -29,10 +29,7 @@ import net.syncthing.java.httprelay.HttpRelayClient
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.tuple.Pair
 import org.slf4j.LoggerFactory
-import java.io.Closeable
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.io.IOException
+import java.io.*
 import java.lang.reflect.InvocationTargetException
 import java.net.Socket
 import java.nio.ByteBuffer

@@ -90,7 +90,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     @Throws(CryptoException::class, IOException::class)
     fun createSocket(relaySocketAddress: InetSocketAddress, protocol: String): SSLSocket {
         try {
-            val socket = socketFactory.internalSSLSocketFactory.createSocket() as SSLSocket
+            val socket = socketFactory.createSocket() as SSLSocket
             socket.connect(relaySocketAddress, SOCKET_TIMEOUT)
             enableALPN(socket, protocol)
             return socket
@@ -106,10 +106,10 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     }
 
     private fun enableALPN(socket: SSLSocket, protocol: String) {
-        logger.debug("enabling ALPN")
-        Class.forName("org.eclipse.jetty.alpn.ALPN")
-        val p = if (protocol == BEP) Protocol.BEP else Protocol.RELAY
-        Platform.get().configureTlsExtensions(socket, null, mutableListOf(p))
+        //logger.debug("enabling ALPN")
+        //Class.forName("org.eclipse.jetty.alpn.ALPN")
+        //val p = if (protocol == BEP) Protocol.BEP else Protocol.RELAY
+        //Platform.get().configureTlsExtensions(socket, null, mutableListOf(p))
         /*
         ALPN.debug = true
         // TODO: all of this is never called
@@ -132,6 +132,10 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
             }
         })
         */
+        socket.addHandshakeCompletedListener { event ->
+            logger.debug("cipherSuite=${event.cipherSuite}, peerCertificateChain=${event.peerCertificateChain.toList()}, peerCertificates=${event.peerCertificates}, peerPrincipal=${event.peerPrincipal}")
+        }
+        socket.startHandshake()
     }
 
     @Throws(SSLPeerUnverifiedException::class, CertificateException::class)

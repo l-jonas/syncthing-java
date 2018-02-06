@@ -37,7 +37,7 @@ class TLSSocketFactory
             override fun checkClientTrusted(xcs: Array<X509Certificate>, string: String) {}
             @Throws(CertificateException::class)
             override fun checkServerTrusted(xcs: Array<X509Certificate>, string: String) {}
-            override fun getAcceptedIssuers() = null
+            override fun getAcceptedIssuers() = arrayOf<X509Certificate>()
         }), null)
         internalSSLSocketFactory = sslContext.socketFactory
     }
