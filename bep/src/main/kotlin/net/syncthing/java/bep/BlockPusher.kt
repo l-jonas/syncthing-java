@@ -15,11 +15,8 @@ package net.syncthing.java.bep
 
 import com.google.protobuf.ByteString
 import net.syncthing.java.bep.BlockExchangeProtos.Vector
-import net.syncthing.java.core.beans.BlockInfo
-import net.syncthing.java.core.beans.FileInfo
+import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.beans.FileInfo.Version
-import net.syncthing.java.core.beans.FolderInfo
-import net.syncthing.java.core.beans.IndexInfo
 import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.utils.BlockUtils
 import net.syncthing.java.core.utils.NetworkUtils
@@ -41,7 +38,7 @@ import java.util.concurrent.Future
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-class BlockPusher internal constructor(private val configuration: Configuration,
+class BlockPusher internal constructor(private val localDeviceId: DeviceId,
                                        private val connectionHandler: ConnectionHandler,
                                        private val indexHandler: IndexHandler) {
 
@@ -159,7 +156,7 @@ class BlockPusher internal constructor(private val configuration: Configuration,
             val nextSequence = indexHandler.sequencer().nextSequence()
             val list = oldVersions ?: emptyList()
             logger.debug("version list = {}", list)
-            val id = ByteBuffer.wrap(configuration.localDeviceId.toHashData()).long
+            val id = ByteBuffer.wrap(localDeviceId.toHashData()).long
             val version = BlockExchangeProtos.Counter.newBuilder()
                     .setId(id)
                     .setValue(nextSequence)

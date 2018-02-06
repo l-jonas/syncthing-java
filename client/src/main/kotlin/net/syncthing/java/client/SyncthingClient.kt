@@ -22,7 +22,6 @@ import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FileInfo
-import net.syncthing.java.core.cache.BlockCache
 import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.awaitTerminationSafe
@@ -33,7 +32,6 @@ import java.io.Closeable
 import java.io.IOException
 import java.io.InputStream
 import java.util.Collections
-import java.util.TreeSet
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -61,7 +59,6 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         indexHandler.clearIndex()
         configuration.folders = emptySet()
         configuration.persistLater()
-        BlockCache.getBlockCache(configuration).clear()
         updateIndexFromPeers()
     }
 

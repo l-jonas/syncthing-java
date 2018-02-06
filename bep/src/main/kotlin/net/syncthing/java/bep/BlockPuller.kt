@@ -17,7 +17,6 @@ import com.google.protobuf.ByteString
 import net.syncthing.java.bep.BlockExchangeProtos.ErrorCode
 import net.syncthing.java.bep.BlockExchangeProtos.Request
 import net.syncthing.java.core.beans.FileBlocks
-import net.syncthing.java.core.cache.BlockCache
 import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.io.FileUtils
@@ -29,10 +28,8 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-class BlockPuller internal constructor(configuration: Configuration,
-                                       private val connectionHandler: ConnectionHandler) {
+class BlockPuller internal constructor(private val connectionHandler: ConnectionHandler) {
 
-    private val blockCache = BlockCache.getBlockCache(configuration)
     private val logger = LoggerFactory.getLogger(javaClass)
     private val blocksByHash = ConcurrentHashMap<String, ByteArray>()
     private val hashList = mutableListOf<String>()
@@ -90,13 +87,6 @@ class BlockPuller internal constructor(configuration: Configuration,
         synchronized(lock) {
             hashList.addAll(fileBlocks.blocks.map { it.hash })
             missingHashes.addAll(hashList)
-            for (hash in missingHashes) {
-                val block = blockCache.pullBlock(hash)
-                if (block != null) {
-                    blocksByHash.put(hash, block)
-                    missingHashes.remove(hash)
-                }
-            }
             for (block in fileBlocks.blocks) {
                 if (missingHashes.contains(block.hash)) {
                     val requestId = Math.abs(Random().nextInt())
@@ -124,7 +114,6 @@ class BlockPuller internal constructor(configuration: Configuration,
             NetworkUtils.assertProtocol(response.code == ErrorCode.NO_ERROR, {"received error response, code = ${response.code}"})
             val data = response.data.toByteArray()
             val hash = Hex.toHexString(MessageDigest.getInstance("SHA-256").digest(data))
-            blockCache.pushBlock(data)
             if (missingHashes.remove(hash)) {
                 blocksByHash.put(hash, data)
                 logger.debug("aquired block, hash = {}", hash)

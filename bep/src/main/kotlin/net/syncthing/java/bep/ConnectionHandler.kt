@@ -60,8 +60,8 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
     private var lastActive = Long.MIN_VALUE
     internal var clusterConfigInfo: ClusterConfigInfo? = null
     private val clusterConfigWaitingLock = Object()
-    private val blockPuller = BlockPuller(configuration, this)
-    private val blockPusher = BlockPusher(configuration, this, indexHandler)
+    private val blockPuller = BlockPuller(this)
+    private val blockPusher = BlockPusher(configuration.localDeviceId, this, indexHandler)
     private val onRequestMessageReceivedListeners = mutableSetOf<(Request) -> Unit>()
     private var isClosed = false
     private var isConnected = false
