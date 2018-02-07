@@ -39,8 +39,7 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.*
 import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLPeerUnverifiedException
-import javax.net.ssl.SSLSocket
+import javax.net.ssl.*
 import javax.security.auth.x500.X500Principal
 
 class KeystoreHandler private constructor(private val keyStore: KeyStore) {
@@ -49,7 +48,22 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
 
     class CryptoException internal constructor(t: Throwable) : GeneralSecurityException(t)
 
-    private val socketFactory = TLSSocketFactory(keyStore)
+    private val socketFactory: SSLSocketFactory
+
+    init {
+        val sslContext = SSLContext.getInstance(TLS_VERSION)
+        val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+        keyManagerFactory.init(keyStore, KEY_PASSWORD.toCharArray())
+
+        sslContext.init(keyManagerFactory.keyManagers, arrayOf(object : X509TrustManager {
+            @Throws(CertificateException::class)
+            override fun checkClientTrusted(xcs: Array<X509Certificate>, string: String) {}
+            @Throws(CertificateException::class)
+            override fun checkServerTrusted(xcs: Array<X509Certificate>, string: String) {}
+            override fun getAcceptedIssuers() = arrayOf<X509Certificate>()
+        }), null)
+        socketFactory = sslContext.socketFactory
+    }
 
     @Throws(CryptoException::class, IOException::class)
     private fun exportKeystoreToData(): ByteArray {
@@ -68,7 +82,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     private fun wrapSocket(socket: Socket, isServerSocket: Boolean, protocol: String): SSLSocket {
         try {
             logger.debug("wrapping plain socket, server mode = {}", isServerSocket)
-            val sslSocket = socketFactory.internalSSLSocketFactory.createSocket(socket, null, socket.port, true) as SSLSocket
+            val sslSocket = socketFactory.createSocket(socket, null, socket.port, true) as SSLSocket
             if (isServerSocket) {
                 sslSocket.useClientMode = false
             }
@@ -239,6 +253,7 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         private const val CERTIFICATE_CN = "CN=syncthing"
         private const val KEY_SIZE = 3072
         private const val SOCKET_TIMEOUT = 2000
+        private const val TLS_VERSION = "TLSv1.2"
 
         init {
             Security.addProvider(BouncyCastleProvider())
