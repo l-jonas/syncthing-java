@@ -69,6 +69,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
     private fun openConnection(deviceAddress: DeviceAddress): ConnectionHandler {
+        logger.debug("Connecting to ${deviceAddress.deviceId}, active connections: ${connections.map { it.deviceId().deviceId }}")
         val connectionHandler = ConnectionHandler(
                 configuration, deviceAddress, indexHandler, { connectionHandler, _ ->
                     connectionHandler.close()
