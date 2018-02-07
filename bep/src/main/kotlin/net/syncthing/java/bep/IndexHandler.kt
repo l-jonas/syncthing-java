@@ -113,10 +113,10 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
             while (!isRemoteIndexAcquired(connectionHandler.clusterConfigInfo!!, connectionHandler.deviceId())) {
                 indexWaitLock.wait(timeoutMillis)
                 NetworkUtils.assertProtocol(connectionHandler.getLastActive() < timeoutMillis || lastActive() < timeoutMillis,
-                        {"unable to aquire index from connection $connectionHandler, timeout reached!"})
+                        {"unable to acquire index from connection $connectionHandler, timeout reached!"})
             }
         }
-        logger.debug("aquired all indexes on connection {}", connectionHandler)
+        logger.debug("acquired all indexes on connection {}", connectionHandler)
         return this
     }
 
@@ -125,12 +125,12 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
             for (folderRecord in clusterConfig.foldersList) {
                 val folder = folderRecord.id
                 val folderInfo = updateFolderInfo(folder, folderRecord.label)
-                logger.debug("aquired folder info from cluster config = {}", folderInfo)
+                logger.debug("acquired folder info from cluster config = {}", folderInfo)
                 for (deviceRecord in folderRecord.devicesList) {
                     val deviceId = DeviceId.fromHashData(deviceRecord.id.toByteArray())
                     if (deviceRecord.hasIndexId() && deviceRecord.hasMaxSequence()) {
                         val folderIndexInfo = updateIndexInfo(folder, deviceId, deviceRecord.indexId, deviceRecord.maxSequence, null)
-                        logger.debug("aquired folder index info from cluster config = {}", folderIndexInfo)
+                        logger.debug("acquired folder index info from cluster config = {}", folderIndexInfo)
                     }
                 }
             }
@@ -411,11 +411,10 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
                 val newIndexInfo = updateIndexInfo(folderId, peerDeviceId, null, null, sequence)
                 val elap = System.currentTimeMillis() - startTime!!
                 queuedRecords -= message.filesCount.toLong()
-                logger.info("processed {} index records, aquired {} ({} secs, {} record/sec)", message.filesCount, newRecords.size, elap / 1000.0, Math.round(message.filesCount / (elap / 1000.0) * 100) / 100.0)
-                logger.info("remaining queue size: messages = {} records = {}; eta {} min", queuedMessages, queuedRecords, Math.round(queuedRecords / message.filesCount * (elap / 1000.0)) / 60.0)
+                logger.info("processed {} index records, acquired {} ({} secs, {} record/sec)", message.filesCount, newRecords.size, elap / 1000.0, Math.round(message.filesCount / (elap / 1000.0) * 100) / 100.0)
                 if (logger.isInfoEnabled && newRecords.size <= 10) {
                     for (fileInfo in newRecords) {
-                        logger.info("aquired record = {}", fileInfo)
+                        logger.info("acquired record = {}", fileInfo)
                     }
                 }
                 val folderInfo = folderInfoByFolder[folderId]
@@ -424,7 +423,7 @@ class IndexHandler(private val configuration: Configuration, val indexRepository
                 }
                 logger.debug("index info = {}", newIndexInfo)
                 if (isRemoteIndexAcquired(clusterConfigInfo!!, peerDeviceId)) {
-                    logger.debug("index aquired")
+                    logger.debug("index acquired")
                     onFullIndexAcquiredListeners.forEach { it(folderInfo!!)}
                 }
                 //                IndexHandler.this.notifyAll();

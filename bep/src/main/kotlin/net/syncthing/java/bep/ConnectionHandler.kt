@@ -34,7 +34,6 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
 import java.lang.reflect.InvocationTargetException
-import java.net.Socket
 import java.nio.ByteBuffer
 import java.security.cert.CertificateException
 import java.util.concurrent.ConcurrentHashMap
@@ -54,11 +53,12 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
     private val inExecutorService = Executors.newSingleThreadExecutor()
     private val messageProcessingService = Executors.newCachedThreadPool()
     private val periodicExecutorService = Executors.newSingleThreadScheduledExecutor()
-    private var socket: SSLSocket? = null
+    private lateinit var socket: SSLSocket
     private var inputStream: DataInputStream? = null
     private var outputStream: DataOutputStream? = null
     private var lastActive = Long.MIN_VALUE
     internal var clusterConfigInfo: ClusterConfigInfo? = null
+        private set
     private val clusterConfigWaitingLock = Object()
     private val blockPuller = BlockPuller(this, indexHandler)
     private val blockPusher = BlockPusher(configuration.localDeviceId, this, indexHandler)
@@ -84,7 +84,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
     fun connect(): ConnectionHandler {
         checkNotClosed()
-        assert(socket == null && !isConnected, {"already connected!"})
+        assert(!isConnected, {"already connected!"})
         logger.info("connecting to {}", address.address)
 
         val keystoreHandler = KeystoreHandler.Loader().loadKeystore(configuration)
@@ -104,8 +104,8 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
             }
             else -> throw UnsupportedOperationException("unsupported address type = " + address.getType())
         }
-        inputStream = DataInputStream(socket!!.inputStream)
-        outputStream = DataOutputStream(socket!!.outputStream)
+        inputStream = DataInputStream(socket.inputStream)
+        outputStream = DataOutputStream(socket.outputStream)
 
         sendHelloMessage(BlockExchangeProtos.Hello.newBuilder()
                 .setClientName(configuration.clientName)
@@ -116,7 +116,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
         receiveHelloMessage()
         try {
-            keystoreHandler.checkSocketCertificate(socket!!, address.deviceId())
+            keystoreHandler.checkSocketCertificate(socket, address.deviceId())
         } catch (e: CertificateException) {
             throw IOException(e)
         }
@@ -200,7 +200,6 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
     @Throws(IOException::class)
     private fun receiveHelloMessage() {
-        logger.trace("receiving hello message")
         val magic = inputStream!!.readInt()
         NetworkUtils.assertProtocol(magic == MAGIC, {"magic mismatch, expected $MAGIC, got $magic"})
         val length = inputStream!!.readShort().toInt()
@@ -214,7 +213,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
     private fun sendHelloMessage(payload: ByteArray): Future<*> {
         return outExecutorService.submitLogging {
             try {
-                logger.trace("sending message")
+                logger.debug("Sending hello message")
                 val header = ByteBuffer.allocate(6)
                 header.putInt(MAGIC)
                 header.putShort(payload.size.toShort())
@@ -241,7 +240,6 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
     @Throws(IOException::class)
     private fun receiveMessage(): Pair<BlockExchangeProtos.MessageType, MessageLite> {
-        logger.trace("receiving message")
         var headerLength = inputStream!!.readShort().toInt()
         while (headerLength == 0) {
             logger.warn("got headerLength == 0, skipping short")
@@ -252,7 +250,6 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
         val headerBuffer = ByteArray(headerLength)
         inputStream!!.readFully(headerBuffer)
         val header = BlockExchangeProtos.Header.parseFrom(headerBuffer)
-        logger.trace("message type = {} compression = {}", header.type, header.compression)
         var messageLength = 0
         while (messageLength == 0) {
             logger.warn("received readInt() == 0, expecting 'bep message header length' (int >0), ignoring (keepalive?)")
@@ -313,6 +310,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
     override fun close() {
         if (!isClosed) {
+            sendMessage(Close.getDefaultInstance())
             isClosed = true
             periodicExecutorService.shutdown()
             outExecutorService.shutdown()
@@ -327,10 +325,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                 IOUtils.closeQuietly(inputStream)
                 inputStream = null
             }
-            if (socket != null) {
-                IOUtils.closeQuietly(socket)
-                socket = null
-            }
+            IOUtils.closeQuietly(socket)
             logger.info("closed connection {}", address)
             synchronized(clusterConfigWaitingLock) {
                 clusterConfigWaitingLock.notifyAll()

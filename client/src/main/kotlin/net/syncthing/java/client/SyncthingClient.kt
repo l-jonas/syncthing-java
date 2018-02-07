@@ -52,7 +52,6 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     }
 
     fun clearCacheAndIndex() {
-        logger.info("clear cache")
         indexHandler.clearIndex()
         configuration.folders = emptySet()
         configuration.persistLater()
@@ -70,7 +69,6 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
 
     @Throws(IOException::class, KeystoreHandler.CryptoException::class)
     private fun openConnection(deviceAddress: DeviceAddress): ConnectionHandler {
-        logger.debug("openConnection($deviceAddress)")
         val connectionHandler = ConnectionHandler(
                 configuration, deviceAddress, indexHandler, { connectionHandler, _ ->
                     connectionHandler.close()
@@ -80,36 +78,42 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
                     connections.remove(connection)
                     onConnectionChangedListeners.forEach { it(connection.deviceId()) }
                 })
-        connectionHandler.connect()
         connections.add(connectionHandler)
+        connectionHandler.connect()
         onConnectionChangedListeners.forEach { it(connectionHandler.deviceId()) }
         return connectionHandler
     }
 
+    /**
+     * Takes discovered addresses from [[DiscoveryHandler]] and connects to devices.
+     *
+     * We need to make sure that we are only connecting once to each device.
+     */
     private fun getPeerConnections(listener: (connection: ConnectionHandler) -> Unit, completeListener: () -> Unit) {
-        logger.debug("getPeerConnections()")
         connections.forEach { listener(it) }
         discoveryHandler.newDeviceAddressSupplier()
                 .takeWhile { it != null }
                 .filterNotNull()
-                .filterNot { connections.map { it.deviceId() }.contains(it.deviceId()) }
-                .forEach {
+                .groupBy { it.deviceId() }
+                .filterNot { connections.map { it.deviceId() }.contains(it.key) }
+                .filterNot { it.value.isEmpty() }
+                .forEach { (_, addresses) ->
+                    val bestAddress = addresses.first()
                     try {
-                        listener(openConnection(it))
+                        listener(openConnection(bestAddress))
                     } catch (e: IOException) {
-                        logger.warn("error connecting to device = $it", e)
+                        logger.warn("error connecting to device = $bestAddress", e)
                     } catch (e: KeystoreHandler.CryptoException) {
-                        logger.warn("error connecting to device = $it", e)
+                        logger.warn("error connecting to device = $bestAddress", e)
                     }
                 }
+
         completeListener()
     }
 
     private fun updateIndexFromPeers() {
-        logger.debug("updateIndexFromPeers()")
         getPeerConnections({ connection ->
             try {
-                logger.debug("updateIndexFromPeers() ${connection.deviceId()}")
                 indexHandler.waitForRemoteIndexAcquired(connection)
             } catch (ex: InterruptedException) {
                 logger.warn("exception while waiting for index", ex)
@@ -119,12 +123,9 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
 
     private fun getConnectionForFolder(folder: String, listener: (connection: ConnectionHandler) -> Unit,
                                        errorListener: () -> Unit) {
-        logger.debug("getConnectionForFolder($folder)")
         val isConnected = AtomicBoolean(false)
         getPeerConnections({ connection ->
-            logger.debug("getConnectionForFolder($folder) checking ${connection.address}")
             if (connection.hasFolder(folder) && !isConnected.get()) {
-                logger.debug("getConnectionForFolder($folder) picked ${connection.address}")
                 listener(connection)
                 isConnected.set(true)
             }

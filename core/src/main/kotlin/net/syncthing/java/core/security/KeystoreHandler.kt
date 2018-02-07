@@ -25,7 +25,6 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.OperatorCreationException
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import org.bouncycastle.util.encoders.Base64
-import org.eclipse.jetty.alpn.ALPN
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -39,6 +38,7 @@ import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.*
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSocket
 import javax.security.auth.x500.X500Principal
@@ -65,14 +65,13 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     }
 
     @Throws(CryptoException::class, IOException::class)
-    private fun wrapSocket(socket: Socket, isServerSocket: Boolean, vararg protocols: String): SSLSocket {
+    private fun wrapSocket(socket: Socket, isServerSocket: Boolean, protocol: String): SSLSocket {
         try {
             logger.debug("wrapping plain socket, server mode = {}", isServerSocket)
-            val sslSocket = socketFactory.createSocket(socket, null, socket.port, true) as SSLSocket
+            val sslSocket = socketFactory.internalSSLSocketFactory.createSocket(socket, null, socket.port, true) as SSLSocket
             if (isServerSocket) {
                 sslSocket.useClientMode = false
             }
-            enableALPN(sslSocket, *protocols)
             return sslSocket
         } catch (e: KeyManagementException) {
             throw CryptoException(e)
@@ -87,11 +86,10 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     }
 
     @Throws(CryptoException::class, IOException::class)
-    fun createSocket(relaySocketAddress: InetSocketAddress, vararg protocols: String): SSLSocket {
+    fun createSocket(relaySocketAddress: InetSocketAddress, protocol: String): SSLSocket {
         try {
             val socket = socketFactory.createSocket() as SSLSocket
             socket.connect(relaySocketAddress, SOCKET_TIMEOUT)
-            enableALPN(socket, *protocols)
             return socket
         } catch (e: KeyManagementException) {
             throw CryptoException(e)
@@ -101,31 +99,6 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
             throw CryptoException(e)
         } catch (e: UnrecoverableKeyException) {
             throw CryptoException(e)
-        }
-    }
-
-    private fun enableALPN(socket: SSLSocket, vararg protocols: String) {
-        try {
-            Class.forName("org.eclipse.jetty.alpn.ALPN")
-            ALPN.put(socket, object : ALPN.ClientProvider {
-
-                override fun protocols(): List<String> {
-                    return Arrays.asList(*protocols)
-                }
-
-                override fun unsupported() {
-                    ALPN.remove(socket)
-                }
-
-                override fun selected(protocol: String) {
-                    ALPN.remove(socket)
-                    logger.debug("ALPN select protocol = {}", protocol)
-                }
-            })
-        } catch (cne: ClassNotFoundException) {
-            logger.warn("ALPN not available, org.eclipse.jetty.alpn.ALPN not found! ( requires java -Xbootclasspath/p:path/to/alpn-boot.jar )")
-        } catch (cne: NoClassDefFoundError) {
-            logger.warn("ALPN not available, org.eclipse.jetty.alpn.ALPN not found! ( requires java -Xbootclasspath/p:path/to/alpn-boot.jar )")
         }
     }
 
@@ -145,8 +118,8 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
     }
 
     @Throws(CryptoException::class, IOException::class)
-    fun wrapSocket(relayConnection: RelayConnection, vararg protocols: String): SSLSocket {
-        return wrapSocket(relayConnection.getSocket(), relayConnection.isServerSocket(), *protocols)
+    fun wrapSocket(relayConnection: RelayConnection, protocol: String): SSLSocket {
+        return wrapSocket(relayConnection.getSocket(), relayConnection.isServerSocket(), protocol)
     }
 
     class Loader {
@@ -199,10 +172,11 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
 
                 val contentSigner = JcaContentSignerBuilder(SIGNATURE_ALGO).build(keyPair.private)
 
-                val startDate = Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000)
-                val endDate = Date(System.currentTimeMillis() + 10 * 365 * 24 * 60 * 60 * 1000)
+                val startDate = Date(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1))
+                val endDate = Date(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(10 * 365))
 
-                val certificateBuilder = JcaX509v1CertificateBuilder(X500Principal(CERTIFICATE_CN), BigInteger.ZERO, startDate, endDate, X500Principal(CERTIFICATE_CN), keyPair.public)
+                val certificateBuilder = JcaX509v1CertificateBuilder(X500Principal(CERTIFICATE_CN), BigInteger.ZERO,
+                        startDate, endDate, X500Principal(CERTIFICATE_CN), keyPair.public)
 
                 val certificateHolder = certificateBuilder.build(contentSigner)
 
@@ -263,7 +237,6 @@ class KeystoreHandler private constructor(private val keyStore: KeyStore) {
         private const val KEY_ALGO = "RSA"
         private const val SIGNATURE_ALGO = "SHA1withRSA"
         private const val CERTIFICATE_CN = "CN=syncthing"
-        private const val BC_PROVIDER = "BC"
         private const val KEY_SIZE = 3072
         private const val SOCKET_TIMEOUT = 2000
 

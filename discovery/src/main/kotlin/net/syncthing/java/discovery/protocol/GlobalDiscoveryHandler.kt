@@ -47,22 +47,19 @@ internal class GlobalDiscoveryHandler(private val configuration: Configuration) 
                     }
                 }
                 .flatten()
-        logger.info("Discovered addresses for $deviceId: $addresses")
         callback(addresses)
     }
 
     private fun pickAnnounceServers(): List<String> {
-        logger.debug("ranking discovery server addresses")
         val list = AddressRanker
                 .pingAddresses(configuration.discoveryServers.map { DeviceAddress(it, "tcp://$it:443") })
-        logger.info("discovery server addresses = {}", list.map { it.address })
         return list.map { it.deviceId }
     }
 
     @Throws(IOException::class)
     private fun queryAnnounceServer(server: String, deviceId: DeviceId): List<DeviceAddress> {
         try {
-            logger.trace("querying server {} for device id {}", server, deviceId)
+            logger.debug("querying server {} for device id {}", server, deviceId)
             val httpClient = HttpClients.custom()
                     .setSSLSocketFactory(SSLConnectionSocketFactory(SSLContextBuilder().loadTrustMaterial(null, TrustSelfSignedStrategy()).build(), SSLConnectionSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER))
                     .build()
@@ -75,10 +72,8 @@ internal class GlobalDiscoveryHandler(private val configuration: Configuration) 
                     }
                     HttpStatus.SC_OK -> {
                         val announcementMessage = Gson().fromJson(EntityUtils.toString(response.entity), AnnouncementMessage::class.java)
-                        val list = (announcementMessage?.addresses ?: emptyList())
+                        return@execute (announcementMessage?.addresses ?: emptyList())
                                 .map { DeviceAddress(deviceId.deviceId, it) }
-                        logger.debug("found address list = {}", list)
-                        return@execute list
                     }
                     else -> {
                         throw IOException("http error ${response.statusLine}, response ${EntityUtils.toString(response.entity)}")

@@ -53,7 +53,7 @@ class DiscoveryHandler(private val configuration: Configuration,
             shouldLoadFromDb = false
             executorService.submitLogging {
                 val list = deviceAddressRepository.findAllDeviceAddress()
-                logger.info("received device address list from database")
+                logger.info("received device address list from database $list")
                 processDeviceAddressBg(list)
             }
         }
@@ -77,7 +77,6 @@ class DiscoveryHandler(private val configuration: Configuration,
             logger.debug("discarding device addresses, discovery handler already closed")
         } else {
             executorService.submitLogging {
-                logger.info("processing device address list")
                 val list = deviceAddresses.toList()
                 val peers = configuration.peerIds
                 //do not process address already processed
@@ -91,7 +90,6 @@ class DiscoveryHandler(private val configuration: Configuration,
     }
 
     private fun putDeviceAddress(deviceAddress: DeviceAddress) {
-        logger.info("acquired device address = {}", deviceAddress)
         deviceAddressMap[Pair.of(DeviceId(deviceAddress.deviceId), deviceAddress.address)] = deviceAddress
         deviceAddressRepository.updateDeviceAddress(deviceAddress)
         deviceAddressSupplier.onNewDeviceAddressAcquired(deviceAddress)

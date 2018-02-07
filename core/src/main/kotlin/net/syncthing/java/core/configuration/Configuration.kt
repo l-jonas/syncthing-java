@@ -23,7 +23,11 @@ class Configuration(configFolder: File = DefaultConfigFolder,
             val localDeviceId: String,
             val discoveryServers: Set<String>,
             val keystoreAlgorithm: String,
-            val keystoreData: String)
+            val keystoreData: String) {
+        // Exclude keystoreData from toString()
+        override fun toString() = "Config(peers=$peers, folders=$folders, localDeviceName=$localDeviceName, " +
+                "localDeviceId=$localDeviceId, discoveryServers=$discoveryServers, keystoreAlgorithm=$keystoreAlgorithm)"
+    }
 
     private val configFile = File(configFolder, ConfigFileName)
     val databaseFolder = File(configFolder, DatabaseFolderName)

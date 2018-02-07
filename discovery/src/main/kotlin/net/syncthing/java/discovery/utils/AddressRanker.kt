@@ -82,11 +82,10 @@ internal class AddressRanker private constructor(private val sourceAddresses: Li
                 socket.connect(deviceAddress.getSocketAddress(), TCP_CONNECTION_TIMEOUT)
             }
         } catch (ex: IOException) {
-            logger.debug("address unreacheable = {}", deviceAddress, ex)
+            logger.debug("address unreacheable = $deviceAddress, ${ex.message}")
             return null
         }
         val ping = (System.currentTimeMillis() - startTime).toInt()
-        logger.debug("tcp connection to address = {} is ok, time = {} ms", deviceAddress, ping)
 
         val baseScore = BASE_SCORE_MAP[deviceAddress.getType()] ?: 0
         return deviceAddress.copyBuilder().setScore(ping + baseScore).build()

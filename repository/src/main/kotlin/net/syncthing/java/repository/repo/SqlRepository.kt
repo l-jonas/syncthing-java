@@ -50,18 +50,15 @@ class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, DeviceAd
     private fun getConnection() = dataSource.connection
 
     init {
-        logger.info("starting sql database")
         val dbDir = File(databaseFolder, "h2_index_database")
         dbDir.mkdirs()
         assert(dbDir.isDirectory && dbDir.canWrite())
         val jdbcUrl = "jdbc:h2:file:" + File(dbDir, "index").absolutePath + ";TRACE_LEVEL_FILE=0;TRACE_LEVEL_SYSTEM_OUT=0;FILE_LOCK=FS;PAGE_SIZE=1024;CACHE_SIZE=8192;"
-        logger.debug("jdbc url = {}", jdbcUrl)
         val hikariConfig = HikariConfig()
         hikariConfig.driverClassName = "org.h2.Driver"
         hikariConfig.jdbcUrl = jdbcUrl
         hikariConfig.minimumIdle = 4
-        val newDataSource: HikariDataSource
-        newDataSource = HikariDataSource(hikariConfig)
+        val newDataSource = HikariDataSource(hikariConfig)
         dataSource = newDataSource
         checkDb()
         recreateTemporaryTables()
@@ -88,7 +85,6 @@ class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, DeviceAd
     }
 
     private fun checkDb() {
-        logger.debug("check db")
         try {
             getConnection().use { connection ->
                 connection.prepareStatement("SELECT version_number FROM version").use { statement ->
@@ -96,11 +92,11 @@ class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, DeviceAd
                     assert(resultSet.first())
                     val version = resultSet.getInt(1)
                     assert(version == VERSION, {"database version mismatch, expected $VERSION, found $version"})
-                    logger.info("database check ok, version = {}", version)
+                    logger.info("Database check successful, version = {}", version)
                 }
             }
         } catch (ex: SQLException) {
-            logger.warn("invalid database, resetting db", ex)
+            logger.warn("Invalid database, resetting db", ex)
             initDb()
         }
     }
@@ -172,13 +168,11 @@ class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, DeviceAd
 
     @Throws(SQLException::class)
     private fun recreateTemporaryTables() {
-        logger.info("recreateTemporaryTables BEGIN")
-            getConnection().use { connection ->
-                connection
-                        .prepareStatement("CREATE CACHED TEMPORARY TABLE IF NOT EXISTS temporary_data (record_key VARCHAR NOT NULL PRIMARY KEY," + "record_data BINARY NOT NULL)")
-                        .use { prepareStatement -> prepareStatement.execute() }
-            }
-        logger.info("recreateTemporaryTables END")
+        getConnection().use { connection ->
+            connection
+                    .prepareStatement("CREATE CACHED TEMPORARY TABLE IF NOT EXISTS temporary_data (record_key VARCHAR NOT NULL PRIMARY KEY," + "record_data BINARY NOT NULL)")
+                    .use { prepareStatement -> prepareStatement.execute() }
+        }
     }
 
     override fun getSequencer(): Sequencer = sequencer

@@ -89,7 +89,7 @@ internal class LocalDiscoveryHandler(private val configuration: Configuration,
                 datagramSocket = DatagramSocket(LISTENING_PORT, InetAddress.getByName("0.0.0.0"))
                 logger.info("Opened udp socket {}", datagramSocket!!.localSocketAddress)
             } catch (e: IOException) {
-                logger.warn("Failed to open listening socket on port {}", LISTENING_PORT, e)
+                logger.warn("Failed to open listening socket on port $LISTENING_PORT, ${e.message}")
                 return
             }
 
@@ -99,8 +99,7 @@ internal class LocalDiscoveryHandler(private val configuration: Configuration,
             override fun run() {
                 try {
                     val datagramPacket = DatagramPacket(ByteArray(INCOMING_BUFFER_SIZE), INCOMING_BUFFER_SIZE)
-                    logger.trace("waiting for message on socket addr = {}",
-                            datagramSocket!!.localSocketAddress)
+                    logger.trace("waiting for message on socket addr = {}", datagramSocket!!.localSocketAddress)
                     datagramSocket!!.receive(datagramPacket)
                     processingExecutor.submitLogging { handleReceivedDatagram(datagramPacket) }
                     listeningExecutor.submitLogging(this)
