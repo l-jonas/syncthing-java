@@ -47,7 +47,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
 
     init {
         indexHandler = IndexHandler(configuration, sqlRepository, sqlRepository)
-        discoveryHandler = DiscoveryHandler(configuration, sqlRepository)
+        discoveryHandler = DiscoveryHandler(configuration)
         connectDevicesScheduler.scheduleAtFixedRate(this::updateIndexFromPeers, 0, 15, TimeUnit.SECONDS)
     }
 

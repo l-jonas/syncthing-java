@@ -16,7 +16,6 @@ package net.syncthing.java.discovery
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.configuration.Configuration
-import net.syncthing.java.core.interfaces.DeviceAddressRepository
 import net.syncthing.java.core.utils.awaitTerminationSafe
 import net.syncthing.java.core.utils.submitLogging
 import net.syncthing.java.discovery.protocol.GlobalDiscoveryHandler
@@ -28,8 +27,7 @@ import java.io.Closeable
 import java.util.*
 import java.util.concurrent.Executors
 
-class DiscoveryHandler(private val configuration: Configuration,
-                       private val deviceAddressRepository: DeviceAddressRepository) : Closeable {
+class DiscoveryHandler(private val configuration: Configuration) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private val globalDiscoveryHandler = GlobalDiscoveryHandler(configuration)
@@ -42,21 +40,12 @@ class DiscoveryHandler(private val configuration: Configuration,
     private val deviceAddressSupplier = DeviceAddressSupplier(this)
     private var isClosed = false
 
-    private var shouldLoadFromDb = true
     private var shouldLoadFromGlobal = true
     private var shouldStartLocalDiscovery = true
 
     fun getAllWorkingDeviceAddresses() = deviceAddressMap.values.filter { it.isWorking() }
 
     private fun updateAddressesBg() {
-        if (shouldLoadFromDb) {
-            shouldLoadFromDb = false
-            executorService.submitLogging {
-                val list = deviceAddressRepository.findAllDeviceAddress()
-                logger.info("received device address list from database $list")
-                processDeviceAddressBg(list)
-            }
-        }
         if (shouldStartLocalDiscovery) {
             shouldStartLocalDiscovery = false
             localDiscoveryHandler.startListener()
@@ -91,7 +80,6 @@ class DiscoveryHandler(private val configuration: Configuration,
 
     private fun putDeviceAddress(deviceAddress: DeviceAddress) {
         deviceAddressMap[Pair.of(DeviceId(deviceAddress.deviceId), deviceAddress.address)] = deviceAddress
-        deviceAddressRepository.updateDeviceAddress(deviceAddress)
         deviceAddressSupplier.onNewDeviceAddressAcquired(deviceAddress)
     }
 

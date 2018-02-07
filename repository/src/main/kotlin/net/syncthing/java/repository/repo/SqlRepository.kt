@@ -22,7 +22,6 @@ import net.syncthing.java.bep.BlockExchangeProtos
 import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.beans.FileInfo.FileType
 import net.syncthing.java.core.beans.FileInfo.Version
-import net.syncthing.java.core.interfaces.DeviceAddressRepository
 import net.syncthing.java.core.interfaces.IndexRepository
 import net.syncthing.java.core.interfaces.Sequencer
 import net.syncthing.java.core.interfaces.TempRepository
@@ -38,7 +37,7 @@ import java.sql.SQLException
 import java.sql.Types
 import java.util.*
 
-class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, DeviceAddressRepository, TempRepository {
+class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, TempRepository {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private var sequencer: Sequencer = IndexRepoSequencer()
@@ -137,15 +136,6 @@ class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, DeviceAd
                     + "size BIGINT NOT NULL,"
                     + "blocks BINARY NOT NULL,"
                     + "PRIMARY KEY (folder, path))").use { prepareStatement -> prepareStatement.execute() }
-            connection.prepareStatement("CREATE TABLE device_address (device_id VARCHAR NOT NULL,"
-                    + "instance_id BIGINT,"
-                    + "address_url VARCHAR NOT NULL,"
-                    + "address_producer VARCHAR NOT NULL,"
-                    + "address_type VARCHAR NOT NULL,"
-                    + "address_score INT NOT NULL,"
-                    + "is_working BOOLEAN NOT NULL,"
-                    + "last_modified BIGINT NOT NULL,"
-                    + "PRIMARY KEY (device_id, address_url))").use { prepareStatement -> prepareStatement.execute() }
             connection.prepareStatement("CREATE INDEX file_info_folder ON file_info (folder)").use { prepareStatement -> prepareStatement.execute() }
             connection.prepareStatement("CREATE INDEX file_info_folder_path ON file_info (folder, path)").use { prepareStatement -> prepareStatement.execute() }
             connection.prepareStatement("CREATE INDEX file_info_folder_parent ON file_info (folder, parent)").use { prepareStatement -> prepareStatement.execute() }
@@ -706,43 +696,6 @@ class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, DeviceAd
                 .setScore(resultSet.getInt("address_score"))
                 .setLastModified(Date(resultSet.getLong("last_modified")))
                 .build()
-    }
-
-    @Throws(SQLException::class)
-    override fun findAllDeviceAddress(): List<DeviceAddress> {
-        val list = mutableListOf<DeviceAddress>()
-        getConnection().use { connection ->
-            connection.prepareStatement("SELECT * FROM device_address ORDER BY last_modified DESC").use { prepareStatement ->
-                val resultSet = prepareStatement.executeQuery()
-                while (resultSet.next()) {
-                    list.add(readDeviceAddress(resultSet))
-                }
-            }
-        }
-        return list
-    }
-
-    @Throws(SQLException::class)
-    override fun updateDeviceAddress(deviceAddress: DeviceAddress) {
-        getConnection().use { connection ->
-            connection.prepareStatement("MERGE INTO device_address"
-                    + " (device_id,instance_id,address_url,address_producer,address_type,address_score,is_working,last_modified)"
-                    + " VALUES (?,?,?,?,?,?,?,?)").use { prepareStatement ->
-                prepareStatement.setString(1, deviceAddress.deviceId)
-                if (deviceAddress.instanceId != null) {
-                    prepareStatement.setLong(2, deviceAddress.instanceId!!)
-                } else {
-                    prepareStatement.setNull(2, Types.BIGINT)
-                }
-                prepareStatement.setString(3, deviceAddress.address)
-                prepareStatement.setString(4, deviceAddress.producer.name)
-                prepareStatement.setString(5, deviceAddress.getType().name)
-                prepareStatement.setInt(6, deviceAddress.score)
-                prepareStatement.setBoolean(7, deviceAddress.isWorking())
-                prepareStatement.setLong(8, deviceAddress.lastModified.time)
-                prepareStatement.executeUpdate()
-            }
-        }
     }
 
     companion object {
