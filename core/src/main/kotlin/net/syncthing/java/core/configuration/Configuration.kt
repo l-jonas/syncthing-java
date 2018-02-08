@@ -11,8 +11,7 @@ import java.io.File
 import java.net.InetAddress
 import java.util.*
 
-class Configuration(configFolder: File = DefaultConfigFolder,
-                    val cacheFolder: File = File(System.getProperty("java.io.tmpdir"), "syncthing_lite_cache")) {
+class Configuration(configFolder: File = DefaultConfigFolder) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -37,10 +36,8 @@ class Configuration(configFolder: File = DefaultConfigFolder,
 
     init {
         configFolder.mkdirs()
-        cacheFolder.mkdirs()
         databaseFolder.mkdirs()
         assert(configFolder.isDirectory && configFile.canWrite(), { "Invalid config folder $configFolder" })
-        assert(cacheFolder.isDirectory && cacheFolder.canWrite(), { "invalid cache dir $databaseFolder" })
 
         if (!configFile.exists()) {
             var localDeviceName = InetAddress.getLocalHost().hostName
@@ -135,5 +132,5 @@ class Configuration(configFolder: File = DefaultConfigFolder,
 
     override fun toString() = "Configuration(peers=$peers, folders=$folders, localDeviceName=$localDeviceName, " +
             "localDeviceId=${localDeviceId.deviceId}, discoveryServers=$discoveryServers, instanceId=$instanceId, " +
-            "configFile=$configFile, databaseFolder=$databaseFolder, cacheFolder=$cacheFolder)"
+            "configFile=$configFile, databaseFolder=$databaseFolder)"
 }
