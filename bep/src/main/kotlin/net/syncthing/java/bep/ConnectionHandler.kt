@@ -46,7 +46,7 @@ import javax.net.ssl.SSLSocket
 class ConnectionHandler(private val configuration: Configuration, val address: DeviceAddress,
                         private val indexHandler: IndexHandler,
                         private val onNewFolderSharedListener: (ConnectionHandler, FolderInfo) -> Unit,
-                        private val onConnectionClosedListener: (ConnectionHandler) -> Unit) : Closeable {
+                        private val onConnectionChangedListener: (ConnectionHandler) -> Unit) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -65,7 +65,8 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
     private val blockPusher = BlockPusher(configuration.localDeviceId, this, indexHandler)
     private val onRequestMessageReceivedListeners = mutableSetOf<(Request) -> Unit>()
     private var isClosed = false
-    private var isConnected = false
+    var isConnected = false
+        private set
 
     fun deviceId(): DeviceId = address.deviceId()
 
@@ -178,6 +179,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
         }
         periodicExecutorService.scheduleWithFixedDelay({ this.sendPing() }, 90, 90, TimeUnit.SECONDS)
         isConnected = true
+        onConnectionChangedListener(this)
         return this
     }
 
@@ -324,6 +326,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
         if (!isClosed) {
             sendMessage(Close.getDefaultInstance())
             isClosed = true
+            isConnected = false
             periodicExecutorService.shutdown()
             outExecutorService.shutdown()
             inExecutorService.shutdown()
@@ -342,7 +345,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
             synchronized(clusterConfigWaitingLock) {
                 clusterConfigWaitingLock.notifyAll()
             }
-            onConnectionClosedListener(this)
+            onConnectionChangedListener(this)
             try {
                 periodicExecutorService.awaitTermination(2, TimeUnit.SECONDS)
                 outExecutorService.awaitTermination(2, TimeUnit.SECONDS)

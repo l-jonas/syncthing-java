@@ -75,13 +75,14 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
                     connectionHandler.close()
                     openConnection(deviceAddress)
                 },
-                { connection ->
-                    connections.remove(connection)
+                {connection ->
+                    if (!connection.isConnected) {
+                        connections.remove(connection)
+                    }
                     onConnectionChangedListeners.forEach { it(connection.deviceId()) }
                 })
         connections.add(connectionHandler)
         connectionHandler.connect()
-        onConnectionChangedListeners.forEach { it(connectionHandler.deviceId()) }
         return connectionHandler
     }
 
@@ -151,7 +152,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
 
     fun getPeerStatus(): List<DeviceInfo> {
         return configuration.peers.map { device ->
-            val isConnected = connections.any { it.deviceId() == device.deviceId }
+            val isConnected = connections.find { it.deviceId() == device.deviceId }?.isConnected ?: false
             device.copy(isConnected = isConnected)
         }
     }
