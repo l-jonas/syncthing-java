@@ -16,5 +16,5 @@ package net.syncthing.java.core.beans
 data class DeviceInfo(val deviceId: DeviceId, val name: String, val isConnected: Boolean? = null) {
 
     constructor(deviceId: DeviceId, name: String?) :
-            this(deviceId, if (name != null && !name.isBlank()) name else deviceId.deviceId.substring(0, 7), null)
+            this(deviceId, if (name != null && !name.isBlank()) name else deviceId.shortId, null)
 }

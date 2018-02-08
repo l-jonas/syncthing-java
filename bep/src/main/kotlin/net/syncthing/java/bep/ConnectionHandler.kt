@@ -20,6 +20,7 @@ import net.syncthing.java.bep.BlockExchangeProtos.*
 import net.syncthing.java.client.protocol.rp.RelayClient
 import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
+import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.security.KeystoreHandler
@@ -198,6 +199,9 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
         Thread { close() }.start()
     }
 
+    /**
+     * Receive hello message and save device name to configuration.
+     */
     @Throws(IOException::class)
     private fun receiveHelloMessage() {
         val magic = inputStream!!.readInt()
@@ -208,6 +212,14 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
         inputStream!!.readFully(buffer)
         val hello = BlockExchangeProtos.Hello.parseFrom(buffer)
         logger.info("Received hello message, deviceName=${hello.deviceName}, clientName=${hello.clientName}, clientVersion=${hello.clientVersion}")
+        configuration.peers = configuration.peers.map { peer ->
+                if (peer.deviceId == deviceId()) {
+                    DeviceInfo(deviceId(), hello.deviceName)
+                } else {
+                    peer
+                }
+            }.toSet()
+        configuration.persistLater()
     }
 
     private fun sendHelloMessage(payload: ByteArray): Future<*> {

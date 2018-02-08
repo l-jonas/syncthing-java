@@ -34,7 +34,7 @@ class FileBlocks(val folder: String, val path: String, blocks: List<BlockInfo>) 
     }
 
     override fun toString(): String {
-        return "FileBlocks{" + "blocks=" + blocks.size + ", hash=" + hash + ", folder=" + folder + ", path=" + path + ", size=" + size + '}'
+        return "FileBlocks(" + "blocks=" + blocks.size + ", hash=" + hash + ", folder=" + folder + ", path=" + path + ", size=" + size + ")"
     }
 
 }

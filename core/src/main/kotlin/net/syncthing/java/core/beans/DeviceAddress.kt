@@ -23,10 +23,10 @@ import java.util.*
  *
  * TODO: this class cant use [[DeviceId]] because [[GlobalDiscoveryHandler.pickAnnounceServers]] uses that field for discovery server URLs.
  */
-class DeviceAddress private constructor(val deviceId: String, val instanceId: Long?, val address: String, producer: AddressProducer?, score: Int?, lastModified: Date?) {
-    val producer: AddressProducer
-    val score: Int
-    val lastModified: Date
+class DeviceAddress private constructor(val deviceId: String, private val instanceId: Long?, val address: String, producer: AddressProducer?, score: Int?, lastModified: Date?) {
+    private val producer = producer ?: AddressProducer.UNKNOWN
+    val score = score ?: Integer.MAX_VALUE
+    private val lastModified = lastModified ?: Date()
 
     fun deviceId() = DeviceId(deviceId)
 
@@ -52,12 +52,6 @@ class DeviceAddress private constructor(val deviceId: String, val instanceId: Lo
     fun getSocketAddress(): InetSocketAddress = InetSocketAddress(getInetAddress(), getPort())
 
     fun isWorking(): Boolean = score < Integer.MAX_VALUE
-
-    init {
-        this.producer = producer ?: AddressProducer.UNKNOWN
-        this.score = score ?: Integer.MAX_VALUE
-        this.lastModified = lastModified ?: Date()
-    }
 
     constructor(deviceId: String, address: String) : this(deviceId, null, address, null, null, null)
 
@@ -202,8 +196,6 @@ class DeviceAddress private constructor(val deviceId: String, val instanceId: Lo
     }
 
     companion object {
-
-        private val logger = LoggerFactory.getLogger(DeviceAddress::class.java)
         private val DEFAULT_PORT_BY_PROTOCOL = mapOf(
                 AddressType.TCP to 22000,
                 AddressType.RELAY to 22067,

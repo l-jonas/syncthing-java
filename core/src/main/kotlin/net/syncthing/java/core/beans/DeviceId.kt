@@ -12,6 +12,9 @@ data class DeviceId @Throws(IOException::class) constructor(val deviceId: String
         NetworkUtils.assertProtocol(DeviceId.fromHashDataToString(toHashData()) == withoutDashes)
     }
 
+    val shortId
+        get() = deviceId.substring(0, 7)
+
     fun toHashData(): ByteArray {
         NetworkUtils.assertProtocol(deviceId.matches("^[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}-[A-Z0-9]{7}$".toRegex()), {"device id syntax error for deviceId = $deviceId"})
         val base32data = deviceId.replaceFirst("(.{7})-(.{6}).-(.{7})-(.{6}).-(.{7})-(.{6}).-(.{7})-(.{6}).".toRegex(), "$1$2$3$4$5$6$7$8") + "==="
