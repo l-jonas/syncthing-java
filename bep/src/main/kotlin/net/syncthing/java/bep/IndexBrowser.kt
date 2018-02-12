@@ -31,9 +31,11 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
     private fun isParent(fileInfo: FileInfo) = PathUtils.isParent(fileInfo.path)
 
     val ALPHA_ASC_DIR_FIRST: Comparator<FileInfo> =
-            compareBy({isParent(it)}, {!it.isDirectory()}, {it.path.toLowerCase()})
+            compareBy<FileInfo>({!isParent(it)}, {!it.isDirectory()})
+                    .thenBy { it.fileName.toLowerCase() }
     val LAST_MOD_DESC: Comparator<FileInfo> =
-            compareBy({isParent(it)}, {it.lastModified}, {it.path.toLowerCase()})
+            compareBy<FileInfo>({!isParent(it)}, {it.lastModified})
+                    .thenBy { it.fileName.toLowerCase() }
 
     private val ordering = ordering ?: ALPHA_ASC_DIR_FIRST
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -129,11 +131,10 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
         logger.debug("doListFiles for path = '{}' BEGIN", path)
         val list = indexRepository.findNotDeletedFilesByFolderAndParent(folder, path)
         logger.debug("doListFiles for path = '{}' : {} records loaded)", path, list.size)
-        Collections.sort(list, ordering)
         if (includeParentInList && (!PathUtils.isRoot(path) || allowParentInRoot)) {
             list.add(0, PARENT_FILE_INFO)
         }
-        return Collections.unmodifiableList(list)
+        return list.sortedWith(ordering)
     }
 
     fun getFileInfoByAbsolutePath(path: String): FileInfo {

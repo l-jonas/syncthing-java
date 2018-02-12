@@ -153,7 +153,7 @@ class BlockPusher internal constructor(private val localDeviceId: DeviceId,
         }
     }
 
-    private fun sendIndexUpdate(folder: String, fileInfoBuilder: BlockExchangeProtos.FileInfo.Builder,
+    private fun sendIndexUpdate(folderId: String, fileInfoBuilder: BlockExchangeProtos.FileInfo.Builder,
                                 oldVersions: Iterable<Version>?): Pair<Future<*>, BlockExchangeProtos.IndexUpdate> {
         run {
             val nextSequence = indexHandler.sequencer().nextSequence()
@@ -179,7 +179,7 @@ class BlockPusher internal constructor(private val localDeviceId: DeviceId,
                 .setNoPermissions(true)
                 .build()
         val indexUpdate = BlockExchangeProtos.IndexUpdate.newBuilder()
-                .setFolder(folder)
+                .setFolder(folderId)
                 .addFiles(fileInfo)
                 .build()
         logger.debug("index update = {}", fileInfo)
