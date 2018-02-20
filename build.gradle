@@ -13,8 +13,8 @@ buildscript {
 allprojects {
     apply plugin: 'maven'
     apply plugin: 'com.github.ben-manes.versions'
-    group = 'com.github.Nutomic'
-    version = '0.2.0'
+    group = "com.github.Nutomic"
+    version = "0.2.1"
 }
 
 
