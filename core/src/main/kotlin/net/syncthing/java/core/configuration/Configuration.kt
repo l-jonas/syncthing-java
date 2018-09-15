@@ -55,6 +55,19 @@ class Configuration(configFolder: File = DefaultConfigFolder) {
             persistNow()
         } else {
             config = Gson.fromJson(configFile.readText(), Config::class.java)
+
+            // automatic migration if the old config was used
+            if (config.discoveryServers == OldDiscoveryServers) {
+                config = Config(
+                    peers = config.peers,
+                    folders = config.folders,
+                    localDeviceName = config.localDeviceName,
+                    localDeviceId = config.localDeviceId,
+                    discoveryServers = Companion.DiscoveryServers,
+                    keystoreAlgorithm = config.keystoreAlgorithm,
+                    keystoreData = config.keystoreData
+                )
+            }
         }
         logger.debug("Loaded config = $config")
     }
@@ -64,6 +77,8 @@ class Configuration(configFolder: File = DefaultConfigFolder) {
         private const val ConfigFileName = "config.json"
         private const val DatabaseFolderName = "database"
         private val DiscoveryServers = setOf(
+                "discovery.syncthing.net", "discovery-v4.syncthing.net", "discovery-v6.syncthing.net")
+        private val OldDiscoveryServers = setOf(
                 "discovery-v4-1.syncthing.net", "discovery-v4-2.syncthing.net", "discovery-v4-3.syncthing.net",
                 "discovery-v6-1.syncthing.net", "discovery-v6-2.syncthing.net", "discovery-v6-3.syncthing.net")
         private val Gson = GsonBuilder().setPrettyPrinting().create()
