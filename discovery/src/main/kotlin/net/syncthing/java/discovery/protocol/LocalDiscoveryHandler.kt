@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2016 Davide Imbriaco
+ * Copyright (C) 2018 Jonas Lochmann
  *
  * This Java file is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -36,7 +37,8 @@ import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 
 internal class LocalDiscoveryHandler(private val configuration: Configuration,
-                                     private val onMessageReceivedListener: (DeviceId, List<DeviceAddress>) -> Unit) : Closeable {
+                                     private val onMessageReceivedListener: (DeviceId, List<DeviceAddress>) -> Unit,
+                                     private val onMessageFromUnknownDeviceListener: (DeviceId) -> Unit = {}) : Closeable {
 
     companion object {
         private const val MAGIC = 0x2EA7D90B
@@ -132,6 +134,9 @@ internal class LocalDiscoveryHandler(private val configuration: Configuration,
 
             if (!configuration.peerIds.contains(deviceId)) {
                 logger.trace("Received local announce from $deviceId which is not a peer, ignoring")
+
+                onMessageFromUnknownDeviceListener(deviceId)
+
                 return
             }
 

@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2016 Davide Imbriaco
+ * Copyright (C) 2018 Jonas Lochmann
  *
  * This Java file is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -34,11 +35,14 @@ class DiscoveryHandler(private val configuration: Configuration) : Closeable {
     private val localDiscoveryHandler = LocalDiscoveryHandler(configuration, { _, deviceAddresses ->
         logger.info("received device address list from local discovery")
         processDeviceAddressBg(deviceAddresses)
+    }, { deviceId ->
+        onMessageFromUnknownDeviceListeners.forEach { listener -> listener(deviceId) }
     })
     private val executorService = Executors.newCachedThreadPool()
     private val deviceAddressMap = Collections.synchronizedMap(hashMapOf<Pair<DeviceId, String>, DeviceAddress>())
     private val deviceAddressSupplier = DeviceAddressSupplier(this)
     private var isClosed = false
+    private val onMessageFromUnknownDeviceListeners = Collections.synchronizedSet(HashSet<(DeviceId) -> Unit>())
 
     private var shouldLoadFromGlobal = true
     private var shouldStartLocalDiscovery = true
@@ -96,5 +100,13 @@ class DiscoveryHandler(private val configuration: Configuration) : Closeable {
             executorService.shutdown()
             executorService.awaitTerminationSafe()
         }
+    }
+
+    fun registerMessageFromUnknownDeviceListener(listener: (DeviceId) -> Unit) {
+        onMessageFromUnknownDeviceListeners.add(listener)
+    }
+
+    fun unregisterMessageFromUnknownDeviceListener(listener: (DeviceId) -> Unit) {
+        onMessageFromUnknownDeviceListeners.remove(listener)
     }
 }
