@@ -113,6 +113,8 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
                         logger.warn("error connecting to device = $address", e)
                       }
                     }
+
+                    throw IOException("connecting to any route to the device failed")
                 }
 
         completeListener()
