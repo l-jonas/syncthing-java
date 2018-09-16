@@ -100,13 +100,18 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
                 .filterNot { connections.map { it.deviceId() }.contains(it.key) }
                 .filterNot { it.value.isEmpty() }
                 .forEach { (_, addresses) ->
-                    val bestAddress = addresses.first()
-                    try {
-                        listener(openConnection(bestAddress))
-                    } catch (e: IOException) {
-                        logger.warn("error connecting to device = $bestAddress", e)
-                    } catch (e: KeystoreHandler.CryptoException) {
-                        logger.warn("error connecting to device = $bestAddress", e)
+                    // try to use all addresses
+
+                    for (address in addresses) {
+                      try {
+                        listener(openConnection(address))
+
+                        break  // it worked, no need to try more
+                      } catch (e: IOException) {
+                        logger.warn("error connecting to device = $address", e)
+                      } catch (e: KeystoreHandler.CryptoException) {
+                        logger.warn("error connecting to device = $address", e)
+                      }
                     }
                 }
 
