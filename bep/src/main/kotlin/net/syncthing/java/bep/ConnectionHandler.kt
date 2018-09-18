@@ -197,7 +197,7 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                 .build())
     }
 
-    private fun closeBg() {
+    fun closeBg() {
         Thread { close() }.start()
     }
 
@@ -340,7 +340,13 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
                 IOUtils.closeQuietly(inputStream)
                 inputStream = null
             }
-            IOUtils.closeQuietly(socket)
+            try {
+              IOUtils.closeQuietly(socket)
+            } catch (ex: Exception) {
+              // ignore this
+              // this can throw an exception if socket was not yet initialized/ set
+              // as Kotlin does an check about this, the closeQuietly does not catch it
+            }
             logger.info("closed connection {}", address)
             synchronized(clusterConfigWaitingLock) {
                 clusterConfigWaitingLock.notifyAll()

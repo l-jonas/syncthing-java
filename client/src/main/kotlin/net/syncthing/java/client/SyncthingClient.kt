@@ -41,9 +41,12 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     val discoveryHandler: DiscoveryHandler
     private val sqlRepository = SqlRepository(configuration.databaseFolder)
     val indexHandler: IndexHandler
-    private val connections = Collections.synchronizedSet(TreeSet<ConnectionHandler>(compareBy { it.address.score }))
+    private val connections = Collections.synchronizedSet(createConnectionsSet())
+    private val connectByDeviceIdLocks = Collections.synchronizedMap(HashMap<DeviceId, Object>())
     private val onConnectionChangedListeners = Collections.synchronizedList(mutableListOf<(DeviceId) -> Unit>())
     private var connectDevicesScheduler = Executors.newSingleThreadScheduledExecutor()
+
+    private fun createConnectionsSet() = TreeSet<ConnectionHandler>(compareBy { it.address.score })
 
     init {
         indexHandler = IndexHandler(configuration, sqlRepository, sqlRepository)
@@ -81,8 +84,17 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
                     }
                     onConnectionChangedListeners.forEach { it(connection.deviceId()) }
                 })
+
+        try {
+          connectionHandler.connect()
+        } catch (ex: Exception) {
+          connectionHandler.closeBg()
+
+          throw ex
+        }
+
         connections.add(connectionHandler)
-        connectionHandler.connect()
+
         return connectionHandler
     }
 
@@ -92,28 +104,67 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
      * We need to make sure that we are only connecting once to each device.
      */
     private fun getPeerConnections(listener: (connection: ConnectionHandler) -> Unit, completeListener: () -> Unit) {
-        connections.forEach { listener(it) }
+        // create an copy to prevent dispatching an action two times
+        val connectionsWhichWereDispatched = createConnectionsSet()
+
+        synchronized (connections) {
+          connectionsWhichWereDispatched.addAll(connections)
+        }
+
+        connectionsWhichWereDispatched.forEach { listener(it) }
+
         discoveryHandler.newDeviceAddressSupplier()
                 .takeWhile { it != null }
                 .filterNotNull()
                 .groupBy { it.deviceId() }
-                .filterNot { connections.map { it.deviceId() }.contains(it.key) }
                 .filterNot { it.value.isEmpty() }
-                .forEach { (_, addresses) ->
-                    // try to use all addresses
+                .forEach { (deviceId, addresses) ->
+                    // create an lock per device id to prevent multiple connections to one device
 
-                    for (address in addresses) {
-                      try {
-                        listener(openConnection(address))
+                    synchronized (connectByDeviceIdLocks) {
+                      if (connectByDeviceIdLocks[deviceId] == null) {
+                        connectByDeviceIdLocks[deviceId] = Object()
+                      }
+                    }
 
-                        break  // it worked, no need to try more
-                      } catch (e: IOException) {
-                        logger.warn("error connecting to device = $address", e)
-                      } catch (e: KeystoreHandler.CryptoException) {
-                        logger.warn("error connecting to device = $address", e)
+                    synchronized (connectByDeviceIdLocks[deviceId]!!) {
+                      val existingConnection = connections.find { it.deviceId() == deviceId && it.isConnected }
+
+                      if (existingConnection != null) {
+                        connectionsWhichWereDispatched.add(existingConnection)
+                        listener(existingConnection)
+
+                        return@synchronized
+                      }
+
+                      // try to use all addresses
+                      for (address in addresses) {
+                        try {
+                          val newConnection = openConnection(address)
+
+                          connectionsWhichWereDispatched.add(newConnection)
+                          listener(newConnection)
+
+                          break  // it worked, no need to try more
+                        } catch (e: IOException) {
+                          logger.warn("error connecting to device = $address", e)
+                        } catch (e: KeystoreHandler.CryptoException) {
+                          logger.warn("error connecting to device = $address", e)
+                        }
                       }
                     }
                 }
+
+        // use all connections which were added in the time between and were not added by this function call
+        val newConnectionsBackup = createConnectionsSet()
+
+        synchronized (connections) {
+          newConnectionsBackup.addAll(connections)
+        }
+
+        connectionsWhichWereDispatched.forEach { newConnectionsBackup.remove(it) }
+
+        newConnectionsBackup.forEach { listener(it) }
 
         completeListener()
     }
