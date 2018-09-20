@@ -138,7 +138,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
                       }
 
                       // try to use all addresses
-                      for (address in addresses) {
+                      for (address in addresses.distinctBy { it.address }) {
                         try {
                           val newConnection = openConnection(address)
 
