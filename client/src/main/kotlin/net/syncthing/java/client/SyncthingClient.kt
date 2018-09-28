@@ -26,7 +26,6 @@ import net.syncthing.java.core.interfaces.TempRepository
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.awaitTerminationSafe
 import net.syncthing.java.discovery.DiscoveryHandler
-import net.syncthing.java.repository.repo.SqlRepository
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.IOException
