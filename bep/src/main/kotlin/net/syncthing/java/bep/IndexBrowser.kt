@@ -129,7 +129,7 @@ class IndexBrowser internal constructor(private val indexRepository: IndexReposi
 
     fun listFiles(path: String = currentPath): List<FileInfo> {
         logger.debug("doListFiles for path = '{}' BEGIN", path)
-        val list = indexRepository.findNotDeletedFilesByFolderAndParent(folder, path)
+        val list = ArrayList(indexRepository.findNotDeletedFilesByFolderAndParent(folder, path))
         logger.debug("doListFiles for path = '{}' : {} records loaded)", path, list.size)
         if (includeParentInList && (!PathUtils.isRoot(path) || allowParentInRoot)) {
             list.add(0, PARENT_FILE_INFO)

@@ -37,7 +37,7 @@ interface IndexRepository: Closeable {
 
     fun updateFileInfo(fileInfo: FileInfo, fileBlocks: FileBlocks?)
 
-    fun findNotDeletedFilesByFolderAndParent(folder: String, parentPath: String): MutableList<FileInfo>
+    fun findNotDeletedFilesByFolderAndParent(folder: String, parentPath: String): List<FileInfo>
 
     fun clearIndex()
 
