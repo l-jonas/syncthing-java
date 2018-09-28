@@ -13,6 +13,13 @@
  */
 package net.syncthing.java.client
 
+// this is archived
+//
+// I'm not sure if anyone still needs it. If someone needs it,
+// it should be moved to an other package because the SqlRepository
+// should not be a dependency of this module.
+
+/*
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FileInfo
@@ -222,3 +229,4 @@ class Main(private val commandLine: CommandLine) {
         latch.await()
     }
 }
+*/

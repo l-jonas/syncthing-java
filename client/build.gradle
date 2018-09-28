@@ -4,7 +4,6 @@ mainClassName = 'net.syncthing.java.client.Main'
 dependencies {
     compile project(':core')
     compile project(':bep')
-    compile project(':repository')
     compile project(':discovery')
     compile "commons-cli:commons-cli:1.4"
 }
