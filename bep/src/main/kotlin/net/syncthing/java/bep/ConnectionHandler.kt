@@ -277,9 +277,10 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
             val uncompressedLength = ByteBuffer.wrap(messageBuffer).int
             messageBuffer = LZ4Factory.fastestInstance().fastDecompressor().decompress(messageBuffer, 4, uncompressedLength)
         }
-        NetworkUtils.assertProtocol(messageTypes.containsKey(header.type), {"unsupported message type = ${header.type}"})
+        val messageTypeInfo = messageTypesByProtoMessageType[header.type]
+        NetworkUtils.assertProtocol(messageTypeInfo != null, {"unsupported message type = ${header.type}"})
         try {
-            val message = messageTypes[header.type]?.getMethod("parseFrom", ByteArray::class.java)?.invoke(null, messageBuffer as Any) as MessageLite
+            val message = messageTypeInfo!!.parseFrom(messageBuffer)
             return Pair.of(header.type, message)
         } catch (e: Exception) {
             when (e) {
@@ -292,11 +293,12 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
     internal fun sendMessage(message: MessageLite): Future<*> {
         checkNotClosed()
-        assert(messageTypes.containsValue(message.javaClass))
+        val messageTypeInfo = messageTypesByJavaClass[message.javaClass]
+        messageTypeInfo!!
         val header = BlockExchangeProtos.Header.newBuilder()
                 .setCompression(BlockExchangeProtos.MessageCompression.NONE)
                 // invert map
-                .setType(messageTypes.entries.associateBy({ it.value }) { it.key }[message.javaClass])
+                .setType(messageTypeInfo.protoMessageType)
                 .build()
         val headerData = header.toByteArray()
         val messageData = message.toByteArray() //TODO compression
@@ -474,15 +476,19 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
 
         private const val MAGIC = 0x2EA7D90B
 
-        private val messageTypes: Map<MessageType, Class<out MessageLite>> = mapOf(
-                BlockExchangeProtos.MessageType.CLOSE to BlockExchangeProtos.Close::class.java,
-                BlockExchangeProtos.MessageType.CLUSTER_CONFIG to BlockExchangeProtos.ClusterConfig::class.java,
-                BlockExchangeProtos.MessageType.DOWNLOAD_PROGRESS to BlockExchangeProtos.DownloadProgress::class.java,
-                BlockExchangeProtos.MessageType.INDEX to BlockExchangeProtos.Index::class.java,
-                BlockExchangeProtos.MessageType.INDEX_UPDATE to BlockExchangeProtos.IndexUpdate::class.java,
-                BlockExchangeProtos.MessageType.PING to BlockExchangeProtos.Ping::class.java,
-                BlockExchangeProtos.MessageType.REQUEST to BlockExchangeProtos.Request::class.java,
-                BlockExchangeProtos.MessageType.RESPONSE to BlockExchangeProtos.Response::class.java)
+        private val messageTypes = listOf(
+                MessageTypeInfo(MessageType.CLOSE, Close::class.java) { Close.parseFrom(it) },
+                MessageTypeInfo(MessageType.CLUSTER_CONFIG, ClusterConfig::class.java) { ClusterConfig.parseFrom(it) },
+                MessageTypeInfo(MessageType.DOWNLOAD_PROGRESS, DownloadProgress::class.java) { DownloadProgress.parseFrom(it) },
+                MessageTypeInfo(MessageType.INDEX, Index::class.java) { Index.parseFrom(it) },
+                MessageTypeInfo(MessageType.INDEX_UPDATE, IndexUpdate::class.java) { IndexUpdate.parseFrom(it) },
+                MessageTypeInfo(MessageType.PING, Ping::class.java) { Ping.parseFrom(it) },
+                MessageTypeInfo(MessageType.REQUEST, Request::class.java) { Request.parseFrom(it) },
+                MessageTypeInfo(MessageType.RESPONSE, Response::class.java) { Response.parseFrom(it) }
+        )
+
+        private val messageTypesByProtoMessageType = messageTypes.map { it.protoMessageType to it }.toMap()
+        private val messageTypesByJavaClass = messageTypes.map { it.javaClass to it }.toMap()
 
         /**
          * get id for message bean/instance, for log tracking
@@ -499,4 +505,9 @@ class ConnectionHandler(private val configuration: Configuration, val address: D
         }
     }
 
+    data class MessageTypeInfo(
+            val protoMessageType: MessageType,
+            val javaClass: Class<out MessageLite>,
+            val parseFrom: (data: ByteArray) -> MessageLite
+    )
 }
