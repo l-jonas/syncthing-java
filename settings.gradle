@@ -6,6 +6,7 @@ include ':bep'
 include ':client'
 include ':repository'
 include ':discovery'
+include ':client-cli'
 
 // Also call this syncthing-java so it can be easily used from syncthing-lite.
 project(':client').name = 'syncthing-java'
