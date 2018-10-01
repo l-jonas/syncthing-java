@@ -14,9 +14,10 @@
 package net.syncthing.java.core.interfaces
 
 import net.syncthing.java.core.beans.*
+import java.io.Closeable
 import java.util.*
 
-interface IndexRepository {
+interface IndexRepository: Closeable {
 
     fun setOnFolderStatsUpdatedListener(listener: ((IndexRepository.FolderStatsUpdatedEvent) -> Unit)?)
 
@@ -36,7 +37,7 @@ interface IndexRepository {
 
     fun updateFileInfo(fileInfo: FileInfo, fileBlocks: FileBlocks?)
 
-    fun findNotDeletedFilesByFolderAndParent(folder: String, parentPath: String): MutableList<FileInfo>
+    fun findNotDeletedFilesByFolderAndParent(folder: String, parentPath: String): List<FileInfo>
 
     fun clearIndex()
 

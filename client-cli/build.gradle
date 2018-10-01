@@ -1,8 +1,9 @@
 apply plugin: 'application'
-mainClassName = 'net.syncthing.java.discovery.Main'
+mainClassName = 'net.syncthing.java.client.cli.Main'
 
 dependencies {
-    compile project(':core')
+    compile project(':syncthing-java')
+    compile project(':repository')
     compile "commons-cli:commons-cli:1.4"
 }
 

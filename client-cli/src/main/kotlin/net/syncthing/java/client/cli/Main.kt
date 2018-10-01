@@ -11,12 +11,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.syncthing.java.client
+package net.syncthing.java.client.cli
 
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.configuration.Configuration
+import net.syncthing.java.repository.repo.SqlRepository
+import net.syncthing.java.client.SyncthingClient
 import org.apache.commons.cli.*
 import org.apache.commons.io.FileUtils
 import org.slf4j.LoggerFactory
@@ -41,7 +43,9 @@ class Main(private val commandLine: CommandLine) {
             val configuration = if (cmd.hasOption("C")) Configuration(File(cmd.getOptionValue("C")))
             else                                        Configuration()
 
-            SyncthingClient(configuration).use { syncthingClient ->
+            val repository = SqlRepository(configuration.databaseFolder)
+
+            SyncthingClient(configuration, repository, repository).use { syncthingClient ->
                 val main = Main(cmd)
                 cmd.options.forEach { main.handleOption(it, configuration, syncthingClient) }
             }

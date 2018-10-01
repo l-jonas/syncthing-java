@@ -21,10 +21,11 @@ import net.syncthing.java.core.beans.DeviceAddress
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.java.core.configuration.Configuration
+import net.syncthing.java.core.interfaces.IndexRepository
+import net.syncthing.java.core.interfaces.TempRepository
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.awaitTerminationSafe
 import net.syncthing.java.discovery.DiscoveryHandler
-import net.syncthing.java.repository.repo.SqlRepository
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.IOException
@@ -35,11 +36,14 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.collections.ArrayList
 
-class SyncthingClient(private val configuration: Configuration) : Closeable {
+class SyncthingClient(
+        private val configuration: Configuration,
+        private val repository: IndexRepository,
+        private val tempRepository: TempRepository
+) : Closeable {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     val discoveryHandler: DiscoveryHandler
-    private val sqlRepository = SqlRepository(configuration.databaseFolder)
     val indexHandler: IndexHandler
     private val connections = Collections.synchronizedSet(createConnectionsSet())
     private val connectByDeviceIdLocks = Collections.synchronizedMap(HashMap<DeviceId, Object>())
@@ -49,7 +53,7 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
     private fun createConnectionsSet() = TreeSet<ConnectionHandler>(compareBy { it.address.score })
 
     init {
-        indexHandler = IndexHandler(configuration, sqlRepository, sqlRepository)
+        indexHandler = IndexHandler(configuration, repository, tempRepository)
         discoveryHandler = DiscoveryHandler(configuration)
         connectDevicesScheduler.scheduleAtFixedRate(this::updateIndexFromPeers, 0, 15, TimeUnit.SECONDS)
     }
@@ -219,7 +223,8 @@ class SyncthingClient(private val configuration: Configuration) : Closeable {
         // Create copy of list, because it will be modified by handleConnectionClosedEvent(), causing ConcurrentModificationException.
         ArrayList(connections).forEach{it.close()}
         indexHandler.close()
-        sqlRepository.close()
+        repository.close()
+        tempRepository.close()
         assert(onConnectionChangedListeners.isEmpty())
     }
 

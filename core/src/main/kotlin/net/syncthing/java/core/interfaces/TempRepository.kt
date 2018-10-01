@@ -13,7 +13,9 @@
  */
 package net.syncthing.java.core.interfaces
 
-interface TempRepository {
+import java.io.Closeable
+
+interface TempRepository: Closeable {
 
     fun pushTempData(data: ByteArray): String
 
